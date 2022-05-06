@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-        http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+		http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
 
 	<parent>
-        <groupId>org.scijava</groupId>
-        <artifactId>pom-scijava</artifactId>
-        <version>28.0.0</version>
-        <relativePath />
-    </parent>
+		<groupId>org.scijava</groupId>
+		<artifactId>pom-scijava</artifactId>
+		<version>28.0.0</version>
+		<relativePath />
+	</parent>
 
 	<groupId>net.imagej</groupId>
 	<artifactId>SoilJ_</artifactId>
-	<version>1.2.18-SNAPSHOT</version>
+	<version>1.3.0-SNAPSHOT</version>
 
 	<name>SoilJ</name>
 	<description>A Maven project implementing the SoilJ ImageJ 1.x plugin</description>
@@ -65,14 +65,14 @@
     </mailingLists>
  
     <scm>
-        <connection>scm:git:git://github.com/johnkoestel/soilj</connection>
-        <developerConnection>scm:git:git@github.com:johnkoestel/soilj</developerConnection>
+        <connection>scm:git:git://github.com/soilj/soilj</connection>
+        <developerConnection>scm:git:git@github.com:soilj/soilj</developerConnection>
         <tag>HEAD</tag>
-        <url>https://github.com/johnkoestel/soilj</url>
+        <url>https://github.com/soilj/soilj</url>
     </scm>
     <issueManagement>
         <system>GitHub Issues</system>
-        <url>https://github.com/johnkoestel/soilj/issues</url>
+        <url>https://github.com/soilj/soilj/issues</url>
     </issueManagement>
     <ciManagement>
         <system>None</system>
@@ -89,7 +89,7 @@
 		<!-- https://mvnrepository.com/artifact/sc.fiji/fiji-lib -->
 		<dependency>
             <groupId>net.imagej</groupId>
-            <artifactId>imagej</artifactId>
+            <artifactId>ij</artifactId>
         </dependency>
         <dependency>
 		    <groupId>sc.fiji</groupId>
