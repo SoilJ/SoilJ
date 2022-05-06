@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+        http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+	<parent>
+        <groupId>org.scijava</groupId>
+        <artifactId>pom-scijava</artifactId>
+        <version>28.0.0</version>
+        <relativePath />
+    </parent>
+
+	<groupId>net.imagej</groupId>
+	<artifactId>SoilJ_</artifactId>
+	<version>1.2.18-SNAPSHOT</version>
+
+	<name>SoilJ</name>
+	<description>A Maven project implementing the SoilJ ImageJ 1.x plugin</description>
+
+    <url>https://github.com/johnkoestel/soilj</url>
+    <inceptionYear>2013</inceptionYear>
+    <organization>
+        <name>JohnKoestel</name>
+        <url>https://github.com/johnkoestel/soilj</url>
+    </organization>
+    <licenses>
+        <license>
+            <name>GNU General Public License, version 3 or later</name>
+            <url>https://www.gnu.org/licenses/gpl-3.0.en.html</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <developers>
+    	<developer>
+        	<id>johnkoestel</id>
+        	<name>John Koestel</name>
+        	<!--<url>https://imagej.net/User:</url>-->
+        	<roles>
+	            <!-- see https://imagej.net/Team -->
+            	<role>founder</role>
+            	<role>lead</role>
+            	<role>developer</role>
+            	<role>debugger</role>
+            	<role>reviewer</role>
+            	<role>support</role>
+            	<role>maintainer</role>
+        	</roles>
+    	</developer>
+    </developers>
+    
+    <contributors>
+        <contributor>
+            <name>John Koestel</name>
+        </contributor>
+    </contributors>
+ 
+    <mailingLists>
+        <mailingList>
+            <name>Image.sc Forum</name>
+            <archive>https://forum.image.sc/</archive>
+        </mailingList>
+    </mailingLists>
+ 
+    <scm>
+        <connection>scm:git:git://github.com/johnkoestel/soilj</connection>
+        <developerConnection>scm:git:git@github.com:johnkoestel/soilj</developerConnection>
+        <tag>HEAD</tag>
+        <url>https://github.com/johnkoestel/soilj</url>
+    </scm>
+    <issueManagement>
+        <system>GitHub Issues</system>
+        <url>https://github.com/johnkoestel/soilj/issues</url>
+    </issueManagement>
+    <ciManagement>
+        <system>None</system>
+    </ciManagement>
+
+    <properties>
+        <main-class>SoilJ_</main-class>
+        <package-name>SoilJ_</package-name>
+        <license.licenseName>GPLv3</license.licenseName>
+        <license.copyrightOwners>N/A</license.copyrightOwners>
+    </properties>    
+    
+	<dependencies>
+		<!-- https://mvnrepository.com/artifact/sc.fiji/fiji-lib -->
+		<dependency>
+            <groupId>net.imagej</groupId>
+            <artifactId>imagej</artifactId>
+        </dependency>
+        <dependency>
+		    <groupId>sc.fiji</groupId>
+		    <artifactId>fiji-lib</artifactId>
+		</dependency>
+		<dependency>
+  			<groupId>sc.fiji</groupId>
+  			<artifactId>bUnwarpJ_</artifactId>
+		</dependency>
+		<!-- https://mvnrepository.com/artifact/sc.fiji/VIB_ -->
+		<dependency>
+		    <groupId>sc.fiji</groupId>
+		    <artifactId>VIB_</artifactId>
+		    </dependency>
+		<dependency>
+			<groupId>sc.fiji</groupId>
+			<artifactId>3D_Objects_Counter</artifactId>
+			</dependency>
+		<dependency>
+			<groupId>sc.fiji</groupId>
+			<artifactId>LocalThickness_</artifactId>
+			</dependency>
+		<dependency>
+			<groupId>net.imglib2</groupId>
+			<artifactId>imglib2</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>fr.inra.ijpb</groupId> 
+			<artifactId>MorphoLibJ_</artifactId>
+		</dependency>		
+		<dependency>
+			<groupId>com.github.mcib3d</groupId>
+			<artifactId>mcib3d-core</artifactId>	
+			<version>master-SNAPSHOT</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-math3</artifactId>			
+		</dependency>
+		<dependency>
+			<groupId>org.apache.directory.studio</groupId>
+			<artifactId>org.apache.commons.io</artifactId>
+			<version>2.4</version>
+		</dependency>
+		<dependency>
+    		<groupId>sc.fiji</groupId>
+    		<artifactId>Skeletonize3D_</artifactId>
+    	</dependency>
+		<dependency>
+    		<groupId>sc.fiji</groupId>
+    		<artifactId>AnalyzeSkeleton_</artifactId>
+    	</dependency>
+<!--     	<dependency>
+    		<groupId>mpicbg</groupId>
+    		<artifactId>mpicbg</artifactId>
+   			<version>0.6.1</version>
+		</dependency>	 -->	
+	</dependencies>
+	
+	<repositories>
+		<!-- NB: for project parent -->
+		<repository>
+			<id>imagej.public</id>
+			<url>http://maven.imagej.net/content/groups/public</url>
+		</repository>
+		<repository> 
+			<id>jitpack.io</id>
+			<url>https://jitpack.io</url>
+		</repository> 
+	</repositories>
+	
+	<build>
+		<plugins>
+			<plugin>
+				<artifactId>maven-jar-plugin</artifactId>
+				<configuration>
+					<archive>
+						<manifest>
+							<mainClass>${main-class}</mainClass>
+						</manifest>
+					</archive>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+	
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>net.imagej</groupId>
+				<artifactId>ij</artifactId>
+				<version>1.52j</version>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+	
+</project>
