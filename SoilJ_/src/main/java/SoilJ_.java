@@ -59,7 +59,7 @@ public class SoilJ_ implements PlugInFilter {
 		//Class<?> clazz = SoilJ_.class;	
 		
 		//System.setProperty("plugins.dir", "D:\\Eclipse\\Maven");
-		System.setProperty("plugins.dir", "D:\\GitSoilJ");
+		System.setProperty("plugins.dir", "C:\\Users\\F80864840\\git\\plugins");
 		//Debug.run("Soil_", "");
 		
 		// start ImageJ
