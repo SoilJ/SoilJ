@@ -246,7 +246,7 @@ public class TailoredMaths implements PlugIn {
 		
 	}
 
-	public double[] LinearLOESSFilter(double[] data, int windowHalfSize) {
+	public double[] linearLOESSFilter(double[] data, int windowHalfSize) {
 				
 		FitStuff fs =  new FitStuff();
 		
@@ -278,7 +278,7 @@ public class TailoredMaths implements PlugIn {
 		
 		return smoothie;
 	}
-
+	
 	public double[][] getXYOfEllipseFromAngle(double[] angleAtThisAngle, double xCenter, double yCenter, double major, double minor, double theta) {
 		
 		int j;

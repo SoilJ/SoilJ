@@ -5397,11 +5397,10 @@ public ColCoords3D findClosestXYSlice2Bottom(InputOutput.MyFileCollection mFC, C
 		
 		MorphologyAnalyzer mA = new MorphologyAnalyzer();
 		
-		double columnHeight = nowTiff.getNSlices() * mWRC.resolutionInMicroMeter;
-		double bboundary = tension * 10000;  //calculate in micrometer
-		double capillaryConstantInMicroMeter = 1.48e7 * Math.cos(mWRC.wettingAngle / 180 * Math.PI);		
+		double columnHeight = nowTiff.getNSlices() * mWRC.voxelSizeInMicroMeter;
+		double bboundary = tension * 1000;  //calculate in micrometer
+		double capillaryConstantInMicroMeter = 1.48e7 * Math.cos(mWRC.wettingAngle / 180 * Math.PI);
 		
-		ImageStack outStack = new ImageStack(nowTiff.getWidth(), nowTiff.getHeight());
 		ImagePlus outTiff = new ImagePlus();
 		ImageStack zwischiStack = new ImageStack(nowTiff.getWidth(), nowTiff.getHeight());
 		ImagePlus zwischiTiff = new ImagePlus();
@@ -5413,11 +5412,10 @@ public ColCoords3D findClosestXYSlice2Bottom(InputOutput.MyFileCollection mFC, C
 				
 				nowTiff.setPosition(z);
 				ImageProcessor nowIP = nowTiff.getProcessor();
-				double columnNow = columnHeight - (z - 0.5) * mWRC.resolutionInMicroMeter;  //-0.5 to get to the voxel midpoint
+				double columnNow = (nowTiff.getNSlices() - (z - 0.5)) * mWRC.voxelSizeInMicroMeter;  //-0.5 to get to the voxel midpoint
 				double cutoffRadius = capillaryConstantInMicroMeter / (bboundary + columnNow);
-				double cutoffThickness = (2 * cutoffRadius) / mWRC.resolutionInMicroMeter;
-				if (cutoffThickness < 2) cutoffThickness = Math.round(cutoffThickness);
-			
+				double cutoffThickness = (2 * cutoffRadius) / mWRC.voxelSizeInMicroMeter;			
+							
 				IJ.showStatus("Extracting air-filled pores at depth " + String.format("%2.2f", (columnHeight - columnNow) / 10000) + " cm");
 				
 				//init out image
@@ -5425,12 +5423,9 @@ public ColCoords3D findClosestXYSlice2Bottom(InputOutput.MyFileCollection mFC, C
 				
 				for (int x = 0 ; x < outIP.getWidth() ; x++) {
 					for (int y = 0 ; y < outIP.getHeight(); y++) {
-						if (cutoffThickness < 2) outIP.putPixel(x, y, 0);
-						else {
-							double nowPix = nowIP.getPixelValue(x, y);
-							if (nowPix <= cutoffThickness) outIP.putPixel(x, y, 0);
-							else outIP.putPixel(x, y, 255);
-						}
+						double nowPix = nowIP.getPixelValue(x, y);
+						if (nowPix <= cutoffThickness) outIP.putPixel(x, y, 0);
+						else outIP.putPixel(x, y, 255);
 					}
 				}
 				
@@ -5444,55 +5439,23 @@ public ColCoords3D findClosestXYSlice2Bottom(InputOutput.MyFileCollection mFC, C
 			return null;
 		}
 		
-		//find connected pore clusters
-		int FORE = -1;
-		int slicesPerChunk = 2; //input parameter 4 particle analyzer
-		int minVol = 0; //input parameter 4 particle analyzer  ..364 corresponds to 100,000,000 cubic micrometers or 0.1 cubic millimeter
-		int maxVol = zwischiTiff.getWidth() * zwischiTiff.getHeight() * zwischiTiff.getNSlices(); //input parameter 4 particle analyzer	
-		
-		//label connected clusters
-		IJ.showStatus("Checking connection status...");
-		Counter3D myOC = new Counter3D(zwischiTiff, 128, minVol, maxVol, false, false);
-		myOC.getObjects();
-		ImagePlus particleLabelTiff = myOC.getObjMap();
-	
-		IJ.freeMemory();IJ.freeMemory();
-		
-		//get label image and check it for connections to the top surface
-		ArrayList<Integer> connected = null;
-		if (mWRC.choiceOfWRCType.equalsIgnoreCase("drainage")) connected = mA.check4TouchingTheTop(particleLabelTiff, surfTiff);	
-			
-		//particleLabelTiff.updateAndDraw();
-		//particleLabelTiff.show();
-		
-		//remove unconnected pores
-		for (int z = 1 ; z <= nowTiff.getNSlices() ; z++) {
-			
-			IJ.showStatus("Correcting for disconnected air-bubbles in slice " + z + "/" + nowTiff.getNSlices());
-						
-			particleLabelTiff.setPosition(z);
-			ImageProcessor nowIP = particleLabelTiff.getProcessor();
-				
-			//init out image
-			ImageProcessor outIP = new ByteProcessor(nowTiff.getWidth(), nowTiff.getHeight());
-			
-			for (int x = 0 ; x < outIP.getWidth() ; x++) {
-				for (int y = 0 ; y < outIP.getHeight(); y++) {
-					int nowPix = (int)Math.round(nowIP.getPixelValue(x, y));
-					if (connected.contains(nowPix)) outIP.putPixel(x, y, 255);
-					else outIP.putPixel(x, y, 0);					
-				}
-			}
-			
-			outStack.addSlice(outIP);			
-		}
-		
-		outTiff.setStack(outStack);		
+		//zwischiTiff.updateAndDraw();zwischiTiff.show();
+					
+		IJ.showStatus("Identifying connected pore-clusters ...");
+		double constant = (2 * capillaryConstantInMicroMeter) / (mWRC.connectingSubresolutionDiameter * mWRC.voxelSizeInMicroMeter);
+		double tensionTerm = (constant - bboundary) / mWRC.voxelSizeInMicroMeter;
+		double columnHeightInVX = columnHeight / mWRC.voxelSizeInMicroMeter;
+		double drainingDepthInVX = columnHeightInVX - tensionTerm + 0.5;
+		if (drainingDepthInVX < 0) drainingDepthInVX = 0;
+		outTiff = mA.findClusterConnected2Top(zwischiTiff, drainingDepthInVX);
 		
 		return outTiff;
 		
-	}	
+	}
+	
 }
+
+
 
 //public RadialModes getRadialPVCIlluminationDEPRECATED(ImagePlus nowTiff, ColCoords3D jCO, MenuWaiter.BeamDeHardeningReturn mBDH) {
 //

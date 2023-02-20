@@ -14,7 +14,7 @@
 
 	<groupId>net.imagej</groupId>
 	<artifactId>SoilJ_</artifactId>
-	<version>1.3.0-SNAPSHOT</version>
+	<version>1.3.1-SNAPSHOT</version>
 
 	<name>SoilJ</name>
 	<description>A Maven project implementing the SoilJ ImageJ 1.x plugin</description>
@@ -146,7 +146,7 @@
     		<groupId>mpicbg</groupId>
     		<artifactId>mpicbg</artifactId>
    			<version>0.6.1</version>
-		</dependency>	 -->	
+		</dependency>	 -->
 	</dependencies>
 	
 	<repositories>

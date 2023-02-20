@@ -91,8 +91,11 @@ public class InputOutput extends ImagePlus implements PlugIn {
 	
 		public int histogramClasses;
 		public int numberOfHistograms;
-		public int[][] histograms;
+		public int[][] histograms;		
 		public ArrayList<String> sampleNames;
+		public float[][] floatHistograms;
+		public float[] jHisto; 				//joint histogram
+		public float[] jHistoSD; 			//standard deviation of joint histogram
 		
 	}
 	
@@ -1150,7 +1153,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
 			IJ.showStatus("Opening sample slice " + (i + 1) + "/" + sampleSlices.length + " ...");
 			
 			try {
-				ImageProcessor nowIP = oT3D.openImage(mFC.nowTiffPath, sampleSlices[i] + 1).getProcessor();
+				ImageProcessor nowIP = oT3D.openImage(mFC.nowTiffPath, sampleSlices[i]).getProcessor();
 				outStack.addSlice(nowIP);
 			}	
 			catch(Exception e){
@@ -1777,37 +1780,64 @@ public class InputOutput extends ImagePlus implements PlugIn {
         
     }
 	
-	public boolean writeWRCResultsInASCII(MyFileCollection mFC, MenuWaiter.WRCCalculatorMenu mWRC, int[] air, int[] water, double[] aSM, double[] wSM) {
+	public boolean writeWRCResultsInASCII(MyFileCollection mFC, MorphologyAnalyzer.WRCPhaseProps myWRCProps) {
 	       
 		try{
 			
-			String pathSep = "\\";
-			
-			//probe operating system and adjust PathSep if necessary
-			String myOS = System.getProperty("os.name");
-			if (myOS.equalsIgnoreCase("Linux")) pathSep = "/";
-            
 			//open file
-			String path = mFC.myOutFolder + pathSep + mFC.colName + ".asc"; 
+			String path = mFC.myOutFolder + mFC.pathSep + mFC.colName + ".asc"; 
 			
 			FileOutputStream fos = new FileOutputStream(path);
             Writer w = new BufferedWriter(new OutputStreamWriter(fos));
             
             //write header
-            String myPreHeader = "tensionAtTop\t" + "tensionAtCenter\t" + "tensionAtBottom\t" +
-            		"airVolume (vx)\t" + "waterVolume (vx)\t" + "airSaturation\t" + "waterSaturation\n";
+            String myPreHeader = "tensionAtTopInMM\t" + "tensionAtCenterInMM\t" + "tensionAtBottomInMM\t" +
+            		"areaInMM2\t" + "heightInMM\t" + "bulkVolumeInMM3\t" +
+            		"theta_w\t" + "sigma_w\t" + "Euler_w\t" + "Gamma_w\t" + "fractalDim_w\t" + "percolates_w\t" + 
+            		"ThetaLargestCluster_w\t" + "ThetaPercolatingCluster_w\t" + 
+            		"theta_a\t" + "sigma_a\t" + "Euler_a\t" + "Gamma_a\t" + "fractalDim_a\t" + "percolates_a\t" + 
+            		"ThetaLargestCluster_a\t" + "ThetaPercolatingCluster_a\t" + 
+            		"depthOfPenetration_a\n";
             w.write(myPreHeader);
             w.flush();
             
-            //write results
-            for (int i = 0 ; i < air.length ; i++) {
-            	String integralString = String.format("%3.2f", mWRC.tensionAtTop[i]) + "\t" +
-            							String.format("%3.2f", mWRC.tensionAtCenter[i]) + "\t" +
-            							String.format("%3.2f", mWRC.tensionAtBottom[i]) + "\t" +
-            							air[i] + "\t" + water[i] + "\t" +
-            							String.format("%1.4f", aSM[i]) + "\t" +
-            							String.format("%1.4f", wSM[i]) + "\n";
+            //set tension precision
+            String tensionFormat = "%4.2f";
+            if (myWRCProps.enforceIntegerTensions) tensionFormat = "%4.0f";
             
+            //write results
+            for (int i = 0 ; i < myWRCProps.tensionAtTopInMM.length ; i++) {
+            	
+            	String integralString = String.format(tensionFormat, myWRCProps.tensionAtTopInMM[i]) + "\t";
+            	integralString += String.format(tensionFormat, myWRCProps.tensionAtCenterInMM[i]) + "\t";
+            	integralString += String.format(tensionFormat, myWRCProps.tensionAtBottomInMM[i]) + "\t";
+            	
+            	integralString += String.format("%4.2f", myWRCProps.areaInMM2[i]) + "\t";
+            	integralString += String.format("%4.2f", myWRCProps.heightInMM[i]) + "\t";
+            	integralString += String.format("%4.2f", myWRCProps.bulkVolumeInMM3[i]) + "\t";
+            	
+            	integralString += String.format("%1.3f", myWRCProps.theta_w[i]) + "\t";
+            	integralString += String.format("%3.3f", myWRCProps.sigma_w[i]) + "\t";
+            	integralString += String.format("%6.0f", myWRCProps.chi_w[i]) + "\t";
+            	integralString += String.format("%1.3f", myWRCProps.gamma_w[i]) + "\t";
+            	integralString += String.format("%1.3f", myWRCProps.fractalDim_w[i]) + "\t";
+            	integralString += String.format("%1.0f", myWRCProps.percolates_w[i]) + "\t";
+            	integralString += String.format("%1.3f", myWRCProps.thetaLC_w[i]) + "\t";
+            	integralString += String.format("%1.3f", myWRCProps.thetaPerc_w[i]) + "\t";
+            	//integralString += String.format("%6.2f", myWRCProps.dc_w) + "\t";
+            	
+            	integralString += String.format("%1.3f", myWRCProps.theta_a[i]) + "\t";
+            	integralString += String.format("%3.3f", myWRCProps.sigma_a[i]) + "\t";
+            	integralString += String.format("%6.0f", myWRCProps.chi_a[i]) + "\t";
+            	integralString += String.format("%1.3f", myWRCProps.gamma_a[i]) + "\t";
+            	integralString += String.format("%1.3f", myWRCProps.fractalDim_a[i]) + "\t";
+            	integralString += String.format("%1.0f", myWRCProps.percolates_a[i]) + "\t";
+            	integralString += String.format("%1.3f", myWRCProps.thetaLC_a[i]) + "\t";
+            	integralString += String.format("%1.3f", myWRCProps.thetaPerc_a[i]) + "\t";          
+            	integralString += String.format("%4.2f", myWRCProps.depthOfPenetrationInMM_a[i]) + "\n";
+            	//integralString += String.format("%6.2f", myWRCProps.dc_a) + "\t";
+            	//integralString += String.format("%6.2f", myWRCProps.thetaWellAerated_a) + "\t";
+
             	String cIntegralString = integralString.replace(',', '.');  
             	w.write(cIntegralString);
             	w.flush();
@@ -4356,6 +4386,63 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		try {
 			
 			FileReader fr = new FileReader(myPath);		
+	        BufferedReader br = new BufferedReader(fr);
+	        
+			int[][] myHists = new int[histogramNumber][histogramClasses]; 
+			
+			//read data
+			ArrayList<String> samples = new ArrayList<>();
+			
+			for (int i = 0 ; i < histogramNumber ; i++) {
+				
+				String line = br.readLine();			
+				String[] wordsArray = line.split("\t");
+				ArrayList<String> words = new ArrayList<>(); 
+				
+				for(String each : wordsArray){
+					if(!"".equals(each)){
+						words.add(each);
+					}					
+				}
+				
+				//only start at line 1 to skip the header
+				samples.add(words.get(0));
+				for (int j = 1 ; j < histogramClasses ; j++) myHists[i][j] = Integer.parseInt(words.get(j));
+				
+			}
+		
+			br.close();
+			fr.close();
+			
+			hists.histogramClasses = histogramClasses;
+			hists.numberOfHistograms = histogramNumber;
+			hists.histograms = myHists;
+			hists.sampleNames = samples;
+			
+			return hists;
+			
+		}
+		catch(Exception e) {
+        			
+			IJ.error("Something went wrong when reading from the histogram file...");
+			return null;
+			
+        }
+		
+	}
+	
+	public Histograms readHistogram(InputOutput.MyFileCollection mFC) {
+		
+		Histograms hists = new Histograms();
+		
+		String readPath = mFC.myOutFolder + mFC.pathSep + "Histo_" + mFC.colName + "." + mFC.bitDepth + "b"; 
+		
+		int histogramNumber = returnLinesInAsciiFile(readPath);
+		int histogramClasses = returnHistogramClassesFromFile(readPath);
+		
+		try {
+			
+			FileReader fr = new FileReader(readPath);		
 	        BufferedReader br = new BufferedReader(fr);
 	        
 			int[][] myHists = new int[histogramNumber][histogramClasses]; 

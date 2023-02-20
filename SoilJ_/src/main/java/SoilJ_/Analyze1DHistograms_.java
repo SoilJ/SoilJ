@@ -2,12 +2,14 @@ package SoilJ_;
 
 import java.io.File;
 
+import SoilJ.tools.DisplayThings;
 import SoilJ.tools.HistogramStuff;
 import SoilJ.tools.InputOutput;
 import SoilJ.tools.MenuWaiter;
 import SoilJ.tools.ObjectDetector;
 import SoilJ.tools.RoiHandler;
 import SoilJ.tools.RollerCaster;
+import SoilJ.tools.TailoredMaths;
 import ij.IJ;
 
 /**
@@ -29,6 +31,7 @@ import ij.IJ;
  */
 
 import ij.ImagePlus;
+import ij.measure.ResultsTable;
 import ij.plugin.PlugIn;
 
 /** 
@@ -39,7 +42,7 @@ import ij.plugin.PlugIn;
  *
  */
 
-public class Extract1DHistograms_ extends ImagePlus implements PlugIn  {
+public class Analyze1DHistograms_ extends ImagePlus implements PlugIn  {
 
 	public void run(String arg) {
 
@@ -62,6 +65,9 @@ public class Extract1DHistograms_ extends ImagePlus implements PlugIn  {
 		RoiHandler roi = new RoiHandler();
 		HistogramStuff hist = new HistogramStuff();
 		RollerCaster rC = new RollerCaster();
+		TailoredMaths math = new TailoredMaths();
+		DisplayThings disp = new DisplayThings();	
+		ResultsTable myTable = new ResultsTable();
 		
 		// init variables
 		int i;
@@ -84,9 +90,7 @@ public class Extract1DHistograms_ extends ImagePlus implements PlugIn  {
 		mFC.fileName = mFC.myTiffs[0];
 		mFC = jIO.addCurrentFileInfo(mFC);
 		
-		float[][] allHists = null;
-		if (mFC.bitDepth == 16) allHists = new float[mFC.myTiffs.length][(int)Math.round(Math.pow(2, 16))];
-		else allHists = new float[mFC.myTiffs.length][(int)Math.round(Math.pow(2, 8))];
+		float[][] allHists = new float[mFC.myTiffs.length][(int)Math.round(Math.pow(2, mFC.bitDepth))];
 		
 		//loop over 3D images
 		for (i = 0 ; i < mFC.myTiffs.length ; i++) {  //myTiffs.length
@@ -122,10 +126,45 @@ public class Extract1DHistograms_ extends ImagePlus implements PlugIn  {
 			int[] histo = new int[(int)Math.pow(2, mFC.bitDepth)];
 			if (mFC.bitDepth == 16) histo = hist.extractHistograms16(mFC, colRoi.nowTiff);
 			else histo = hist.extractHistograms8(mFC, colRoi.nowTiff);
+			
+			for (int j = 0 ; j < (int)Math.round(Math.pow(2, mFC.bitDepth)) - 1 ; j++) {
+				allHists[i][j] = (float)histo[j];
+			}
 
 			//save it
-			jIO.writeHistogram(mFC, histo);				
+			jIO.writeHistogram(mFC, histo);
 		}
 		
+		//calculate joint histograms
+		InputOutput.Histograms jHisto = hist.calcJointHistogram(allHists);
+		
+		//smnooth histogram
+		double[] jh = rC.castFloat2Double(jHisto.jHisto);		
+		double[] sh = math.linearLOESSFilter(jh, mFC.bitDepth);
+		sh = math.linearLOESSFilter(sh, mFC.bitDepth);
+		float[] sJHisto = rC.castDouble2Float(sh); 
+		
+		//calculate thresholds
+		HistogramStuff.Thresholds myThreshes = hist.calcThreshes(sJHisto);
+			
+		//plot joint histogram		
+		disp.plotHistogramAdvanced(sJHisto, 0); 
+		
+		//plot table with thresholds
+		ResultsTable tab = new ResultsTable();
+		
+		tab.incrementCounter();
+		tab.addValue("Otsu", myThreshes.otsu);
+		tab.addValue("Minimum", myThreshes.minimumJohns);
+		tab.addValue("Isodata", myThreshes.isodata);
+		tab.addValue("Renyi Entropy", myThreshes.renyiEntropy);		
+		tab.addValue("Maximum Entropy", myThreshes.maxEntropy);
+		tab.addValue("Triangle", myThreshes.triangle);
+		tab.addValue("Huang", myThreshes.huang);
+		tab.addValue("Li", myThreshes.li);
+		tab.addValue("Yen", myThreshes.yen);
+		
+		tab.show("Thresholds");
+			
 	}
 }

@@ -127,6 +127,19 @@ public class DisplayThings implements PlugIn {
 		//nowTiff.hide();	
 	}
 	
+	public void showMeMyRoi(String name, ImageProcessor myIP) {
+		
+		ImagePlus nowTiff = new ImagePlus(name, myIP);
+		
+		nowTiff.setTitle(name);
+		nowTiff.updateAndDraw();
+		nowTiff.show();
+		
+		IJ.wait(2500);
+		
+		//nowTiff.hide();	
+	}
+	
 	public void displayColumnOutlinesByZ(ImagePlus nowTiff, ObjectDetector.EggShapedColCoords3D colCoords, InputOutput.MyFileCollection mFC, ImagePlus surfaceTiff) {
 		
 		String pathSep = "/";
@@ -985,6 +998,48 @@ public class DisplayThings implements PlugIn {
 	    
 	    IJ.freeMemory();IJ.freeMemory();
 	    
+	    return true;
+		
+	}
+	
+	public boolean plotHistogramAdvanced(float[] hist, int myThresh) {
+		
+		RollerCaster rC = new RollerCaster();		
+		HistogramStuff mHS = new HistogramStuff();
+		
+		//find maxima and minima
+		double mini=StatUtils.min(rC.castFloat2Double(hist));
+		double maxi=StatUtils.max(rC.castFloat2Double(hist));
+		
+		//get cumulative histogram
+		double xLeft = mHS.findQuantileFromHistogram(rC.castFloat2Int(hist), 0.001);
+		double xRight = mHS.findQuantileFromHistogram(rC.castFloat2Int(hist), 0.999);
+		
+		//create x-axis
+		int[] x = new int[hist.length];
+		for (int i = 0 ; i < hist.length ; i++) x[i] = i;
+		
+		Plot rmo = new Plot("Joint Histogram", "Gray Value", "Frequency");	
+		
+		rmo.setLimits(xLeft, xRight, mini-5, maxi+5);
+		rmo.setColor(Color.BLACK);
+		rmo.addPoints(rC.castInt2Float(x), hist, Plot.LINE);
+				
+		//add threshold
+		double[] ylim = {mini, maxi};
+		float[] thresh = {myThresh, myThresh};
+		
+		rmo.setColor(Color.RED);
+		rmo.addPoints(thresh, rC.castDouble2Float(ylim), Plot.LINE);
+	
+		//show histogram and thresholds..
+		rmo.draw();		
+		PlotWindow win1 = rmo.show();
+		GenericDialog gd = new GenericDialog("");
+		
+		//save figure
+		
+		
 	    return true;
 		
 	}

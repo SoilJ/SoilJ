@@ -34,6 +34,7 @@ import java.util.concurrent.Future;
 
 import org.apache.commons.math3.stat.StatUtils;
 
+import SoilJ.tools.RoiHandler.ColumnRoi;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.ImageStack;
@@ -44,7 +45,9 @@ import ij.plugin.PlugIn;
 import ij.process.ByteProcessor;
 import ij.process.ImageProcessor;
 import inra.ijpb.binary.conncomp.FloodFillComponentsLabeling3D;
+import inra.ijpb.geometry.Box3D;
 import inra.ijpb.label.LabelImages;
+import inra.ijpb.measure.region3d.BoundingBox3D;
 import inra.ijpb.measure.region3d.IntrinsicVolumesAnalyzer3D;
 import inra.ijpb.measure.region3d.IntrinsicVolumesAnalyzer3D.Result;
 import process3d.Dilate_;
@@ -212,6 +215,42 @@ public class MorphologyAnalyzer implements PlugIn {
 		int con2BotDeadEnds;
 		double con2BotMeanCN; 		//CN == coordination number		
 		double con2BotMeanAngleFromZ;
+		
+	}
+	
+	public class WRCPhaseProps {
+		
+		public double[] tensionAtTopInMM;
+		public double[] tensionAtCenterInMM;
+		public double[] tensionAtBottomInMM;
+		
+		public double[] areaInMM2;
+		public double[] heightInMM;
+		public double[] bulkVolumeInMM3;
+		
+		public double[] theta_w;
+		public double[] sigma_w;
+		public double[] chi_w;
+		public double[] gamma_w;
+		public double[] fractalDim_w;
+		public double[] percolates_w;
+		public double[] thetaLC_w;
+		public double[] thetaPerc_w;
+		public double[] dc_w;
+		
+		public double[] theta_a;
+		public double[] sigma_a;
+		public double[] chi_a;
+		public double[] gamma_a;
+		public double[] fractalDim_a;
+		public double[] percolates_a;
+		public double[] thetaLC_a;
+		public double[] thetaPerc_a;
+		public double[] dc_a;
+		public double[] depthOfPenetrationInMM_a;
+		public double[] thetaWellAerated_a;  //dilation of 2(?) mm around aerated pores + aerated pores .. look up what a good value would be 
+		
+		public boolean enforceIntegerTensions;
 		
 	}
 	
@@ -477,7 +516,7 @@ public class MorphologyAnalyzer implements PlugIn {
 			return mCP;		
 		}
 
-	public double[] calculateTheBulkSoilVolume(String nowGaugePath, ImagePlus soilSurface, MenuWaiter.PoreSpaceAnalyzerOptions mPSA, InputOutput.MyFileCollection mFC) {
+	public double[] calculateTheBulkSoilVolume(String nowGaugePath, ImagePlus soilSurface, MenuWaiter.ROISelectionOptions mRSO, InputOutput.MyFileCollection mFC) {
 		
 		InputOutput jIO = new InputOutput();
 		RoiHandler rH  = new RoiHandler();
@@ -491,7 +530,7 @@ public class MorphologyAnalyzer implements PlugIn {
 		if (versio == 0) jCO = jIO.readInnerCircleVer0(nowGaugePath);	
 		else jCO = jIO.readInnerCircleVer1(nowGaugePath);
 		
-		PolygonRoi[] pRoi = rH.makeMeAPolygonRoiStack("inner", "tight", jCO, -mPSA.mRSO.cutAwayFromWall);
+		PolygonRoi[] pRoi = rH.makeMeAPolygonRoiStack("inner", "tight", jCO, -mRSO.cutAwayFromWall);
 		
 		//assign soil top and bottom surfaces		
 		ImageStack surStack = soilSurface.getStack();
@@ -528,7 +567,7 @@ public class MorphologyAnalyzer implements PlugIn {
 		
 		//calculate volume of cut-out column (in case the parts close to the walls have been cut away)
 		double columnVolume = 0;
-		if (mPSA.mRSO.heightOfRoi == 0) {			
+		if (mRSO.heightOfRoi == 0) {			
 			
 			//calculate volume of complete column
 			double volume2Walls = 0;
@@ -539,7 +578,7 @@ public class MorphologyAnalyzer implements PlugIn {
 			volume2Walls = originalVolume - columnVolume;
 			
 			for (int i = 0 ; i < jCO.heightOfColumn ; i++) {
-				columnVolume += Math.round(Math.PI * (jCO.innerMajorRadius[i] - mPSA.mRSO.cutAwayFromWall) * (jCO.innerMinorRadius[i] - mPSA.mRSO.cutAwayFromWall));
+				columnVolume += Math.round(Math.PI * (jCO.innerMajorRadius[i] - mRSO.cutAwayFromWall) * (jCO.innerMinorRadius[i] - mRSO.cutAwayFromWall));
 			}			
 			bulkVolume[0] = columnVolume - volumeAboveColumn - volumeBelowColumn;
 			bulkVolume[1] = volumeAboveColumn;
@@ -547,8 +586,8 @@ public class MorphologyAnalyzer implements PlugIn {
 			bulkVolume[3] = volume2Walls;
 		}
 		else {
-			for (int i = mFC.startSlice ; i < mFC.startSlice + mPSA.mRSO.heightOfRoi ; i++) {
-				columnVolume += Math.round(Math.PI * (jCO.innerMajorRadius[i] - mPSA.mRSO.cutAwayFromWall) * (jCO.innerMinorRadius[i] - mPSA.mRSO.cutAwayFromWall));
+			for (int i = mFC.startSlice ; i < mFC.startSlice + mRSO.heightOfRoi ; i++) {
+				columnVolume += Math.round(Math.PI * (jCO.innerMajorRadius[i] - mRSO.cutAwayFromWall) * (jCO.innerMinorRadius[i] - mRSO.cutAwayFromWall));
 			}	
 			bulkVolume[0] = columnVolume;
 		}
@@ -557,7 +596,7 @@ public class MorphologyAnalyzer implements PlugIn {
 		
 	}
 
-	public ArrayList<Integer> check4TouchingTheBottom(ImagePlus nowTiff, ImagePlus surfTiff) {
+	public ArrayList<Integer> check4TouchingTheBottom(ImagePlus nowTiff, ImagePlus origTiff, ImagePlus surfTiff) {
 	
 		ArrayList<Integer> conBot = new ArrayList<Integer>();
 		
@@ -626,15 +665,18 @@ public class MorphologyAnalyzer implements PlugIn {
 			
 			//check bottom of sub-sample
 			nowTiff.setPosition(stackHeight);
+			origTiff.setPosition(stackHeight);
 			ImageProcessor nowIP = nowTiff.getProcessor();
+			ImageProcessor oriIP = origTiff.getProcessor();
 			int cc = 0;		
 			for (x = 0 ; x < iW ; x++) {
 				for (y = 0 ; y < iH ; y++) {				
 					cc++;
 					IJ.showStatus("Finding pore clusters connected to the bottom surface in kilo-pixel " + (cc / 1000) + "/" + (iW * iH / 1000));
 					
-					int nPixel = (int)nowIP.getPixelValue(x, y) - 1;										
-					if (nPixel > -1) if (!conBot.contains(nPixel)) conBot.add(nPixel);	
+					int nPixel = (int)nowIP.getPixelValue(x, y);
+					int oPixel = (int)oriIP.getPixelValue(x, y);		
+					if (oPixel != 0) if (!conBot.contains(nPixel)) conBot.add(nPixel);	
 				}
 			}	
 		}
@@ -643,7 +685,7 @@ public class MorphologyAnalyzer implements PlugIn {
 	
 	}
 
-	public ArrayList<Integer> check4TouchingTheTop(ImagePlus nowTiff, ImagePlus surfTiff) {
+	public ArrayList<Integer> check4TouchingTheTop(ImagePlus nowTiff, ImagePlus origTiff, ImagePlus surfTiff) {
 	
 		ArrayList<Integer> conTop = new ArrayList<Integer>();
 		
@@ -711,14 +753,17 @@ public class MorphologyAnalyzer implements PlugIn {
 			
 			//check top of sub sample
 			nowTiff.setPosition(1);
+			origTiff.setPosition(1);
 			ImageProcessor nowIP = nowTiff.getProcessor();
+			ImageProcessor oriIP = origTiff.getProcessor();
 			for (x = 0 ; x < iW ; x++) {
 				for (y = 0 ; y < iH ; y++) {
 					cc++;
 					IJ.showStatus("Finding pore clusters connected to the top surface in kilo-pixel " + (cc / 1000) + "/" + (iW * iH / 1000));
 				
-					int nPixel = (int)nowIP.getPixelValue(x, y) - 1;							
-					if (nPixel > -1) if (!conTop.contains(nPixel)) conTop.add(nPixel);
+					int nPixel = (int)nowIP.getPixelValue(x, y);							
+					int oPixel = (int)oriIP.getPixelValue(x, y);		
+					if (oPixel != 0) if (!conTop.contains(nPixel)) conTop.add(nPixel);	
 				}
 			}
 		}
@@ -763,7 +808,7 @@ public class MorphologyAnalyzer implements PlugIn {
 			return isPercolating;	
 		}
 	
-	public FractalProperties calculateFractalProperties(RoiHandler.ColumnRoi colRoi, MenuWaiter.PoreSpaceAnalyzerOptions mPSA) {
+	public FractalProperties calculateFractalProperties(RoiHandler.ColumnRoi colRoi, MenuWaiter.ROISelectionOptions mRSO) {
 		
 		FractalProperties myFracs = new FractalProperties();
 		HistogramStuff hist = new HistogramStuff();
@@ -810,7 +855,7 @@ public class MorphologyAnalyzer implements PlugIn {
 								
 				double[] iDims = {dilTiff.getWidth(), dilTiff.getHeight()};
 				colRoi.jCO.heightOfColumn = dilTiff.getNSlices();
-				ObjectDetector.ColCoords3D scaledCO = roi.scaleColumnCoordinates(iDims, colRoi.jCO, mPSA, 1 / l[i], oddVoxelContribution);
+				ObjectDetector.ColCoords3D scaledCO = roi.scaleColumnCoordinates(iDims, colRoi.jCO, mRSO, 1 / l[i], oddVoxelContribution);
 				PolygonRoi[] pRoi = roi.makeMeAPolygonRoiStack("inner", "tight", scaledCO, -1);					
 				dilTiff = jIM.clearOutside(dilTiff, pRoi);
 			}
@@ -1098,8 +1143,8 @@ public class MorphologyAnalyzer implements PlugIn {
 			cc++;
 			IJ.showStatus("Finding critical pore diameter, iteration " + cc + " ...");
 			
-			ArrayList<Integer> laConTop = check4TouchingTheTop(laParLaTiff, surfTiff);	
-			ArrayList<Integer> laConBot = check4TouchingTheBottom(laParLaTiff, surfTiff);
+			ArrayList<Integer> laConTop = check4TouchingTheTop(laParLaTiff, nowTiff, surfTiff);	
+			ArrayList<Integer> laConBot = check4TouchingTheBottom(laParLaTiff, nowTiff, surfTiff);
 			boolean[] laP = checkForPercolatingClusters(numOfObjects, laConTop, laConBot);
 			ArrayList<Integer> percolatingClusters = new ArrayList<Integer>();
 			
@@ -1180,8 +1225,8 @@ public class MorphologyAnalyzer implements PlugIn {
 			
 			IJ.showStatus("Finding critical pore diameter, iteration " + cc + " ...");
 			
-			ArrayList<Integer> laConTop = check4TouchingTheTop(laParLaTiff, surfTiff);	
-			ArrayList<Integer> laConBot = check4TouchingTheBottom(laParLaTiff, surfTiff);
+			ArrayList<Integer> laConTop = check4TouchingTheTop(laParLaTiff, laPores, surfTiff);	
+			ArrayList<Integer> laConBot = check4TouchingTheBottom(laParLaTiff, laPores, surfTiff);
 			boolean[] laP = checkForPercolatingClusters(numOfObjects, laConTop, laConBot);
 			ArrayList<Integer> percolatingClusters = new ArrayList<Integer>();
 			
@@ -2484,7 +2529,7 @@ public class MorphologyAnalyzer implements PlugIn {
 		
 		if (mPSA.calcFractal == true) {
 			
-			FractalProperties myFP = calculateFractalProperties(colRoi, mPSA);		
+			FractalProperties myFP = calculateFractalProperties(colRoi, mPSA.mRSO);		
 
 			myP.surfaceFractalDimension = myFP.surfaceFractalDim;
 			
@@ -2537,7 +2582,7 @@ public class MorphologyAnalyzer implements PlugIn {
 			if (mFC.myCutSurfaceFolder != null) {
 				surfTiff = jIO.openTiff3D(mFC.myCutSurfaceFolder + pathSep + myGandS[1]);
 			}
-			bulkSoilVolume = calculateTheBulkSoilVolume(myGandS[0], surfTiff, mPSA, mFC);
+			bulkSoilVolume = calculateTheBulkSoilVolume(myGandS[0], surfTiff, mPSA. mRSO, mFC);
 			myP.roiBulkVolume = bulkSoilVolume[0];			
 		}
 		else { 
@@ -2584,6 +2629,7 @@ public class MorphologyAnalyzer implements PlugIn {
 			
 			//surface and curvature
 			IntrinsicVolumesAnalyzer3D mIRA = new IntrinsicVolumesAnalyzer3D();
+			mIRA.setConnectivity(26);
 			Result[] myMorphos = mIRA.analyzeRegions(myLabelStack, labels, calib);
 			
 			double[] morphoVols = new double[myMorphos.length];
@@ -2597,7 +2643,7 @@ public class MorphologyAnalyzer implements PlugIn {
 				morphoEuler[i] = myMorphos[i].eulerNumber;
 			}
 						
-			myP.phaseVolume = StatUtils.sum(morphoVols);
+			//myP.phaseVolume = StatUtils.sum(morphoVols);
 			myP.surfaceArea = StatUtils.sum(morphoSurf);
 			myP.meanCurvature = StatUtils.sum(morphoCurv);			
 			myP.eulerNumber = StatUtils.sum(morphoEuler);	
@@ -2607,12 +2653,13 @@ public class MorphologyAnalyzer implements PlugIn {
 			boolean[] cBot = new boolean[1]; cBot[0] = false;		
 			boolean[] isPercolating = new boolean[1]; isPercolating[0] = false;
 			if (numOfObjects > 0) {
-				ArrayList<Integer> conTop = check4TouchingTheTop(labelTiff, surfTiff);
-				ArrayList<Integer> conBot = check4TouchingTheBottom(labelTiff, surfTiff);
+				ArrayList<Integer> conTop = check4TouchingTheTop(labelTiff, colRoi.nowTiff, surfTiff);
+				ArrayList<Integer> conBot = check4TouchingTheBottom(labelTiff, colRoi.nowTiff, surfTiff);
 				cTop = new boolean[numOfObjects];
 				for (int i = 0 ; i < numOfObjects; i++) if (conTop.contains(i)) cTop[i] = true;
 				cBot = new boolean[numOfObjects];
 				for (int i = 0 ; i < numOfObjects; i++) if (conBot.contains(i)) cBot[i] = true;
+				isPercolating = new boolean[numOfObjects];
 				isPercolating = checkForPercolatingClusters(numOfObjects, conTop, conBot);
 			}
 			
@@ -2960,7 +3007,6 @@ public class MorphologyAnalyzer implements PlugIn {
 			String nowDir = mFC.myPreOutFolder + pathSep + "PoreThick";		
 			String thicknessImageName = nowImageName + "_Thickness.tif";
 			jIO.tiffSaver(nowDir, thicknessImageName, thickTiff);
-
 		}
 		
 		System.gc();System.gc();
@@ -3037,8 +3083,8 @@ public class MorphologyAnalyzer implements PlugIn {
 		int[] labels = LabelImages.findAllLabels(myLabelStack);
 		int numOfObjects = labels.length;
 		
-		ArrayList<Integer> laConTop = check4TouchingTheTop(laParLaTiff, surfTiff);	
-		ArrayList<Integer> laConBot = check4TouchingTheBottom(laParLaTiff, surfTiff);
+		ArrayList<Integer> laConTop = check4TouchingTheTop(laParLaTiff, laPores, surfTiff);	
+		ArrayList<Integer> laConBot = check4TouchingTheBottom(laParLaTiff, laPores, surfTiff);
 		boolean[] laP = checkForPercolatingClusters(numOfObjects, laConTop, laConBot);
 		
 		//collect all percolating clusters
@@ -3103,6 +3149,76 @@ public class MorphologyAnalyzer implements PlugIn {
 		double avgThick = StatUtils.mean(thickArray);
 		
 		return avgThick;
+	}
+	
+	public ImagePlus findClusterConnected2Top(ImagePlus nowTiff, double drainingDepthInVx) {
+		
+		BoundingBox3D mBB = new BoundingBox3D();
+		
+		//nowTiff.updateAndDraw();nowTiff.show();
+		
+		//find connected pore clusters
+		FloodFillComponentsLabeling3D myFCCL = new FloodFillComponentsLabeling3D(26, 32);
+		ImageStack myLabelStack = myFCCL.computeLabels(nowTiff.getStack());
+		
+		//calculate surface and Euler number.. using MorphoLibJ
+		ImagePlus labelTiff = new ImagePlus();
+		labelTiff.setStack(myLabelStack);				
+		
+		//get Topmost coordinate of each cluster
+		int[] labels = LabelImages.findAllLabels(myLabelStack);
+		int numOfObjects = labels.length;
+		Calibration calib = labelTiff.getCalibration();		
+		Box3D[] myBox = mBB.analyzeRegions(myLabelStack, labels, calib);
+		
+		//labelTiff.updateAndDraw();labelTiff.show();
+			
+		// check if the cluster is draining
+		ArrayList<Integer> isDraining = new ArrayList<Integer>();
+		if (numOfObjects > 0 ) {	
+			for (int i = 0 ; i < myBox.length ; i++) {
+				if (myBox[i].getZMin() <= drainingDepthInVx) isDraining.add(i + 1);
+			}
+		}		
+		
+		//extract Image
+		ImagePlus drainingClusters = extractSpecificPoreLabels(labelTiff, isDraining);
+		
+		//touchesTopImp.updateAndDraw();touchesTopImp.show();
+							
+		return drainingClusters;
+				
+	}
+	
+	public ImagePlus findClusterConnected2Bottom(ImagePlus nowTiff, double wettingHeightInVX) {
+		
+		BoundingBox3D mBB = new BoundingBox3D();
+		
+		//find connected pore clusters
+		FloodFillComponentsLabeling3D myFCCL = new FloodFillComponentsLabeling3D(26, 32);
+		ImageStack myLabelStack = myFCCL.computeLabels(nowTiff.getStack());
+		
+		//calculate surface and Euler number.. using MorphoLibJ
+		ImagePlus labelTiff = new ImagePlus();
+		labelTiff.setStack(myLabelStack);
+		int[] labels = LabelImages.findAllLabels(myLabelStack);
+		int numOfObjects = labels.length;
+		Calibration calib = labelTiff.getCalibration();			
+		Box3D[] myBox = mBB.analyzeRegions(myLabelStack, labels, calib);
+		
+		//calculate percolating clusters ... needs the other parameters.. and is needed for following parameters	
+		ArrayList<Integer> isWetting = new ArrayList<Integer>();
+		if (numOfObjects > 0) {	
+			for (int i = 0 ; i < myBox.length ; i++) {
+				if (myBox[i].getZMin() >= wettingHeightInVX) isWetting.add(i);
+			}
+		}		
+		
+		//extract Image
+		ImagePlus touchesTopImp = extractSpecificPoreLabels(labelTiff, isWetting);
+							
+		return touchesTopImp;
+				
 	}
 
 	public double tMaxLaplace(ImageStack nowStack, ImageStack lapStack, int myMode) {
@@ -3393,8 +3509,12 @@ public class MorphologyAnalyzer implements PlugIn {
 		public double criticalPhaseDiameter;		
 		public double percolatingVolumeFraction;
 		public double percolationThreshold;
+		public double largesPhaseClusterVolumeFraction;
 		
 		public double volumeFractionConnected2Top;
+		public double volumeFractionConnected2Bottom;
+		
+		public double depthOfPhasePenetration;
 		
 	}
 	
@@ -3734,7 +3854,125 @@ public class MorphologyAnalyzer implements PlugIn {
 		
 	}
 	
-	
+	public ROIMorphoProps getSomeSimpleMorphoProps(InputOutput.MyFileCollection	mFC, ColumnRoi colRoi, MenuWaiter.ROISelectionOptions mRSO) {
+		
+		MorphologyAnalyzer morph = new MorphologyAnalyzer();
+		InputOutput jIO = new InputOutput();
+		BoundingBox3D mBB = new BoundingBox3D();
+		
+		//init output structure
+		MorphologyAnalyzer.ROIMorphoProps myR = morph.new ROIMorphoProps();
+		
+		//analyze air phase
+		FractalProperties myFP = morph.calculateFractalProperties(colRoi, mRSO);
+		myR.surfaceFractalDimension = myFP.surfaceFractalDim;
+		IJ.showStatus("Calculating macroporosities ...");
+		
+		//macroporosity
+		myR.phaseVolume = morph.macroPoreVolume(colRoi.nowTiff);
+		double[] bulkSoilVolume = {0, 0, 0, 0};
+		ImagePlus surfTiff = new ImagePlus();		
+		if (mRSO.choiceOfRoi.equalsIgnoreCase("RealSample") & mRSO.includeSurfaceTopography) {
+			String[] myGandS = jIO.getTheCorrectGaugeNSurfaceFiles(mFC);
+			surfTiff = jIO.openTiff3D(mFC.mySurfaceFolder + mFC.pathSep + myGandS[1]);
+			if (mFC.myCutSurfaceFolder != null) {
+				surfTiff = jIO.openTiff3D(mFC.myCutSurfaceFolder + mFC.pathSep + myGandS[1]);
+			}
+			bulkSoilVolume = morph.calculateTheBulkSoilVolume(myGandS[0], surfTiff, mRSO, mFC);
+			myR.roiBulkVolume = bulkSoilVolume[0];			
+		}
+		else { 
+			bulkSoilVolume[0] = Math.round(mRSO.areaOfInterest) * (double)colRoi.nowTiff.getNSlices();
+			myR.roiBulkVolume = bulkSoilVolume[0];
+			surfTiff = null;
+		}				
+		myR.phaseVolumeFraction = myR.phaseVolume / myR.roiBulkVolume;	
+		
+		IJ.showStatus("Identifying connected pore-clusters ...");
+
+		FloodFillComponentsLabeling3D myFCCL = new FloodFillComponentsLabeling3D(26, 32);
+		ImageStack myLabelStack = myFCCL.computeLabels(colRoi.nowTiff.getStack());
+										
+		IJ.freeMemory();IJ.freeMemory();
+		
+		//calculate surface and Euler number.. using MorphoLibJ
+		ImagePlus labelTiff = new ImagePlus();
+		labelTiff.setStack(myLabelStack);				
+		
+		int[] labels = LabelImages.findAllLabels(myLabelStack);
+		int numOfObjects = labels.length;
+		Calibration calib = labelTiff.getCalibration();
+		
+		//also find bounding boxes 
+		Box3D[] myBox = mBB.analyzeRegions(myLabelStack, labels, calib);
+		
+		//labelTiff.updateAndDraw();
+		//labelTiff.show();
+		
+		//surface and curvature
+		IntrinsicVolumesAnalyzer3D mIRA = new IntrinsicVolumesAnalyzer3D();
+		mIRA.setConnectivity(26);
+		Result[] myMorphos = mIRA.analyzeRegions(myLabelStack, labels, calib);
+		
+		double[] morphoVols = new double[myMorphos.length];
+		double[] morphoSurf = new double[myMorphos.length];
+		double[] morphoCurv = new double[myMorphos.length];
+		double[] morphoEuler = new double[myMorphos.length];
+		for (int i = 0 ; i < myMorphos.length ; i++) {
+			morphoVols[i] = myMorphos[i].volume;
+			morphoSurf[i] = myMorphos[i].surfaceArea;
+			morphoCurv[i] = 2 * Math.PI * myMorphos[i].meanBreadth;
+			morphoEuler[i] = myMorphos[i].eulerNumber;
+		}
+					
+		//myP.phaseVolume = StatUtils.sum(morphoVols);
+		myR.surfaceArea = StatUtils.sum(morphoSurf);
+		myR.meanCurvature = StatUtils.sum(morphoCurv);			
+		myR.eulerNumber = StatUtils.sum(morphoEuler);	
+		
+		//calculate percolating clusters ... needs the other parameters.. and is needed for following parameters	
+		boolean[] cTop = new boolean[numOfObjects]; 
+		boolean[] cBot = new boolean[numOfObjects];	
+		boolean[] isPercolating = new boolean[numOfObjects];		
+		if (numOfObjects > 0) {
+			ArrayList<Integer> conTop = check4TouchingTheTop(labelTiff, colRoi.nowTiff, surfTiff);
+			ArrayList<Integer> conBot = check4TouchingTheBottom(labelTiff, colRoi.nowTiff, surfTiff);			
+			for (int i = 0 ; i < numOfObjects; i++) if (conTop.contains(i)) cTop[i] = true;
+			for (int i = 0 ; i < numOfObjects; i++) if (conBot.contains(i)) cBot[i] = true;
+			isPercolating = checkForPercolatingClusters(numOfObjects, conTop, conBot);		
+			IJ.wait(33);
+		}		
+		
+		//calculate percolating phase fraction
+		double percolatingVolume = 0;
+		for (int i = 0 ; i < isPercolating.length ; i++) if (isPercolating[i]) percolatingVolume += morphoVols[i-1]; //in contrast to the BoneJ particle counter, MorphoLibJ always omits the background.  
+		myR.percolatingVolumeFraction = percolatingVolume / myR.roiBulkVolume;
+		
+		//check if volume percolates
+		myR.phasePercolates = 0;
+		if (myR.percolatingVolumeFraction > 0) myR.phasePercolates = 1;
+		
+		//calculate fraction of largest pore cluster
+		double volOfLC = StatUtils.max(morphoVols);
+		myR.largesPhaseClusterVolumeFraction = volOfLC / myR.roiBulkVolume;
+		
+		//calculate depth of phase penetration		
+		double penetrationDepth = 0;
+		for (int i = 0 ; i < myBox.length ; i++) if (myBox[i].getZMax() > penetrationDepth) penetrationDepth = myBox[i].getZMax();
+		myR.depthOfPhasePenetration = penetrationDepth;
+		
+		//calculate global connection probability (gamma)
+		double sumOfSquaredClusterSizes = 0;
+		double rF = 1000000;
+		for (int i = 0 ; i < myMorphos.length ; i++) {
+			double squaredClusterSize = morphoVols[i] / rF * morphoVols[i] / rF;
+			sumOfSquaredClusterSizes += squaredClusterSize;
+		}
+		myR.gamma = sumOfSquaredClusterSizes / (myR.phaseVolume / rF * myR.phaseVolume / rF);	
+		
+		return myR;
+		
+	}
 }
 
 

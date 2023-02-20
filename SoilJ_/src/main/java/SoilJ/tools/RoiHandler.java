@@ -57,36 +57,36 @@ public class RoiHandler implements PlugIn {
 		
 	}
 	
-	public ObjectDetector.ColCoords3D scaleColumnCoordinates(double[] iDims, ObjectDetector.ColCoords3D inCo, MenuWaiter.PoreSpaceAnalyzerOptions mPSA, double scalingFactor, double[] oddVoxelContribution) {
+	public ObjectDetector.ColCoords3D scaleColumnCoordinates(double[] iDims, ObjectDetector.ColCoords3D inCo, MenuWaiter.ROISelectionOptions mRSO, double scalingFactor, double[] oddVoxelContribution) {
 		
 		ObjectDetector jOD = new ObjectDetector();
 		ObjectDetector.ColCoords3D outCo = jOD.new ColCoords3D();
 		
-		int cFT = mPSA.mRSO.cutAwayFromTop;
-		int iHeight = mPSA.mRSO.heightOfRoi;
+		int cFT = mRSO.cutAwayFromTop;
+		int iHeight = mRSO.heightOfRoi;
 		
 		//check if height of ROI is definedin percent of original height
 		if (iHeight == 0) {
-			if (mPSA.mRSO.cutZPercent == true) {
-				if ((mPSA.mRSO.cutAwayFromTop == 50 & mPSA.mRSO.cutAwayFromBottom == 0) | (mPSA.mRSO.cutAwayFromTop == 0 & mPSA.mRSO.cutAwayFromBottom == 50)) {							
+			if (mRSO.cutZPercent == true) {
+				if ((mRSO.cutAwayFromTop == 50 & mRSO.cutAwayFromBottom == 0) | (mRSO.cutAwayFromTop == 0 & mRSO.cutAwayFromBottom == 50)) {							
 					iHeight = inCo.xmid.length / 2;
-					if (mPSA.mRSO.cutAwayFromTop == 50) cFT = inCo.xmid.length / 2 - 1; 
+					if (mRSO.cutAwayFromTop == 50) cFT = inCo.xmid.length / 2 - 1; 
 				}			
 				else {
-					iHeight = inCo.xmid.length - (mPSA.mRSO.cutAwayFromTop + mPSA.mRSO.cutAwayFromBottom) * inCo.xmid.length / 100;
-					cFT = inCo.xmid.length - mPSA.mRSO.cutAwayFromTop * inCo.xmid.length / 100;
+					iHeight = inCo.xmid.length - (mRSO.cutAwayFromTop + mRSO.cutAwayFromBottom) * inCo.xmid.length / 100;
+					cFT = inCo.xmid.length - mRSO.cutAwayFromTop * inCo.xmid.length / 100;
 				}
 			}
 			else {
-				iHeight = inCo.xmid.length - mPSA.mRSO.cutAwayFromTop - mPSA.mRSO.cutAwayFromBottom;
+				iHeight = inCo.xmid.length - mRSO.cutAwayFromTop - mRSO.cutAwayFromBottom;
 			}
 		}
 		
 		//check if radius of ROI is defined in percent of original radius
-		double cutAwayFromXY = mPSA.mRSO.cutAwayFromWall;
-		if (mPSA.mRSO.cutXYPercent == true) {
+		double cutAwayFromXY = mRSO.cutAwayFromWall;
+		if (mRSO.cutXYPercent == true) {
 			double myRadius = (StatUtils.mean(inCo.innerMajorRadius) + StatUtils.mean(inCo.innerMinorRadius)) / 2;
-			cutAwayFromXY = mPSA.mRSO.cutAwayFromWall * myRadius / 100; 
+			cutAwayFromXY = mRSO.cutAwayFromWall * myRadius / 100; 
 		}
 		
 		double[] innerMajorRadius = new double[iHeight];

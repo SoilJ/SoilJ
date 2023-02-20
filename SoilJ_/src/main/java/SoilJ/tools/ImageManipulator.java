@@ -720,6 +720,62 @@ public class ImageManipulator implements PlugIn {
 			return outTiff;
 		}
 		
+		public ImagePlus subtractNumber(ImagePlus a, int b) {
+			
+			ImageStack outStack = new ImageStack(a.getWidth(), a.getHeight()); 
+			ImagePlus outTiff = new ImagePlus();
+			
+			for (int z = 0 ; z < a.getNSlices() ; z++) {
+				
+				a.setPosition(z + 1);
+				
+				ImageProcessor aIP = a.getProcessor();
+						
+				ImageProcessor outIP = aIP.duplicate();
+				
+				for (int x = 0 ; x < a.getWidth() ; x++) {
+					for (int y = 0 ; y < a.getHeight() ; y++) {
+						int avox = aIP.getPixel(x, y);						
+						outIP.putPixel(x, y, avox - b);
+					}
+				}
+				
+				outStack.addSlice(outIP);
+			}
+			
+			outTiff.setStack(outStack);
+			
+			return outTiff;
+		}
+		
+		public ImagePlus addNumber(ImagePlus a, int b) {
+			
+			ImageStack outStack = new ImageStack(a.getWidth(), a.getHeight()); 
+			ImagePlus outTiff = new ImagePlus();
+			
+			for (int z = 0 ; z < a.getNSlices() ; z++) {
+				
+				a.setPosition(z + 1);
+				
+				ImageProcessor aIP = a.getProcessor();
+						
+				ImageProcessor outIP = aIP.duplicate();
+				
+				for (int x = 0 ; x < a.getWidth() ; x++) {
+					for (int y = 0 ; y < a.getHeight() ; y++) {
+						int avox = aIP.getPixel(x, y);						
+						outIP.putPixel(x, y, avox + b);
+					}
+				}
+				
+				outStack.addSlice(outIP);
+			}
+			
+			outTiff.setStack(outStack);
+			
+			return outTiff;
+		}
+		
 	}
 	
 	public class SkeletonizerOptions {
@@ -3567,8 +3623,6 @@ public class ImageManipulator implements PlugIn {
 			
 		}
 		
-		
-		
 		//nowTiff.updateAndDraw();nowTiff.show();
 		
 		return nowTiff;
@@ -4133,23 +4187,23 @@ public class ImageManipulator implements PlugIn {
 		if (myNR.lowRef.equalsIgnoreCase("quantile")) {					
 			double[] smoothLower = maths.filterAnArray(lowerQuantile, myNR.windowSize, myNR.lowerSmoothingFilter);
 			smoothLower = maths.fillStartAndEndZeros(smoothLower);
-			myNR.originalLower = maths.LinearLOESSFilter(smoothLower, windowHalfSize);
+			myNR.originalLower = maths.linearLOESSFilter(smoothLower, windowHalfSize);
 		}
 		if (myNR.lowRef.equalsIgnoreCase("wall")) {
 			double[] smoothLower = maths.filterAnArray(wall, myNR.windowSize, myNR.lowerSmoothingFilter);
 			smoothLower = maths.fillStartAndEndZeros(smoothLower);
-			myNR.originalLower = maths.LinearLOESSFilter(smoothLower, windowHalfSize);	
+			myNR.originalLower = maths.linearLOESSFilter(smoothLower, windowHalfSize);	
 		}
 		
 		if (myNR.hiRef.equalsIgnoreCase("quantile")) {
 			double[] smoothUpper = maths.filterAnArray(upperQuantile, myNR.windowSize, myNR.upperSmoothingFilter);
 			smoothUpper = maths.fillStartAndEndZeros(smoothUpper);
-			myNR.originalUpper = maths.LinearLOESSFilter(smoothUpper, windowHalfSize);	
+			myNR.originalUpper = maths.linearLOESSFilter(smoothUpper, windowHalfSize);	
 		}
 		if (myNR.hiRef.equalsIgnoreCase("wall")) {
 			double[] smoothUpper = maths.filterAnArray(wall, myNR.windowSize, myNR.upperSmoothingFilter);
 			smoothUpper = maths.fillStartAndEndZeros(smoothUpper);
-			myNR.originalUpper = maths.LinearLOESSFilter(smoothUpper, windowHalfSize);	
+			myNR.originalUpper = maths.linearLOESSFilter(smoothUpper, windowHalfSize);	
 		}
 			
 		//String myFileName = nowTiff.getTitle().substring(0, nowTiff.getTitle().length() - 4);
