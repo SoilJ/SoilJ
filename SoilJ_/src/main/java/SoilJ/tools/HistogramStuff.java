@@ -185,6 +185,26 @@ public class HistogramStuff implements PlugIn {
 		
 	}
 	
+	public int[] extractHistograms8(ImagePlus nowTiff) {
+		
+		RollerCaster rC = new RollerCaster();
+		double[] histo = new double[(int)Math.round(Math.pow(2, 8))];
+		
+		//get histogram
+		for (int j = 0 ; j < nowTiff.getNSlices() ; j++) { 
+		
+			nowTiff.setPosition(j+1);
+			ImageProcessor nowIP = nowTiff.getProcessor();
+		
+			int[]  nowHist = nowIP.getHistogram();
+			nowHist[0] = 0;  //set zero entries to 0
+			for (int i = 0 ; i < histo.length ; i++) histo[i] += (double)nowHist[i]*100/nowTiff.getNSlices();
+			
+		}		
+		
+		return rC.castDouble2Int(histo);
+	}
+	
 	public void analyze2DHistograms(InputOutput.MyFileCollection mFC) {
 				
 		InputOutput jIO = new InputOutput();

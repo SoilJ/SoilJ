@@ -44,7 +44,10 @@ import ij.measure.Calibration;
 import ij.plugin.PlugIn;
 import ij.process.ByteProcessor;
 import ij.process.ImageProcessor;
+import inra.ijpb.binary.ChamferWeights3D;
 import inra.ijpb.binary.conncomp.FloodFillComponentsLabeling3D;
+import inra.ijpb.binary.distmap.DistanceTransform3D;
+import inra.ijpb.binary.distmap.DistanceTransform3DFloat;
 import inra.ijpb.geometry.Box3D;
 import inra.ijpb.label.LabelImages;
 import inra.ijpb.measure.region3d.BoundingBox3D;
@@ -57,7 +60,6 @@ import sc.fiji.analyzeSkeleton.Graph;
 import sc.fiji.analyzeSkeleton.Point;
 import sc.fiji.analyzeSkeleton.SkeletonResult;
 import sc.fiji.analyzeSkeleton.Vertex;
-import sc.fiji.localThickness.EDT_S1D;
 import sc.fiji.localThickness.LocalThicknessWrapper;
 import sc.fiji.skeletonize3D.Skeletonize3D_;
 
@@ -231,7 +233,7 @@ public class MorphologyAnalyzer implements PlugIn {
 		public double[] areaInMM2;
 		public double[] heightInMM;
 		public double[] bulkVolumeInMM3;
-		
+
 		public double[] theta_w;
 		public double[] sigma_w;
 		public double[] chi_w;
@@ -252,7 +254,12 @@ public class MorphologyAnalyzer implements PlugIn {
 		public double[] thetaPerc_a;
 		public double[] dc_a;
 		public double[] depthOfPenetrationInMM_a;
-		public double[] thetaWellAerated_a;  //dilation of 2(?) mm around aerated pores + aerated pores .. look up what a good value would be 
+		
+		public double[] averageDistanceFromAeratedPoreInMM; 
+		public double[] fractionLessThan5VXFromAeratedPore;
+		public double[] fraction5to10VXFromAeratedPore;
+		public double[] fraction10to20VXFromAeratedPore;
+		public double[] fractionMoreThan10to20VXFromAeratedPore;
 		
 		public boolean enforceIntegerTensions;
 		
@@ -1489,17 +1496,12 @@ public class MorphologyAnalyzer implements PlugIn {
 		String nowImageName = mFC.colName;
 		
 		//create distance map to superimpose skeleton
-		EDT_S1D edt = new EDT_S1D();
-		ImagePlus distTiff = colRoi.nowTiff.duplicate();
+		float[] floatWeights = ChamferWeights3D.BORGEFORS.getFloatWeights();
+		boolean normalize = true;
+		DistanceTransform3D dt = new DistanceTransform3DFloat(floatWeights, normalize);
+		ImageStack result = dt.distanceMap(colRoi.nowTiff.getStack());
 		
-		edt.setup("", distTiff);	
-		edt.showOptions = false;
-		edt.runSilent = true;
-		edt.inverse = false;
-		edt.thresh = 128;					
-		edt.run(null);
-	
-		distTiff = edt.getResultImage();
+		ImagePlus distTiff = new ImagePlus("dist",result);
 		
 		//add slices on top and bottom of column to be able to extract the backbone
 		ImageManipulator.SkeletonizerOptions mSO = jIM.addSlices4Skeletonization(colRoi.nowTiff, mPSA, colRoi);
@@ -2897,16 +2899,12 @@ public class MorphologyAnalyzer implements PlugIn {
 					
 					IJ.showStatus("Performing Euklidean distance transform ...");
 					
-					EDT_S1D edt = new EDT_S1D();
+					float[] floatWeights = ChamferWeights3D.BORGEFORS.getFloatWeights();
+					boolean normalize = true;
+					DistanceTransform3D dt = new DistanceTransform3DFloat(floatWeights, normalize);
+					ImageStack result = dt.distanceMap(colRoi.nowTiff.getStack());
 					
-					edt.setup("", distTiff);	
-					edt.showOptions = false;
-					edt.runSilent = true;
-					edt.inverse = false;
-					edt.thresh = 128;					
-					edt.run(null);
-				
-					distTiff = edt.getResultImage();
+					distTiff = new ImagePlus("dist",result);
 					
 					myP.averageDistance2PhaseBoundary = calculateAverageValue(distTiff);
 
@@ -3136,6 +3134,40 @@ public class MorphologyAnalyzer implements PlugIn {
 			
 			thickTiff.setSlice(z + 1);
 			ImageProcessor nowIP = thickTiff.getProcessor();
+			
+			for (int x = 0 ; x < thickTiff.getWidth() ; x++) {
+				for (int y = 0 ; y < thickTiff.getHeight() ; y++) {
+					
+					float nowPix = nowIP.getPixelValue(x, y);
+					if (nowPix > 0) listOfThicknesses.add(nowPix);
+					
+				}
+			}
+		}
+		
+		double[] thickArray = new double[listOfThicknesses.size()]; 
+		for (int i = 0 ; i < thickArray.length ; i++) thickArray[i] = listOfThicknesses.get(i);
+		
+		double avgThick = StatUtils.mean(thickArray);
+		
+		return avgThick;
+	}
+	
+	public double calculateAverageValue(ImagePlus thickTiff, RoiHandler.ColumnRoi pRoi) {
+		
+		DisplayThings disp = new DisplayThings();
+		
+		ArrayList<Float> listOfThicknesses = new ArrayList<Float>();
+			
+		for (int z = 0 ; z < thickTiff.getNSlices() ; z++) {
+			
+			thickTiff.setSlice(z + 1);
+			ImageProcessor nowIP = thickTiff.getProcessor().duplicate();
+			
+			nowIP.setRoi(pRoi.pRoi[z]);
+			nowIP.crop();
+			
+			//disp.displayIP(nowIP, null);
 			
 			for (int x = 0 ; x < thickTiff.getWidth() ; x++) {
 				for (int y = 0 ; y < thickTiff.getHeight() ; y++) {
@@ -3503,6 +3535,10 @@ public class MorphologyAnalyzer implements PlugIn {
 		
 		public double averagePhaseDiameter;
 		public double averageDistance2PhaseBoundary;
+		public double fractionLessThan5VXFromPhaseBoundary;
+		public double fraction5to10VXFromPhaseBoundary;
+		public double fraction10to20VXFromPhaseBoundary;
+		public double fractionMoreThan10to20VXFromPhaseBoundary;
 		
 		public double surfaceFractalDimension;					
 		
@@ -3519,6 +3555,8 @@ public class MorphologyAnalyzer implements PlugIn {
 		public double volumeFractionConnected2Bottom;
 		
 		public double depthOfPhasePenetration;
+
+		public int[] distanceHistogram;		
 		
 	}
 	
@@ -3855,6 +3893,72 @@ public class MorphologyAnalyzer implements PlugIn {
 		}
 		
 		return mCG;
+		
+	}
+	
+	public ROIMorphoProps getDistances2AirFilledPores(InputOutput.MyFileCollection	mFC, ColumnRoi colRoi, MenuWaiter.ROISelectionOptions mRSO) {
+		
+		MorphologyAnalyzer morph = new MorphologyAnalyzer();
+		InputOutput jIO = new InputOutput();
+		BoundingBox3D mBB = new BoundingBox3D();
+		DisplayThings disp = new DisplayThings();
+		HistogramStuff hist = new HistogramStuff();
+		
+		//init output structure
+		MorphologyAnalyzer.ROIMorphoProps myR = morph.new ROIMorphoProps();
+		
+		//colRoi.nowTiff.updateAndDraw();colRoi.nowTiff.show();
+		
+		//add black invert ROI
+		ImageStack distStack = new ImageStack(colRoi.nowTiff.getWidth(), colRoi.nowTiff.getHeight());
+		ImageProcessor whiteOne = colRoi.nowTiff.getProcessor().duplicate();
+		whiteOne.fill();
+		distStack.addSlice(whiteOne);
+		//disp.displayIP(whiteOne, "test");
+		for (int z = 1 ; z < colRoi.nowTiff.getNSlices() + 1; z++) {
+			colRoi.nowTiff.setPosition(z);
+			ImageProcessor nowIP = colRoi.nowTiff.getProcessor().duplicate();
+			nowIP.invert();
+			distStack.addSlice(nowIP);
+		}
+		ImagePlus distTiff = new ImagePlus("inverted", distStack);
+		
+		//distTiff.updateAndDraw();distTiff.show();
+		
+		//calculate distance map
+		IJ.showStatus("Performing Euklidean distance transform ...");
+		
+		float[] floatWeights = ChamferWeights3D.BORGEFORS.getFloatWeights();
+		boolean normalize = true;
+		DistanceTransform3D dt = new DistanceTransform3DFloat(floatWeights, normalize);
+		ImageStack result = dt.distanceMap(distStack);
+		
+		//remove topmost slice and set to distTiff
+		result.deleteSlice(1);
+		distTiff.setStack(result);
+
+		//distTiff.updateAndDraw();distTiff.show();
+		
+		//calc average distance to aerated pore		
+		myR.averageDistance2PhaseBoundary = calculateAverageValue(distTiff, colRoi);
+		
+		//get histogram of distances
+		ImageStack binStack = new ImageStack(colRoi.nowTiff.getWidth(), colRoi.nowTiff.getHeight(),colRoi.nowTiff.getNSlices());			
+		for (int z = 1 ; z < colRoi.nowTiff.getNSlices() ; z++) {  //skip first slice since it was added to sumulate the soil surface..
+			distTiff.setPosition(z + 1);
+			ImageProcessor thIP = distTiff.getProcessor();
+			ImageProcessor cpIP = thIP.duplicate();			
+			ImageProcessor binIP = cpIP.convertToByte(false);
+			binStack.setProcessor(binIP, z);		
+		}
+		ImagePlus binTiff = new ImagePlus("distanceBin", binStack);
+		
+		//binTiff.updateAndDraw();binTiff.show();
+		
+		//get average distance to aerated pore
+		//myR.distanceHistogram = hist.extractHistograms8(binTiff);
+		
+		return myR;		
 		
 	}
 	

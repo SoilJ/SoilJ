@@ -49,6 +49,7 @@ public class RoiHandler implements PlugIn {
 	public class ColumnRoi {
 		
 		public double area;
+		public double voxelSize;
 		public ObjectDetector.ColCoords3D jCO;
 		public PolygonRoi[] pRoi;
 		public PolygonRoi[] iRoi;

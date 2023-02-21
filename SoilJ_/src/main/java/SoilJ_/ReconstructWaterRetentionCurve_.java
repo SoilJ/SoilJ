@@ -173,8 +173,13 @@ public class ReconstructWaterRetentionCurve_ extends ImagePlus implements PlugIn
 			double[] thetaPerc_a = new double[mWRC.tensionStepsInMM.length];
 			double[] depthOfPenetrationInMM_a = new double[mWRC.tensionStepsInMM.length];
 			
-			//find air and water-filled pores
-			String fileName = mFC.fileName;			
+		    double[] averageDistanceFromAeratedPoreInMM = new double[mWRC.tensionStepsInMM.length]; 
+			//double[] fractionLessThan5VXFromAeratedPore = new double[mWRC.tensionStepsInMM.length];
+			//double[] fraction5to10VXFromAeratedPore = new double[mWRC.tensionStepsInMM.length];
+			//double[] fraction10to20VXFromAeratedPore = new double[mWRC.tensionStepsInMM.length];
+			//double[] fractionMoreThan10to20VXFromAeratedPore = new double[mWRC.tensionStepsInMM.length];
+			
+			//find air and water-filled pores	
 			for (int j = 0 ; j < mWRC.tensionStepsInMM.length ; j++) {
 				
 				//extract air-filled pores
@@ -193,13 +198,16 @@ public class ReconstructWaterRetentionCurve_ extends ImagePlus implements PlugIn
 				airRoi.pRoi = colRoi.pRoi;
 				MorphologyAnalyzer.ROIMorphoProps myAirProps = morph.getSomeSimpleMorphoProps(mFC, airRoi, mWRC.mRSO);
 				
+				//calculate distances to next air-filled pore.				
+				MorphologyAnalyzer.ROIMorphoProps myDistProps = morph.getDistances2AirFilledPores(mFC, airRoi, mWRC.mRSO);
+								
 				//calculate properties for air phase
 				RoiHandler.ColumnRoi waterRoi = roi.new ColumnRoi();
 				waterRoi.nowTiff = waterTiff;
 				waterRoi.area = colRoi.area;
 				waterRoi.pRoi = colRoi.pRoi;
 				MorphologyAnalyzer.ROIMorphoProps myWaterProps = morph.getSomeSimpleMorphoProps(mFC, waterRoi, mWRC.mRSO);
-		
+				
 				//try to free up some memory
  				System.gc();System.gc();
  				
@@ -230,6 +238,8 @@ public class ReconstructWaterRetentionCurve_ extends ImagePlus implements PlugIn
  				thetaLC_a[j] = myAirProps.largesPhaseClusterVolumeFraction;
  				thetaPerc_a[j] = myAirProps.percolatingVolumeFraction;
  				depthOfPenetrationInMM_a[j] = myAirProps.depthOfPhasePenetration * mWRC.voxelSizeInMicroMeter / 1000;
+ 				
+ 				averageDistanceFromAeratedPoreInMM[j] = myDistProps.averageDistance2PhaseBoundary * mWRC.voxelSizeInMicroMeter / 1000; 
  				
 				//save image
 				airwaterTiff = sC.subtract(binTiff, sC.subtractNumber(airTiff, 128));				
@@ -266,6 +276,8 @@ public class ReconstructWaterRetentionCurve_ extends ImagePlus implements PlugIn
 			myWRCProperties.thetaLC_a = thetaLC_a;
 			myWRCProperties.thetaPerc_a = thetaPerc_a;
 			myWRCProperties.depthOfPenetrationInMM_a = depthOfPenetrationInMM_a;
+			
+			myWRCProperties.averageDistanceFromAeratedPoreInMM = averageDistanceFromAeratedPoreInMM; 
 			
 			myWRCProperties.enforceIntegerTensions = mWRC.enforceIntegerTensions;
 			
