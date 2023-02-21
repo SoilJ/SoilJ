@@ -1765,8 +1765,7 @@ public class MenuWaiter implements PlugIn {
 		ROISelectionOptions mRSO = regionOfInterestSelection();
 				
 	    return mRSO;
-
-	}
+	}	
 
 	public PoreSpaceAnalyzerOptions showNetworkSpaceAnalyzerMenu() {
 		
@@ -2510,6 +2509,27 @@ public class MenuWaiter implements PlugIn {
 		public String imagePhase2BeAnalyzed = "255";
 		
 	}
+	
+	public class DrainageSimulatorOptions {
+
+		public ROISelectionOptions mRSO;
+				
+		public double voxelSizeInMicroMeter;		
+		public double columnHeightInMM;
+		public double wettingAngle;
+					
+		public double[] pressureStepsInMM;		
+		public double[] pressureAtTopInMM;		
+		public double[] pressureAtCenterInMM;
+		public double[] pressureAtBottomInMM;
+		
+		public boolean hasSurfaceFiles;
+		public boolean saveAirWaterImages;	
+		public boolean enforceIntegerPressures;
+				
+		public String imagePhase2BeAnalyzed = "255";
+		
+	}
 
 	public WRCCalculatorMenu showWRCMenu() {
 		
@@ -2673,10 +2693,10 @@ public class MenuWaiter implements PlugIn {
 	    GenericDialog gd3 = new GenericDialog("Water retention curve calculator - modify tension steps (reference depth is the bottom surface of te ROI)");
 	    
 	    if (roundValues) {
-		    for (int i = 0 ; i < tensionStepNumber ; i++) gd3.addNumericField("Modify tension step #" + i  + " at the top of the ROI?", tensionSteps[i], 0, 6, " mm");
+		    for (int i = 0 ; i < tensionStepNumber ; i++) gd3.addNumericField("Modify tension step #" + i  + " at the bottom of the ROI?", tensionSteps[i], 0, 6, " mm");
 	    }
 		else {	    
-			for (int i = 0 ; i < tensionStepNumber ; i++) gd3.addNumericField("Modify tension step #" + i  + " at the top of the ROI?", tensionSteps[i], 2, 6, " mm");			
+			for (int i = 0 ; i < tensionStepNumber ; i++) gd3.addNumericField("Modify tension step #" + i  + " at the bottom of the ROI?", tensionSteps[i], 2, 6, " mm");			
 		}
 	    
 	    gd3.addCheckbox("Do you want to save the images of air and water?", false);
@@ -2700,6 +2720,124 @@ public class MenuWaiter implements PlugIn {
 	    mWRC.tensionStepsInMM = tensionSteps;	    
 	    
 		return mWRC;
+	}
+	
+	public DrainageSimulatorOptions showDrainageSimulatorMenu() {
+		
+		//construct objects
+		GenericDialog gd = new GenericDialog("Drainage simulation");
+		DrainageSimulatorOptions mDS = new DrainageSimulatorOptions();
+		
+		String myText = "This plugin simulates water and air phases in the pore network  under drainage. Hydraulic equilibrium is assumed\n ";
+		gd.setInsets(0, 0, 0);gd.addMessage(myText);
+
+		
+		//define volume to be analyzed		
+		mDS.mRSO = regionOfInterestSelection();  //select Region of interest
+		
+		//choose draining or wetting curves..
+		String[] choiceOfWRC = new String[1];
+		choiceOfWRC[0] = "drainage";
+		//choiceOfWRC[1] = "wetting from bottom";
+		//choiceOfWRC[2] = "gravity flow";
+		//choiceOfWRC[3] = "gravity flow with seepage face";
+		gd.addRadioButtonGroup("Please choose a type of water retention curve", choiceOfWRC, 1, 1, "drainage");
+		
+		gd.addNumericField("Please enter the voxel edge length in micrometer", 43, 0, 6, "");
+		gd.addNumericField("Please enter wetting angle (0 - 90 degree, 0 is perfect wetting)", 0, 1, 6, "");
+		gd.addNumericField("Please enter approximate height of ROI in mm", 48, 2, 6, "");
+		
+		gd.setInsets(0, 0, 0);gd.addMessage("");
+		
+		gd.addNumericField("How many pressure steps do you want to calculate?", 10, 0, 3, "");
+		gd.addNumericField("Initial pressure at upper boundary in mm", 0, 2, 3, "");
+		gd.addNumericField("Constant pressure at lower boundary in mm", 0, 2, 3, "");
+		
+		gd.addCheckbox("Do you want to enforce integer values at the tension steps?", false);
+		
+		//gd.addCheckbox("Do you want to take the soils top and bottom topographies into account?", false);
+		String myReference = "If you are using this plugin please cite the following references: \n\n";
+		gd.setInsets(40, 0, 0);gd.addMessage(myReference);
+		myReference = "Koestel, J. 2018. SoilJ: An ImageJ plugin for the semiautomatic processing of three-dimensional X-ray images of soils.\n ";
+		myReference += "Vadose Zone Journal, doi:10.2136/vzj2017.03.0062.";
+		gd.setInsets(0, 0, 0);gd.addMessage(myReference);
+
+		//show dialog
+	    int pressureStepNumber = 0;
+		boolean roundValues = false;
+		double initialPressureAtTop = 0;
+		double pressureAtBottom = 0;
+		
+		gd.showDialog();
+		int myChoiceIndex = 0;
+	    if (gd.wasCanceled()) return null;
+	    else {	    	
+	    		    	
+	    	mDS.voxelSizeInMicroMeter = gd.getNextNumber();
+	    	mDS.wettingAngle = gd.getNextNumber();
+	    	mDS.columnHeightInMM = gd.getNextNumber();
+	    	
+	    	pressureStepNumber = (int)Math.round(gd.getNextNumber());
+	    	initialPressureAtTop = gd.getNextNumber();
+	    	pressureAtBottom = gd.getNextNumber();
+	    	
+	    	roundValues = gd.getNextBoolean();    	
+	    	mDS.enforceIntegerPressures = roundValues;
+	    	
+	    	//mDS.hasSurfaceFiles = gd.getNextBoolean();
+
+	    }
+	    
+	    //calculate the highest reasonable pressure to consider
+	    double[] pressureSteps = new double[pressureStepNumber]; 	
+	    
+	    //assign pressure steps
+	    pressureSteps[0] = initialPressureAtTop + mDS.columnHeightInMM;
+	    pressureSteps[pressureStepNumber - 1] = pressureAtBottom;
+	    double stepSize = (pressureSteps[0] - pressureAtBottom) / (pressureStepNumber - 1);
+	    if (pressureStepNumber > 2) for (int i = 1 ; i < pressureStepNumber - 1; i++) {
+	    	pressureSteps[i] = pressureSteps[0] - i * stepSize;
+	    }
+	    
+	    //round values in case option was checked
+	    if (roundValues) {
+	    	pressureSteps[0] = Math.round(pressureSteps[0]); 
+	    	pressureSteps[pressureStepNumber - 1] =  Math.round(pressureSteps[pressureStepNumber - 1]);	    	
+		    if (pressureStepNumber > 2) for (int i = 1 ; i < pressureStepNumber - 1; i++) {
+		    	pressureSteps[i] = Math.round(pressureSteps[0] - i * stepSize);
+		    }	    	
+	    }
+	    
+	    //construct objects
+	    GenericDialog gd3 = new GenericDialog("Drainage simulator - modify pressure steps (reference depth is the bottom surface of te ROI)");
+	    
+	    if (roundValues) {
+		    for (int i = 0 ; i < pressureStepNumber ; i++) gd3.addNumericField("Modify pressure step #" + i  + " at the bottom of the ROI?", pressureSteps[i], 0, 6, " mm");
+	    }
+		else {	    
+			for (int i = 0 ; i < pressureStepNumber ; i++) gd3.addNumericField("Modify pressure step #" + i  + " at the bottom of the ROI?", pressureSteps[i], 2, 6, " mm");			
+		}	    
+	    gd3.addCheckbox("Do you want to save the images of air and water?", false);
+	    
+		myReference = "If you are using this plugin please cite the following references: \n\n";
+		gd.setInsets(40, 0, 0);gd.addMessage(myReference);
+		myReference = "Koestel, J. 2018. SoilJ: An ImageJ plugin for the semiautomatic processing of three-dimensional X-ray images of soils.\n ";
+		myReference += "Vadose Zone Journal, doi:10.2136/vzj2017.03.0062.";
+		gd.setInsets(0, 0, 0);gd.addMessage(myReference);
+	    
+	    gd3.showDialog();
+	    if (gd3.wasCanceled()) return null;	    
+	    else {
+	    	for (int i = 0 ; i < pressureStepNumber ; i++) {
+	    		pressureSteps[i] = gd3.getNextNumber();
+	    	}
+	    	
+	    	mDS.saveAirWaterImages = gd3.getNextBoolean();
+	    }
+	  
+	    mDS.pressureStepsInMM = pressureSteps;	    
+	    
+		return mDS;
 	}
 
 	public class ColumnFinderMenuReturn {
@@ -3388,6 +3526,57 @@ public class MenuWaiter implements PlugIn {
 			if (myTiffs.length == 3) altChoice = myTiffs[0] + "     " + myTiffs[1] + "     " + myTiffs[2]+ "   ";
 			if (myTiffs.length == 4) altChoice = myTiffs[0] + "     " + myTiffs[1] + "     " + myTiffs[2] + "     " + myTiffs[3]+ "   ";
 			if (myTiffs.length > 4) altChoice = myTiffs[0] + "     " + myTiffs[1] + "     " + myTiffs[2] + "     " + myTiffs[3] + " ...   ";
+
+			//prepare radio box with the choices
+			String[] choiceOfRoi = new String[2];
+			choiceOfRoi[0] = file.getName();
+			choiceOfRoi[1] = altChoice;
+			gd.addRadioButtonGroup("Please enter your choice", choiceOfRoi, 2, 1, file.getName());			
+
+			//show dialog
+			gd.showDialog();
+		    if (gd.wasCanceled()) return null;
+		    else {
+		    	//get ROI typ
+		    	String myChoice = gd.getNextRadioButton();
+		    	int myChoiceIndex = 0;
+		    	for (int i = 0 ; i < choiceOfRoi.length ; i++) if (myChoice.equalsIgnoreCase(choiceOfRoi[i])) {
+		    		myChoiceIndex = i;
+		    		break;
+		    	}
+		    	switch (myChoiceIndex) {
+		    		case 0: mSF.selectChosen = true; break;
+		    		case 1: mSF.selectChosen = false; 
+		    	}
+	
+		    } 
+		}
+		
+		else mSF.selectChosen = true;
+		
+		return mSF;
+	}
+	
+	public SelectFiles showHistogramSelectionMenu(File file, int bitDepth) {
+
+		//construct objects
+		InputOutput jIO = new InputOutput();
+		GenericDialog gd = new GenericDialog("Do you want to process the selected file or all files in the selected folder?");
+
+		SelectFiles mSF = new SelectFiles();
+		
+		//list files in directory
+		File myPath = file.getParentFile();
+		String[] myHists = jIO.listHistsInFolder(myPath);
+		if (bitDepth == 8) myHists = jIO.listHistsInFolder8(myPath);
+		
+		if (myHists.length > 1) {
+			
+			String altChoice = ""; 
+			if (myHists.length == 2) altChoice = myHists[0] + "     " + myHists[1] + "   ";
+			if (myHists.length == 3) altChoice = myHists[0] + "     " + myHists[1] + "     " + myHists[2]+ "   ";
+			if (myHists.length == 4) altChoice = myHists[0] + "     " + myHists[1] + "     " + myHists[2] + "     " + myHists[3]+ "   ";
+			if (myHists.length > 4) altChoice = myHists[0] + "     " + myHists[1] + "     " + myHists[2] + "     " + myHists[3] + " ...   ";
 
 			//prepare radio box with the choices
 			String[] choiceOfRoi = new String[2];

@@ -224,6 +224,10 @@ public class MorphologyAnalyzer implements PlugIn {
 		public double[] tensionAtCenterInMM;
 		public double[] tensionAtBottomInMM;
 		
+		public double[] pressureAtTopInMM;
+		public double[] pressureAtCenterInMM;
+		public double[] pressureAtBottomInMM;
+		
 		public double[] areaInMM2;
 		public double[] heightInMM;
 		public double[] bulkVolumeInMM3;

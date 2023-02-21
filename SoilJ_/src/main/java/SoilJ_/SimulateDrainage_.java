@@ -2,8 +2,6 @@ package SoilJ_;
 
 import java.io.File;
 
-import SoilJ.tools.DisplayThings;
-import SoilJ.tools.HistogramStuff;
 import SoilJ.tools.ImageManipulator;
 import SoilJ.tools.ImageManipulator.StackCalculator;
 import SoilJ.tools.InputOutput;
@@ -49,7 +47,7 @@ import ij.process.ImageProcessor;
  *
  */
 
-public class ReconstructWaterRetentionCurve_ extends ImagePlus implements PlugIn  {
+public class SimulateDrainage_ extends ImagePlus implements PlugIn  {
 
 	public void run(String arg) {
 		
@@ -69,18 +67,17 @@ public class ReconstructWaterRetentionCurve_ extends ImagePlus implements PlugIn
 		InputOutput jIO = new InputOutput();		
 		ObjectDetector jOD = new ObjectDetector();
 		ImageManipulator jIM = new ImageManipulator();
-		MenuWaiter menu = new MenuWaiter();
-		HistogramStuff hist = new HistogramStuff();
+		MenuWaiter menu = new MenuWaiter();		
 		StackCalculator sC= jIM.new StackCalculator();
 		RoiHandler roi = new RoiHandler();
 		MorphologyAnalyzer morph = new MorphologyAnalyzer();
-		DisplayThings disp = new DisplayThings();
+
 		
 		// init variables
 		int i;
-		MenuWaiter.WRCCalculatorMenu mWRC = menu.new WRCCalculatorMenu();
-		mWRC = menu.showWRCMenu();
-		if (mWRC == null) return;
+		MenuWaiter.DrainageSimulatorOptions mDS = menu.new DrainageSimulatorOptions();
+		mDS = menu.showDrainageSimulatorMenu();
+		if (mDS == null) return;
 		
 		//construct image related objects
 		ImagePlus airTiff;  
@@ -91,7 +88,7 @@ public class ReconstructWaterRetentionCurve_ extends ImagePlus implements PlugIn
 		MyFileCollection mFC = jIO.fileSelector("Please choose a file or folder with your image data");				
 						
 		//create output folder
-		String myOutFolder = "WaterRetentionData";
+		String myOutFolder = "DrainageSimulation";
 		String mySubBaseFolder = jIO.getTheFolderAbove(mFC.myBaseFolder, pathSep);
 		String myOutPath = mySubBaseFolder + pathSep + myOutFolder;
 		new File(myOutPath).mkdir();		
@@ -113,17 +110,17 @@ public class ReconstructWaterRetentionCurve_ extends ImagePlus implements PlugIn
 			mFC.myOutFolder = nowOutPath;
 			
 			//load file			
-			int[] startStopSlices = jIO.findStartAndStopSlices(mFC, mWRC.mRSO);
+			int[] startStopSlices = jIO.findStartAndStopSlices(mFC, mDS.mRSO);
 			int[] colSlices = new int[startStopSlices[1] - startStopSlices[0] + 1];
 			for (int j = 0 ; j < colSlices.length ; j++) colSlices[j] = startStopSlices[0] + j;
 		
 			//cut roi		
 			mFC.startSlice = startStopSlices[0];
 			mFC.stopSlice = startStopSlices[1];
-			RoiHandler.ColumnRoi colRoi = roi.prepareDesiredRoi(mFC, jIO.openTiff3DSomeSlices(mFC, colSlices), mWRC.mRSO, "null", "null");
+			RoiHandler.ColumnRoi colRoi = roi.prepareDesiredRoi(mFC, jIO.openTiff3DSomeSlices(mFC, colSlices), mDS.mRSO, "null", "null");
 						
-			//calculate tension at top, center and bottom of column
-			mWRC.columnHeightInMM = mWRC.voxelSizeInMicroMeter * colRoi.nowTiff.getNSlices() / 1000;
+			//calculate  at top, center and bottom of column
+			mDS.columnHeightInMM = mDS.voxelSizeInMicroMeter * colRoi.nowTiff.getNSlices() / 1000;
 			
 			//colRoi.nowTiff.updateAndDraw(); colRoi.nowTiff.show();
 					
@@ -143,43 +140,42 @@ public class ReconstructWaterRetentionCurve_ extends ImagePlus implements PlugIn
 			//binTiff.updateAndDraw();binTiff.show();
 			
 			//init output structure
-			WRCPhaseProps myWRCProperties = morph.new WRCPhaseProps();
+			WRCPhaseProps myDrainageProps = morph.new WRCPhaseProps();
 			
 			//init output arrays
-			double[] tensionAtBottomInMM = new double[mWRC.tensionStepsInMM.length];
-			double[] tensionAtCenterInMM = new double[mWRC.tensionStepsInMM.length];
-			double[] tensionAtTopInMM = new double[mWRC.tensionStepsInMM.length];
+			double[] pressureAtBottomInMM = new double[mDS.pressureStepsInMM.length];
+			double[] pressureAtCenterInMM = new double[mDS.pressureStepsInMM.length];
+			double[] pressureAtTopInMM = new double[mDS.pressureStepsInMM.length];
 
-			double[] areaInMM2 = new double[mWRC.tensionStepsInMM.length];
-			double[] heightInMM = new double[mWRC.tensionStepsInMM.length];
-			double[] bulkVolumeInMM3 = new double[mWRC.tensionStepsInMM.length];
+			double[] areaInMM2 = new double[mDS.pressureStepsInMM.length];
+			double[] heightInMM = new double[mDS.pressureStepsInMM.length];
+			double[] bulkVolumeInMM3 = new double[mDS.pressureStepsInMM.length];
 			
-			double[] theta_w = new double[mWRC.tensionStepsInMM.length];			
-			double[] sigma_w = new double[mWRC.tensionStepsInMM.length];
-			double[] chi_w = new double[mWRC.tensionStepsInMM.length];			
-			double[] gamma_w = new double[mWRC.tensionStepsInMM.length];
-			double[] fractalDim_w = new double[mWRC.tensionStepsInMM.length];
-			double[] percolates_w = new double[mWRC.tensionStepsInMM.length]; 				
-			double[] thetaLC_w = new double[mWRC.tensionStepsInMM.length];
-			double[] thetaPerc_w = new double[mWRC.tensionStepsInMM.length];
+			double[] theta_w = new double[mDS.pressureStepsInMM.length];			
+			double[] sigma_w = new double[mDS.pressureStepsInMM.length];
+			double[] chi_w = new double[mDS.pressureStepsInMM.length];			
+			double[] gamma_w = new double[mDS.pressureStepsInMM.length];
+			double[] fractalDim_w = new double[mDS.pressureStepsInMM.length];
+			double[] percolates_w = new double[mDS.pressureStepsInMM.length]; 				
+			double[] thetaLC_w = new double[mDS.pressureStepsInMM.length];
+			double[] thetaPerc_w = new double[mDS.pressureStepsInMM.length];
 			
-			double[] theta_a = new double[mWRC.tensionStepsInMM.length];
-			double[] sigma_a = new double[mWRC.tensionStepsInMM.length];
-			double[] chi_a = new double[mWRC.tensionStepsInMM.length];
-			double[] gamma_a = new double[mWRC.tensionStepsInMM.length];
-			double[] fractalDim_a = new double[mWRC.tensionStepsInMM.length];
-			double[] percolates_a = new double[mWRC.tensionStepsInMM.length];
-			double[] thetaLC_a = new double[mWRC.tensionStepsInMM.length];
-			double[] thetaPerc_a = new double[mWRC.tensionStepsInMM.length];
-			double[] depthOfPenetrationInMM_a = new double[mWRC.tensionStepsInMM.length];
+			double[] theta_a = new double[mDS.pressureStepsInMM.length];
+			double[] sigma_a = new double[mDS.pressureStepsInMM.length];
+			double[] chi_a = new double[mDS.pressureStepsInMM.length];
+			double[] gamma_a = new double[mDS.pressureStepsInMM.length];
+			double[] fractalDim_a = new double[mDS.pressureStepsInMM.length];
+			double[] percolates_a = new double[mDS.pressureStepsInMM.length];
+			double[] thetaLC_a = new double[mDS.pressureStepsInMM.length];
+			double[] thetaPerc_a = new double[mDS.pressureStepsInMM.length];
+			double[] depthOfPenetrationInMM_a = new double[mDS.pressureStepsInMM.length];
 			
 			//find air and water-filled pores
-			String fileName = mFC.fileName;			
-			for (int j = 0 ; j < mWRC.tensionStepsInMM.length ; j++) {
+			for (int j = 0 ; j < mDS.pressureStepsInMM.length ; j++) {
 				
-				//extract air-filled pores
-				if (mWRC.tensionStepsInMM[j] <= -mWRC.columnHeightInMM) airTiff = sC.subtractNumber(binTiff, 128);  //if all pores in the image will be air-filled, don't bother to calculate it explicitly.
-				else airTiff = jOD.extractAirFilledPores(mWRC.tensionStepsInMM[j], colRoi.nowTiff, null, mWRC, mFC);
+				//extract air-filled pores 
+				if (-mDS.pressureStepsInMM[j] <= -mDS.columnHeightInMM) airTiff = sC.subtractNumber(binTiff, 255);  //if all pores in the image will be water-filled, don't bother to calculate it explicitly.
+				else airTiff = jOD.extractAirFilledPores(-mDS.pressureStepsInMM[j], colRoi.nowTiff, null, mDS, mFC);
 				
 				//airTiff.updateAndDraw();airTiff.show();
 				
@@ -191,26 +187,26 @@ public class ReconstructWaterRetentionCurve_ extends ImagePlus implements PlugIn
 				airRoi.nowTiff = airTiff;
 				airRoi.area = colRoi.area;
 				airRoi.pRoi = colRoi.pRoi;
-				MorphologyAnalyzer.ROIMorphoProps myAirProps = morph.getSomeSimpleMorphoProps(mFC, airRoi, mWRC.mRSO);
+				MorphologyAnalyzer.ROIMorphoProps myAirProps = morph.getSomeSimpleMorphoProps(mFC, airRoi, mDS.mRSO);
 				
 				//calculate properties for air phase
 				RoiHandler.ColumnRoi waterRoi = roi.new ColumnRoi();
 				waterRoi.nowTiff = waterTiff;
 				waterRoi.area = colRoi.area;
 				waterRoi.pRoi = colRoi.pRoi;
-				MorphologyAnalyzer.ROIMorphoProps myWaterProps = morph.getSomeSimpleMorphoProps(mFC, waterRoi, mWRC.mRSO);
+				MorphologyAnalyzer.ROIMorphoProps myWaterProps = morph.getSomeSimpleMorphoProps(mFC, waterRoi, mDS.mRSO);
 		
 				//try to free up some memory
  				System.gc();System.gc();
  				
  				//populate output structure
- 				tensionAtBottomInMM[j] = mWRC.tensionStepsInMM[j];
- 				tensionAtCenterInMM[j] = mWRC.tensionStepsInMM[j] + mWRC.columnHeightInMM / 2;
- 				tensionAtTopInMM[j] = mWRC.tensionStepsInMM[j] + mWRC.columnHeightInMM;
+ 				pressureAtBottomInMM[j] = mDS.pressureStepsInMM[j];
+ 				pressureAtCenterInMM[j] = mDS.pressureStepsInMM[j] - mDS.columnHeightInMM / 2;
+ 				pressureAtTopInMM[j] = mDS.pressureStepsInMM[j] - mDS.columnHeightInMM;
 
- 				areaInMM2[j] = colRoi.area * mWRC.voxelSizeInMicroMeter * mWRC.voxelSizeInMicroMeter / 1000000;
- 				heightInMM[j] = mWRC.columnHeightInMM;
- 				bulkVolumeInMM3[j] = myAirProps.roiBulkVolume * (Math.pow(mWRC.voxelSizeInMicroMeter / 1000, 2));
+ 				areaInMM2[j] = colRoi.area * mDS.voxelSizeInMicroMeter * mDS.voxelSizeInMicroMeter / 1000000;
+ 				heightInMM[j] = mDS.columnHeightInMM;
+ 				bulkVolumeInMM3[j] = myAirProps.roiBulkVolume * (Math.pow(mDS.voxelSizeInMicroMeter / 1000, 2));
  				
  				theta_w[j] = myWaterProps.phaseVolumeFraction; 				
  				sigma_w[j] = myWaterProps.surfaceArea / bulkVolumeInMM3[j];
@@ -229,48 +225,48 @@ public class ReconstructWaterRetentionCurve_ extends ImagePlus implements PlugIn
  				percolates_a[j] = myAirProps.phasePercolates;
  				thetaLC_a[j] = myAirProps.largesPhaseClusterVolumeFraction;
  				thetaPerc_a[j] = myAirProps.percolatingVolumeFraction;
- 				depthOfPenetrationInMM_a[j] = myAirProps.depthOfPhasePenetration * mWRC.voxelSizeInMicroMeter / 1000;
+ 				depthOfPenetrationInMM_a[j] = myAirProps.depthOfPhasePenetration * mDS.voxelSizeInMicroMeter / 1000;
  				
 				//save image
 				airwaterTiff = sC.subtract(binTiff, sC.subtractNumber(airTiff, 128));				
-				if (mWRC.tensionStepsInMM[j] < 0) mFC.fileName = "AnW_At_neg" + String.format("%04.0f",-1 * mWRC.tensionStepsInMM[j]) + "mm.tif";
-				else mFC.fileName = "AnW_At_" + String.format("%04.0f",mWRC.tensionStepsInMM[j]) + "mm.tif";
-				if (mWRC.saveAirWaterImages) jIO.tiffSaver(mFC, airwaterTiff);
+				if (mDS.pressureStepsInMM[j] < 0) mFC.fileName = "AnW_At_neg" + String.format("%04.0f",-1 * mDS.pressureStepsInMM[j]) + "mm.tif";
+				else mFC.fileName = "AnW_At_" + String.format("%04.0f",mDS.pressureStepsInMM[j]) + "mm.tif";
+				if (mDS.saveAirWaterImages) jIO.tiffSaver(mFC, airwaterTiff);
  				
 			}
 			
 			//populate output structure
-			myWRCProperties.tensionAtBottomInMM = tensionAtBottomInMM;
-			myWRCProperties.tensionAtCenterInMM = tensionAtCenterInMM;
-			myWRCProperties.tensionAtTopInMM = tensionAtTopInMM;
+			myDrainageProps.pressureAtBottomInMM = pressureAtBottomInMM;
+			myDrainageProps.pressureAtCenterInMM = pressureAtCenterInMM;
+			myDrainageProps.pressureAtTopInMM = pressureAtTopInMM;
 
-			myWRCProperties.areaInMM2 = areaInMM2;
-			myWRCProperties.heightInMM = heightInMM;
-			myWRCProperties.bulkVolumeInMM3 = bulkVolumeInMM3;
+			myDrainageProps.areaInMM2 = areaInMM2;
+			myDrainageProps.heightInMM = heightInMM;
+			myDrainageProps.bulkVolumeInMM3 = bulkVolumeInMM3;
 			
-			myWRCProperties.theta_w = theta_w; 				
-			myWRCProperties.sigma_w = sigma_w;
-			myWRCProperties.chi_w = chi_w; 				
-			myWRCProperties.gamma_w = gamma_w;
-			myWRCProperties.fractalDim_w = fractalDim_w;
-			myWRCProperties.percolates_w = percolates_w; 				
-			myWRCProperties.thetaLC_w = thetaLC_w;
-			myWRCProperties.thetaPerc_w = thetaPerc_w;
+			myDrainageProps.theta_w = theta_w; 				
+			myDrainageProps.sigma_w = sigma_w;
+			myDrainageProps.chi_w = chi_w; 				
+			myDrainageProps.gamma_w = gamma_w;
+			myDrainageProps.fractalDim_w = fractalDim_w;
+			myDrainageProps.percolates_w = percolates_w; 				
+			myDrainageProps.thetaLC_w = thetaLC_w;
+			myDrainageProps.thetaPerc_w = thetaPerc_w;
 			
-			myWRCProperties.theta_a = theta_a;
-			myWRCProperties.sigma_a = sigma_a;
-			myWRCProperties.chi_a = chi_a;
-			myWRCProperties.gamma_a = gamma_a;
-			myWRCProperties.fractalDim_a = fractalDim_a;
-			myWRCProperties.percolates_a = percolates_a;
-			myWRCProperties.thetaLC_a = thetaLC_a;
-			myWRCProperties.thetaPerc_a = thetaPerc_a;
-			myWRCProperties.depthOfPenetrationInMM_a = depthOfPenetrationInMM_a;
+			myDrainageProps.theta_a = theta_a;
+			myDrainageProps.sigma_a = sigma_a;
+			myDrainageProps.chi_a = chi_a;
+			myDrainageProps.gamma_a = gamma_a;
+			myDrainageProps.fractalDim_a = fractalDim_a;
+			myDrainageProps.percolates_a = percolates_a;
+			myDrainageProps.thetaLC_a = thetaLC_a;
+			myDrainageProps.thetaPerc_a = thetaPerc_a;
+			myDrainageProps.depthOfPenetrationInMM_a = depthOfPenetrationInMM_a;
 			
-			myWRCProperties.enforceIntegerTensions = mWRC.enforceIntegerTensions;
+			myDrainageProps.enforceIntegerTensions = mDS.enforceIntegerPressures;
 			
 			//save results as ascii
-			jIO.writeWRCResultsInASCII(mFC, myWRCProperties);
+			jIO.writeDrainageSimulationResultsInASCII(mFC, myDrainageProps);
 						
 		}
 			

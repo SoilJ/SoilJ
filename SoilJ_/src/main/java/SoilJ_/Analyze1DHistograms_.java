@@ -1,16 +1,14 @@
 package SoilJ_;
 
-import java.io.File;
-
 import SoilJ.tools.DisplayThings;
 import SoilJ.tools.HistogramStuff;
 import SoilJ.tools.InputOutput;
+import SoilJ.tools.InputOutput.Histograms;
 import SoilJ.tools.MenuWaiter;
 import SoilJ.tools.ObjectDetector;
 import SoilJ.tools.RoiHandler;
 import SoilJ.tools.RollerCaster;
 import SoilJ.tools.TailoredMaths;
-import ij.IJ;
 
 /**
  *SoilJ is a collection of ImageJ plugins for the semi-automatized processing of 3-D X-ray images of soil columns
@@ -69,86 +67,25 @@ public class Analyze1DHistograms_ extends ImagePlus implements PlugIn  {
 		DisplayThings disp = new DisplayThings();	
 		ResultsTable myTable = new ResultsTable();
 		
-		// init variables
-		int i;
+		//select a histogram file
+		InputOutput.MyFileCollection mFC = jIO.selectAHistogramFile("Please select a histogram file (.8b or .16b)");
 		
-		//tell me what I should do!
-		MenuWaiter.ROISelectionOptions mRSO = menu.showHistogramExtractionMenu();
-		if (mRSO == null) return;
+		//load histogram
+		Histograms myHist = jIO.readHistogram(mFC);
 		
-		//create Folder structure
-		InputOutput.MyFileCollection mFC = jIO.createFolders4SubROIData(mRSO);
-		
-		//also create a folder for the cut surfaces
-		if (mRSO.includeSurfaceTopography) {
-			String myCutSurfacePath = mFC.myPreOutFolder + pathSep + "CutSurfaceFiles";
-			new File(myCutSurfacePath).mkdir();
-			mFC.myCutSurfaceFolder = myCutSurfacePath;
-		}
-		
-		//probe type of images that are going to be processed..
-		mFC.fileName = mFC.myTiffs[0];
-		mFC = jIO.addCurrentFileInfo(mFC);
-		
-		float[][] allHists = new float[mFC.myTiffs.length][(int)Math.round(Math.pow(2, mFC.bitDepth))];
-		
-		//loop over 3D images
-		for (i = 0 ; i < mFC.myTiffs.length ; i++) {  //myTiffs.length
-
-			//try to free up some memory
-			System.gc();
-	
-			//write imageProperties in folder collection
-			mFC.fileName = mFC.myTiffs[i];
-			if (mFC.bitDepth == 16) mFC = jIO.addCurrentFileInfo(mFC);
-			else mFC = jIO.addCurrentFileInfo8Bit(mFC);
-			
-			//load file                                                                                                               
-			int[] startStopSlices = jIO.findStartAndStopSlices(mFC, mRSO);			
-			int[] colSlices = new int[startStopSlices[1]  - startStopSlices[0]];
-			for (int j = 0 ; j < colSlices.length ; j++) colSlices[j] = startStopSlices[0] + j;
-			ImagePlus nowTiff = jIO.openTiff3DSomeSlices(mFC, colSlices);
-			
-			//cut roi		
-			mFC.startSlice = startStopSlices[0];
-			mFC.stopSlice = startStopSlices[1];
-			
-			//cut image... the ROI handler needs the PoreSpaceAnalyzerOptions as input.. should be changed in the future..			
-			MenuWaiter.PoreSpaceAnalyzerOptions mPSA = menu.new PoreSpaceAnalyzerOptions(); 
-			mPSA.mRSO = mRSO;
-			mPSA.imagePhase2BeAnalyzed = "null";
-			RoiHandler.ColumnRoi colRoi = roi.prepareDesiredRoi(mFC, nowTiff, mRSO, mPSA.imagePhase2BeAnalyzed, "");					
-						
-			//try to free up some memory			
-			IJ.freeMemory();IJ.freeMemory();		
-			
-			//apply segmentation	
-			int[] histo = new int[(int)Math.pow(2, mFC.bitDepth)];
-			if (mFC.bitDepth == 16) histo = hist.extractHistograms16(mFC, colRoi.nowTiff);
-			else histo = hist.extractHistograms8(mFC, colRoi.nowTiff);
-			
-			for (int j = 0 ; j < (int)Math.round(Math.pow(2, mFC.bitDepth)) - 1 ; j++) {
-				allHists[i][j] = (float)histo[j];
-			}
-
-			//save it
-			jIO.writeHistogram(mFC, histo);
-		}
-		
-		//calculate joint histograms
-		InputOutput.Histograms jHisto = hist.calcJointHistogram(allHists);
-		
-		//smnooth histogram
-		double[] jh = rC.castFloat2Double(jHisto.jHisto);		
-		double[] sh = math.linearLOESSFilter(jh, mFC.bitDepth);
-		sh = math.linearLOESSFilter(sh, mFC.bitDepth);
-		float[] sJHisto = rC.castDouble2Float(sh); 
+		//calculate joint histogram.
+		if (myHist.numberOfHistograms == 1) myHist.jHisto = rC.castInt2Float(myHist.histograms[0]); 
+		else myHist = hist.calcJointHistogram(myHist.floatHistograms);		
 		
 		//calculate thresholds
-		HistogramStuff.Thresholds myThreshes = hist.calcThreshes(sJHisto);
+		HistogramStuff.Thresholds myThreshes = hist.calcThreshes(myHist.jHisto);
 			
 		//plot joint histogram		
-		disp.plotHistogramAdvanced(sJHisto, 0); 
+		disp.plotHistogramAdvanced(myHist.jHisto, 0); 
+		
+		//save histogram
+		if (mFC.bitDepth == 8) jIO.writeJointHistogram8(mFC, rC.castFloat2Int(myHist.jHisto));
+		if (mFC.bitDepth == 16) jIO.writeJointHistogram(mFC, rC.castFloat2Int(myHist.jHisto));
 		
 		//plot table with thresholds
 		ResultsTable tab = new ResultsTable();
