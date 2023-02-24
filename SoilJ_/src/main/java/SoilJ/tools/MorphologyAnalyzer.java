@@ -781,14 +781,14 @@ public class MorphologyAnalyzer implements PlugIn {
 		
 	}
 
-	public boolean[] checkForPercolatingClusters(int nParticles, ArrayList<Integer> conTop, ArrayList<Integer> conBot) {
+	public ArrayList<Integer> checkForPercolatingClusters(int nParticles, ArrayList<Integer> conTop, ArrayList<Integer> conBot) {
 			
 			int i;		
+			ArrayList<Integer> conPerk= new ArrayList<Integer>();
 			
 			//check if 
-			if (nParticles < 1) { 
-				boolean[] isPercolating = {false, false};
-				return isPercolating; 
+			if (nParticles < 1) {
+				return conPerk; 
 			}
 							
 			//sort Lists
@@ -798,23 +798,12 @@ public class MorphologyAnalyzer implements PlugIn {
 			//checking if a cluster is percolating..
 			//IJ.showStatus("Pinning down percolating clusters ...");
 					
-			//find percolating clusters
-			ArrayList<Integer> conPerk= new ArrayList<Integer>();
+			//find percolating clusters			
 	        for (int temp : conTop) {
 	        	if (conBot.contains(temp)) conPerk.add(temp);
 	        }
-					
-			//writing touches to cluster properties
-			int numOfCluster = nParticles;
-			boolean[] isPercolating = new boolean[numOfCluster];
-			
-			//init touching information
-			for (i = 0 ; i < isPercolating.length ; i++) {
-				if (conPerk.contains(i)) isPercolating[i] = true;
-				else isPercolating[i] = false;
-			}
 		
-			return isPercolating;	
+			return conPerk;	
 		}
 	
 	public FractalProperties calculateFractalProperties(RoiHandler.ColumnRoi colRoi, MenuWaiter.ROISelectionOptions mRSO) {
@@ -1154,10 +1143,7 @@ public class MorphologyAnalyzer implements PlugIn {
 			
 			ArrayList<Integer> laConTop = check4TouchingTheTop(laParLaTiff, nowTiff, surfTiff);	
 			ArrayList<Integer> laConBot = check4TouchingTheBottom(laParLaTiff, nowTiff, surfTiff);
-			boolean[] laP = checkForPercolatingClusters(numOfObjects, laConTop, laConBot);
-			ArrayList<Integer> percolatingClusters = new ArrayList<Integer>();
-			
-			for (int i = 0 ; i < laP.length ; i++) if (laP[i] == true) percolatingClusters.add(i + 1);
+			ArrayList<Integer> percolatingClusters = checkForPercolatingClusters(numOfObjects, laConTop, laConBot);
 			
 			if (!percolatingClusters.isEmpty()) {
 				laPerco = true;
@@ -1236,10 +1222,7 @@ public class MorphologyAnalyzer implements PlugIn {
 			
 			ArrayList<Integer> laConTop = check4TouchingTheTop(laParLaTiff, laPores, surfTiff);	
 			ArrayList<Integer> laConBot = check4TouchingTheBottom(laParLaTiff, laPores, surfTiff);
-			boolean[] laP = checkForPercolatingClusters(numOfObjects, laConTop, laConBot);
-			ArrayList<Integer> percolatingClusters = new ArrayList<Integer>();
-			
-			for (int i = 0 ; i < laP.length ; i++) if (laP[i] == true) percolatingClusters.add(i + 1);
+			ArrayList<Integer> percolatingClusters = checkForPercolatingClusters(numOfObjects, laConTop, laConBot);
 			
 			//laParLaTiff.updateAndDraw();
 			//laParLaTiff.show();
@@ -2653,18 +2636,13 @@ public class MorphologyAnalyzer implements PlugIn {
 			myP.eulerNumber = StatUtils.sum(morphoEuler);	
 			
 			//calculate percolating clusters ... needs the other parameters.. and is needed for following parameters	
-			boolean[] cTop = new boolean[1]; cTop[0] = false;
-			boolean[] cBot = new boolean[1]; cBot[0] = false;		
-			boolean[] isPercolating = new boolean[1]; isPercolating[0] = false;
+			ArrayList<Integer> conTop = new ArrayList<Integer>();
+			ArrayList<Integer> conBot = new ArrayList<Integer>();
+			ArrayList<Integer> isPercolating = new ArrayList<Integer>();
 			if (numOfObjects > 0) {
-				ArrayList<Integer> conTop = check4TouchingTheTop(labelTiff, colRoi.nowTiff, surfTiff);
-				ArrayList<Integer> conBot = check4TouchingTheBottom(labelTiff, colRoi.nowTiff, surfTiff);
-				cTop = new boolean[numOfObjects];
-				for (int i = 0 ; i < numOfObjects; i++) if (conTop.contains(i)) cTop[i] = true;
-				cBot = new boolean[numOfObjects];
-				for (int i = 0 ; i < numOfObjects; i++) if (conBot.contains(i)) cBot[i] = true;
-				isPercolating = new boolean[numOfObjects];
-				isPercolating = checkForPercolatingClusters(numOfObjects, conTop, conBot);
+				conTop = check4TouchingTheTop(labelTiff, colRoi.nowTiff, surfTiff);
+				conBot = check4TouchingTheBottom(labelTiff, colRoi.nowTiff, surfTiff);
+				isPercolating = checkForPercolatingClusters(numOfObjects, conTop, conBot);				
 			}
 			
 			//free memory	
@@ -2716,15 +2694,23 @@ public class MorphologyAnalyzer implements PlugIn {
 						surfaceArea[i] = morphoSurf[sortedIndices[i]];		
 						meanCurvature[i] = morphoCurv[sortedIndices[i]];
 						euler[i] = morphoEuler[sortedIndices[i]];
-						
-						tTop[i] = cTop[sortedIndices[i]];
-						tBot[i] = cBot[sortedIndices[i]];
-						percolating[i] = isPercolating[sortedIndices[i]];
-						
+	
 					}
 				}
 			}
-		
+
+			//also find percolating clusters
+			for (int i = 0 ; i < id.length ; i++) {
+				if (conTop.contains(id[i])) tTop[i] = true;
+				else  tTop[i] = false;
+				
+				if (conBot.contains(id[i])) tBot[i] = true;
+				else  tBot[i] = false;
+				
+				if (isPercolating.contains(id[i])) percolating[i] = true;
+				else  percolating[i] = false;
+			}
+			
 			//assign results to output structure		
 			mPCP.hasItObjects = hasItObjects;
 			mPCP.id = id;
@@ -3085,12 +3071,8 @@ public class MorphologyAnalyzer implements PlugIn {
 		
 		ArrayList<Integer> laConTop = check4TouchingTheTop(laParLaTiff, laPores, surfTiff);	
 		ArrayList<Integer> laConBot = check4TouchingTheBottom(laParLaTiff, laPores, surfTiff);
-		boolean[] laP = checkForPercolatingClusters(numOfObjects, laConTop, laConBot);
-		
-		//collect all percolating clusters
-		ArrayList<Integer> percolatingClusters = new ArrayList<Integer>();
-		for (int i = 0 ; i < laP.length ; i++) if (laP[i] == true) percolatingClusters.add(i + 1);
-		
+		ArrayList<Integer> percolatingClusters = checkForPercolatingClusters(numOfObjects, laConTop, laConBot);
+
 		//remove all isolated clusters
 		ImageStack outStack = new ImageStack(laParLaTiff.getWidth(), laParLaTiff.getHeight());
 		ImagePlus outTiff = new ImagePlus();
@@ -4061,21 +4043,19 @@ public class MorphologyAnalyzer implements PlugIn {
 		myR.eulerNumber = StatUtils.sum(morphoEuler);	
 		
 		//calculate percolating clusters ... needs the other parameters.. and is needed for following parameters	
-		boolean[] cTop = new boolean[numOfObjects]; 
-		boolean[] cBot = new boolean[numOfObjects];	
-		boolean[] isPercolating = new boolean[numOfObjects];		
+		//calculate percolating clusters ... needs the other parameters.. and is needed for following parameters	
+		ArrayList<Integer> conTop = new ArrayList<Integer>();
+		ArrayList<Integer> conBot = new ArrayList<Integer>();
+		ArrayList<Integer> isPercolating = new ArrayList<Integer>();
 		if (numOfObjects > 0) {
-			ArrayList<Integer> conTop = check4TouchingTheTop(labelTiff, colRoi.nowTiff, surfTiff);
-			ArrayList<Integer> conBot = check4TouchingTheBottom(labelTiff, colRoi.nowTiff, surfTiff);			
-			for (int i = 0 ; i < numOfObjects; i++) if (conTop.contains(i)) cTop[i] = true;
-			for (int i = 0 ; i < numOfObjects; i++) if (conBot.contains(i)) cBot[i] = true;
-			isPercolating = checkForPercolatingClusters(numOfObjects, conTop, conBot);		
-			IJ.wait(33);
-		}		
+			conTop = check4TouchingTheTop(labelTiff, colRoi.nowTiff, surfTiff);
+			conBot = check4TouchingTheBottom(labelTiff, colRoi.nowTiff, surfTiff);
+			isPercolating = checkForPercolatingClusters(numOfObjects, conTop, conBot);				
+		}	
 		
 		//calculate percolating phase fraction
 		double percolatingVolume = 0;
-		for (int i = 0 ; i < isPercolating.length ; i++) if (isPercolating[i]) percolatingVolume += morphoVols[i-1]; //in contrast to the BoneJ particle counter, MorphoLibJ always omits the background.  
+		for (int i : isPercolating) percolatingVolume += morphoVols[i-1];   
 		myR.percolatingVolumeFraction = percolatingVolume / myR.roiBulkVolume;
 		
 		//check if volume percolates

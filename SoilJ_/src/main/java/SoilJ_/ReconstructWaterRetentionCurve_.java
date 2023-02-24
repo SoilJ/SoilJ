@@ -82,17 +82,14 @@ public class ReconstructWaterRetentionCurve_ extends ImagePlus implements PlugIn
 		if (mWRC == null) return;
 		
 		//construct image related objects
-		ImagePlus airTiff;  
-		ImagePlus waterTiff;
 		ImagePlus airwaterTiff;  //output
 		
 		//read base folder and number of 3D images
 		MyFileCollection mFC = jIO.fileSelector("Please choose a file or folder with your image data");				
 						
 		//create output folder
-		String myOutFolder = "WaterRetentionData";
-		String mySubBaseFolder = jIO.getTheFolderAbove(mFC.myBaseFolder, pathSep);
-		String myOutPath = mySubBaseFolder + pathSep + myOutFolder;
+		String myOutFolder = "WaterRetentionData";	
+		String myOutPath = mFC.myBaseFolder + pathSep + myOutFolder;
 		new File(myOutPath).mkdir();		
 		mFC.myOutFolder = myOutPath;
 						
@@ -181,41 +178,36 @@ public class ReconstructWaterRetentionCurve_ extends ImagePlus implements PlugIn
 			//double[] fraction10to20VXFromAeratedPore = new double[mWRC.tensionStepsInMM.length];
 			//double[] fractionMoreThan10to20VXFromAeratedPore = new double[mWRC.tensionStepsInMM.length];
 			
+			RoiHandler.ColumnRoi airRoi = roi.new ColumnRoi();
 			//find air and water-filled pores	
 			for (int j = 0 ; j < mWRC.tensionStepsInMM.length ; j++) {
 				
 				//extract air-filled pores
-				if (mWRC.tensionStepsInMM[j] <= -mWRC.columnHeightInMM) airTiff = sC.subtractNumber(binTiff, 128);  //if all pores in the image will be air-filled, don't bother to calculate it explicitly.
-				else airTiff = jOD.extractAirFilledPores(mWRC.tensionStepsInMM[j], colRoi.nowTiff, null, mWRC, mFC);
+				if (mWRC.tensionStepsInMM[j] <= -mWRC.columnHeightInMM) airRoi.nowTiff = sC.subtractNumber(binTiff, 128);  //if all pores in the image will be air-filled, don't bother to calculate it explicitly.
+				else airRoi.nowTiff = jOD.extractAirFilledPores(mWRC.tensionStepsInMM[j], colRoi.nowTiff, null, mWRC, mFC);
 				//colRoi.nowTiff.unlock();colRoi.nowTiff.flush();
 				//System.gc();System.gc();
 				
 				//airTiff.updateAndDraw();airTiff.show();
 				
 				//calculate properties for air phase
-				RoiHandler.ColumnRoi airRoi = roi.new ColumnRoi();
-				airRoi.nowTiff = airTiff;
 				airRoi.area = colRoi.area;
 				airRoi.pRoi = colRoi.pRoi;
 				airRoi.voxelSizeInMicron = mWRC.voxelSizeInMicroMeter;
 				MorphologyAnalyzer.ROIMorphoProps myAirProps = morph.getSomeSimpleMorphoProps(mFC, airRoi, mWRC.mRSO);
 				
-				
-				  //calculate distances to next air-filled pore.
-				  MorphologyAnalyzer.ROIMorphoProps myDistProps = morph.getDistances2AirFilledPores(mFC, airRoi, mWRC.mRSO);
-		  
-				  //extract water phase image. 
-				  waterTiff = sC.subtract(binTiff, airTiff);
-				  airRoi.nowTiff.unlock();airRoi.nowTiff.flush(); 
-				  System.gc();System.gc();			  //try to free up some memory
-				  
-				  //calculate properties for air phase 
-				  RoiHandler.ColumnRoi waterRoi = roi.new ColumnRoi(); 
-				  waterRoi.nowTiff = waterTiff; 
-				  waterRoi.area = colRoi.area;
-				  waterRoi.pRoi = colRoi.pRoi; 
-				  MorphologyAnalyzer.ROIMorphoProps myWaterProps = morph.getSomeSimpleMorphoProps(mFC, waterRoi, mWRC.mRSO);
-				 
+			
+			    //calculate distances to next air-filled pore.
+			    MorphologyAnalyzer.ROIMorphoProps myDistProps = morph.getDistances2AirFilledPores(mFC, airRoi, mWRC.mRSO);
+	  	  			  
+			    //calculate properties for air phase 
+			    RoiHandler.ColumnRoi waterRoi = roi.new ColumnRoi(); 
+			    waterRoi.nowTiff = sC.subtract(binTiff, airRoi.nowTiff);
+			    waterRoi.area = colRoi.area;
+			    waterRoi.pRoi = colRoi.pRoi; 
+			    MorphologyAnalyzer.ROIMorphoProps myWaterProps = morph.getSomeSimpleMorphoProps(mFC, waterRoi, mWRC.mRSO);
+			    
+			    //waterRoi.nowTiff.updateAndDraw();waterRoi.nowTiff.show();
 				
  				//populate output structure
  				tensionAtBottomInMM[j] = mWRC.tensionStepsInMM[j];
@@ -250,7 +242,7 @@ public class ReconstructWaterRetentionCurve_ extends ImagePlus implements PlugIn
  				fractionMoreThan3MMFromPhaseBoundary[j] = myDistProps.fractionMoreThan3MMFromPhaseBoundary;
  				
 				//save image
-				airwaterTiff = sC.subtract(binTiff, sC.subtractNumber(airTiff, 128));				
+				airwaterTiff = sC.subtract(binTiff, sC.subtractNumber(airRoi.nowTiff, 128));				
 				if (mWRC.tensionStepsInMM[j] < 0) mFC.fileName = "AnW_At_neg" + String.format("%04.0f",-1 * mWRC.tensionStepsInMM[j]) + "mm.tif";
 				else mFC.fileName = "AnW_At_" + String.format("%04.0f",mWRC.tensionStepsInMM[j]) + "mm.tif";
 				if (mWRC.saveAirWaterImages) jIO.tiffSaver(mFC, airwaterTiff);
