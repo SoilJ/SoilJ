@@ -760,16 +760,18 @@ public class RoiHandler implements PlugIn {
 				offsetX[i] = colRoi.pRoi[i].getXBase() - cutRoi.getXBase();		
 				offsetY[i] = colRoi.pRoi[i].getYBase() - cutRoi.getYBase();		
 
-				ixmid[i] = colRoi.jCO.ixmid[i + mFC.startSlice] - cutRoi.getXBase();						
-				iymid[i] = colRoi.jCO.iymid[i + mFC.startSlice] - cutRoi.getYBase();
-				innerMajorRadius[i] = colRoi.jCO.innerMajorRadius[i + mFC.startSlice] - mRSO.cutAwayFromWall;
-				innerMinorRadius[i] = colRoi.jCO.innerMinorRadius[i + mFC.startSlice] - mRSO.cutAwayFromWall;
-				outerMajorRadius[i] = colRoi.jCO.innerMajorRadius[i + mFC.startSlice] - mRSO.cutAwayFromWall;
-				outerMinorRadius[i] = colRoi.jCO.innerMinorRadius[i + mFC.startSlice] - mRSO.cutAwayFromWall;
-				theta[i] = colRoi.jCO.theta[i + mFC.startSlice];
-				wallThickness[i] = colRoi.jCO.wallThickness[i + mFC.startSlice];
-				nowZ[i] = i + 1;
-				dummy[i] = 0;
+				if (GandS[0].contains("Gauge")) {
+					ixmid[i] = colRoi.jCO.xmid[i + mFC.startSlice] - cutRoi.getXBase();						
+					iymid[i] = colRoi.jCO.ymid[i + mFC.startSlice] - cutRoi.getYBase();
+					innerMajorRadius[i] = colRoi.jCO.innerMajorRadius[i + mFC.startSlice] - mRSO.cutAwayFromWall;
+					innerMinorRadius[i] = colRoi.jCO.innerMinorRadius[i + mFC.startSlice] - mRSO.cutAwayFromWall;
+					outerMajorRadius[i] = colRoi.jCO.outerMajorRadius[i + mFC.startSlice] - mRSO.cutAwayFromWall;
+					outerMinorRadius[i] = colRoi.jCO.outerMinorRadius[i + mFC.startSlice] - mRSO.cutAwayFromWall;
+					theta[i] = colRoi.jCO.theta[i + mFC.startSlice];
+					wallThickness[i] = colRoi.jCO.wallThickness[i + mFC.startSlice];
+					nowZ[i] = i + 1;
+					dummy[i] = 0;
+				}
 				
 				//remember old image canvas dimensions
 				//double oldX = cutRoi.getXBase();
