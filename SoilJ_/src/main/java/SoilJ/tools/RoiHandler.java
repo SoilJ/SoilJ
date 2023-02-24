@@ -49,12 +49,17 @@ public class RoiHandler implements PlugIn {
 	public class ColumnRoi {
 		
 		public double area;
-		public double voxelSize;
+		public double voxelSizeInMicron;
 		public ObjectDetector.ColCoords3D jCO;
+		public ObjectDetector.ColCoords3D outCO;
 		public PolygonRoi[] pRoi;
 		public PolygonRoi[] iRoi;
+		public PolygonRoi[] outRoi;
 		public ImagePlus nowTiff;
 		public ImagePlus surfaceNotCut;
+		
+		public int oldWidth;
+		public int oldHeight;
 		
 	}
 	
@@ -469,6 +474,7 @@ public class RoiHandler implements PlugIn {
 		double area = 0;
 		boolean hasSurface = mRSO.includeSurfaceTopography;
 		
+		
 		//check if mFC and mRSO values match
 		if (mRSO.cutAwayFromTop != mFC.startSlice) mFC.startSlice = mRSO.cutAwayFromTop;
 		if (mRSO.cutAwayFromBottom > 0 & mRSO.cutAwayFromBottom != nowTiff.getNSlices() - mFC.stopSlice) mFC.stopSlice = nowTiff.getNSlices() - mRSO.cutAwayFromBottom;
@@ -714,6 +720,21 @@ public class RoiHandler implements PlugIn {
 			ImageStack cutStack1 = new ImageStack(maxX-minX, maxY-minY);
 			
 			//nowTiff.updateAndDraw();nowTiff.show();			
+			double[] offsetX = new double[outTiffs[0].getNSlices()];
+			double[] offsetY = new double[outTiffs[0].getNSlices()];
+			double[] ixmid = new double[outTiffs[0].getNSlices()];
+			double[] iymid = new double[outTiffs[0].getNSlices()];			
+			double[] innerMajorRadius = new double[outTiffs[0].getNSlices()];
+			double[] innerMinorRadius = new double[outTiffs[0].getNSlices()];	
+			double[] outerMajorRadius = new double[outTiffs[0].getNSlices()];
+			double[] outerMinorRadius = new double[outTiffs[0].getNSlices()];	
+			double[] theta = new double[outTiffs[0].getNSlices()];
+			double[] wallThickness = new double[outTiffs[0].getNSlices()];
+			double[] nowZ = new double[outTiffs[0].getNSlices()];
+			double[] dummy = new double[outTiffs[0].getNSlices()];
+					
+			PolygonRoi[] outRoi = new PolygonRoi[outTiffs[0].getNSlices()];
+			ObjectDetector.ColCoords3D nowCoords = jOD.new ColCoords3D();
 		
 			for (int i = 0 ; i < outTiffs[0].getNSlices() ; i++) {
 				
@@ -734,6 +755,25 @@ public class RoiHandler implements PlugIn {
 				
 				nowIP.setRoi(cutRoi);
 				ImageProcessor cutIP = nowIP.crop();
+			
+				//make new ColumnRoi
+				offsetX[i] = colRoi.pRoi[i].getXBase() - cutRoi.getXBase();		
+				offsetY[i] = colRoi.pRoi[i].getYBase() - cutRoi.getYBase();		
+
+				ixmid[i] = colRoi.jCO.ixmid[i + mFC.startSlice] - cutRoi.getXBase();						
+				iymid[i] = colRoi.jCO.iymid[i + mFC.startSlice] - cutRoi.getYBase();
+				innerMajorRadius[i] = colRoi.jCO.innerMajorRadius[i + mFC.startSlice] - mRSO.cutAwayFromWall;
+				innerMinorRadius[i] = colRoi.jCO.innerMinorRadius[i + mFC.startSlice] - mRSO.cutAwayFromWall;
+				outerMajorRadius[i] = colRoi.jCO.innerMajorRadius[i + mFC.startSlice] - mRSO.cutAwayFromWall;
+				outerMinorRadius[i] = colRoi.jCO.innerMinorRadius[i + mFC.startSlice] - mRSO.cutAwayFromWall;
+				theta[i] = colRoi.jCO.theta[i + mFC.startSlice];
+				wallThickness[i] = colRoi.jCO.wallThickness[i + mFC.startSlice];
+				nowZ[i] = i + 1;
+				dummy[i] = 0;
+				
+				//remember old image canvas dimensions
+				//double oldX = cutRoi.getXBase();
+				//colRoi.oldHeight = nowTiff.getHeight();
 				
 				cutStack0.addSlice(cutIP);
 				
@@ -747,7 +787,26 @@ public class RoiHandler implements PlugIn {
 					
 					cutStack1.addSlice(cutIP1);					
 				}
+				
 			}
+
+			nowCoords.xmid = ixmid;
+			nowCoords.ymid = iymid;
+			nowCoords.zmid = nowZ;
+			nowCoords.innerMajorRadius = innerMajorRadius;
+			nowCoords.innerMinorRadius = innerMinorRadius;
+			nowCoords.outerMajorRadius = outerMajorRadius;
+			nowCoords.outerMinorRadius = outerMinorRadius;
+			nowCoords.theta = theta;
+			nowCoords.itheta = theta;
+			nowCoords.heightOfColumn = outTiffs[0].getNSlices();
+			nowCoords.wallThickness = wallThickness;
+			nowCoords.ixmid = ixmid;
+			nowCoords.iymid = iymid;
+			nowCoords.innerR2 = dummy;
+			nowCoords.outerR2 = dummy;
+			colRoi.outCO = nowCoords;
+			colRoi.outRoi = makeMeAPolygonRoiStack("inner", "exact", nowCoords, 0);	
 			
 			outTiffs[0].setStack(cutStack0);
 			if (outTiffs[1] != null) outTiffs[1].setStack(cutStack1);

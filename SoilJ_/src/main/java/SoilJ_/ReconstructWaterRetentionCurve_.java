@@ -3,7 +3,6 @@ package SoilJ_;
 import java.io.File;
 
 import SoilJ.tools.DisplayThings;
-import SoilJ.tools.HistogramStuff;
 import SoilJ.tools.ImageManipulator;
 import SoilJ.tools.ImageManipulator.StackCalculator;
 import SoilJ.tools.InputOutput;
@@ -13,6 +12,7 @@ import SoilJ.tools.MorphologyAnalyzer;
 import SoilJ.tools.MorphologyAnalyzer.WRCPhaseProps;
 import SoilJ.tools.ObjectDetector;
 import SoilJ.tools.RoiHandler;
+import ij.IJ;
 
 /**
  *SoilJ is a collection of ImageJ plugins for the semi-automatized processing of 3-D X-ray images of soil columns
@@ -70,7 +70,6 @@ public class ReconstructWaterRetentionCurve_ extends ImagePlus implements PlugIn
 		ObjectDetector jOD = new ObjectDetector();
 		ImageManipulator jIM = new ImageManipulator();
 		MenuWaiter menu = new MenuWaiter();
-		HistogramStuff hist = new HistogramStuff();
 		StackCalculator sC= jIM.new StackCalculator();
 		RoiHandler roi = new RoiHandler();
 		MorphologyAnalyzer morph = new MorphologyAnalyzer();
@@ -174,6 +173,9 @@ public class ReconstructWaterRetentionCurve_ extends ImagePlus implements PlugIn
 			double[] depthOfPenetrationInMM_a = new double[mWRC.tensionStepsInMM.length];
 			
 		    double[] averageDistanceFromAeratedPoreInMM = new double[mWRC.tensionStepsInMM.length]; 
+		    double[] fractionLessThan3MMFromPhaseBoundary = new double[mWRC.tensionStepsInMM.length]; 
+		    double[] fractionMoreThan3MMFromPhaseBoundary = new double[mWRC.tensionStepsInMM.length]; 
+		    
 			//double[] fractionLessThan5VXFromAeratedPore = new double[mWRC.tensionStepsInMM.length];
 			//double[] fraction5to10VXFromAeratedPore = new double[mWRC.tensionStepsInMM.length];
 			//double[] fraction10to20VXFromAeratedPore = new double[mWRC.tensionStepsInMM.length];
@@ -185,32 +187,36 @@ public class ReconstructWaterRetentionCurve_ extends ImagePlus implements PlugIn
 				//extract air-filled pores
 				if (mWRC.tensionStepsInMM[j] <= -mWRC.columnHeightInMM) airTiff = sC.subtractNumber(binTiff, 128);  //if all pores in the image will be air-filled, don't bother to calculate it explicitly.
 				else airTiff = jOD.extractAirFilledPores(mWRC.tensionStepsInMM[j], colRoi.nowTiff, null, mWRC, mFC);
+				//colRoi.nowTiff.unlock();colRoi.nowTiff.flush();
+				//System.gc();System.gc();
 				
 				//airTiff.updateAndDraw();airTiff.show();
-				
-				//extract water-filled pores
-				waterTiff = sC.subtract(binTiff, airTiff);
 				
 				//calculate properties for air phase
 				RoiHandler.ColumnRoi airRoi = roi.new ColumnRoi();
 				airRoi.nowTiff = airTiff;
 				airRoi.area = colRoi.area;
 				airRoi.pRoi = colRoi.pRoi;
+				airRoi.voxelSizeInMicron = mWRC.voxelSizeInMicroMeter;
 				MorphologyAnalyzer.ROIMorphoProps myAirProps = morph.getSomeSimpleMorphoProps(mFC, airRoi, mWRC.mRSO);
 				
-				//calculate distances to next air-filled pore.				
-				MorphologyAnalyzer.ROIMorphoProps myDistProps = morph.getDistances2AirFilledPores(mFC, airRoi, mWRC.mRSO);
-								
-				//calculate properties for air phase
-				RoiHandler.ColumnRoi waterRoi = roi.new ColumnRoi();
-				waterRoi.nowTiff = waterTiff;
-				waterRoi.area = colRoi.area;
-				waterRoi.pRoi = colRoi.pRoi;
-				MorphologyAnalyzer.ROIMorphoProps myWaterProps = morph.getSomeSimpleMorphoProps(mFC, waterRoi, mWRC.mRSO);
 				
-				//try to free up some memory
- 				System.gc();System.gc();
- 				
+				  //calculate distances to next air-filled pore.
+				  MorphologyAnalyzer.ROIMorphoProps myDistProps = morph.getDistances2AirFilledPores(mFC, airRoi, mWRC.mRSO);
+		  
+				  //extract water phase image. 
+				  waterTiff = sC.subtract(binTiff, airTiff);
+				  airRoi.nowTiff.unlock();airRoi.nowTiff.flush(); 
+				  System.gc();System.gc();			  //try to free up some memory
+				  
+				  //calculate properties for air phase 
+				  RoiHandler.ColumnRoi waterRoi = roi.new ColumnRoi(); 
+				  waterRoi.nowTiff = waterTiff; 
+				  waterRoi.area = colRoi.area;
+				  waterRoi.pRoi = colRoi.pRoi; 
+				  MorphologyAnalyzer.ROIMorphoProps myWaterProps = morph.getSomeSimpleMorphoProps(mFC, waterRoi, mWRC.mRSO);
+				 
+				
  				//populate output structure
  				tensionAtBottomInMM[j] = mWRC.tensionStepsInMM[j];
  				tensionAtCenterInMM[j] = mWRC.tensionStepsInMM[j] + mWRC.columnHeightInMM / 2;
@@ -221,7 +227,7 @@ public class ReconstructWaterRetentionCurve_ extends ImagePlus implements PlugIn
  				bulkVolumeInMM3[j] = myAirProps.roiBulkVolume * (Math.pow(mWRC.voxelSizeInMicroMeter / 1000, 2));
  				
  				theta_w[j] = myWaterProps.phaseVolumeFraction; 				
- 				sigma_w[j] = myWaterProps.surfaceArea / bulkVolumeInMM3[j];
+				sigma_w[j] = myWaterProps.surfaceArea / bulkVolumeInMM3[j];
  				chi_w[j] = myWaterProps.eulerNumber; 				
  				gamma_w[j] = myWaterProps.gamma;
  				fractalDim_w[j] = myWaterProps.surfaceFractalDimension;
@@ -240,6 +246,8 @@ public class ReconstructWaterRetentionCurve_ extends ImagePlus implements PlugIn
  				depthOfPenetrationInMM_a[j] = myAirProps.depthOfPhasePenetration * mWRC.voxelSizeInMicroMeter / 1000;
  				
  				averageDistanceFromAeratedPoreInMM[j] = myDistProps.averageDistance2PhaseBoundary * mWRC.voxelSizeInMicroMeter / 1000; 
+ 				fractionLessThan3MMFromPhaseBoundary[j] = myDistProps.fractionLessThan3MMFromPhaseBoundary;
+ 				fractionMoreThan3MMFromPhaseBoundary[j] = myDistProps.fractionMoreThan3MMFromPhaseBoundary;
  				
 				//save image
 				airwaterTiff = sC.subtract(binTiff, sC.subtractNumber(airTiff, 128));				
@@ -278,6 +286,8 @@ public class ReconstructWaterRetentionCurve_ extends ImagePlus implements PlugIn
 			myWRCProperties.depthOfPenetrationInMM_a = depthOfPenetrationInMM_a;
 			
 			myWRCProperties.averageDistanceFromAeratedPoreInMM = averageDistanceFromAeratedPoreInMM; 
+			myWRCProperties.fractionLessThan3MMFromPhaseBoundary = fractionLessThan3MMFromPhaseBoundary;
+			myWRCProperties.fractionMoreThan3MMFromPhaseBoundary = fractionMoreThan3MMFromPhaseBoundary;
 			
 			myWRCProperties.enforceIntegerTensions = mWRC.enforceIntegerTensions;
 			
@@ -285,6 +295,8 @@ public class ReconstructWaterRetentionCurve_ extends ImagePlus implements PlugIn
 			jIO.writeWRCResultsInASCII(mFC, myWRCProperties);
 						
 		}
+		
+		IJ.showMessage("Water retention curves have been reconstructed for all samples!!");
 			
 	}
 }

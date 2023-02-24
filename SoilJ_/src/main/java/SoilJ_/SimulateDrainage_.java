@@ -169,31 +169,29 @@ public class SimulateDrainage_ extends ImagePlus implements PlugIn  {
 			double[] thetaLC_a = new double[mDS.pressureStepsInMM.length];
 			double[] thetaPerc_a = new double[mDS.pressureStepsInMM.length];
 			double[] depthOfPenetrationInMM_a = new double[mDS.pressureStepsInMM.length];
-			
+						
 			//find air and water-filled pores
+			RoiHandler.ColumnRoi airRoi = roi.new ColumnRoi();
+			RoiHandler.ColumnRoi waterRoi = roi.new ColumnRoi();
+			airRoi.area = colRoi.area;
+			airRoi.pRoi = colRoi.pRoi;
+			waterRoi.area = colRoi.area;
+			waterRoi.pRoi = colRoi.pRoi;
 			for (int j = 0 ; j < mDS.pressureStepsInMM.length ; j++) {
 				
 				//extract air-filled pores 
-				if (-mDS.pressureStepsInMM[j] <= -mDS.columnHeightInMM) airTiff = sC.subtractNumber(binTiff, 255);  //if all pores in the image will be water-filled, don't bother to calculate it explicitly.
-				else airTiff = jOD.extractAirFilledPores(-mDS.pressureStepsInMM[j], colRoi.nowTiff, null, mDS, mFC);
+				if (-mDS.pressureStepsInMM[j] <= -mDS.columnHeightInMM) airRoi.nowTiff = sC.subtractNumber(binTiff, 255);  //if all pores in the image will be water-filled, don't bother to calculate it explicitly.
+				else airRoi.nowTiff = jOD.extractAirFilledPores(-mDS.pressureStepsInMM[j], colRoi.nowTiff, null, mDS, mFC);
 				
 				//airTiff.updateAndDraw();airTiff.show();
 				
 				//extract water-filled pores
-				waterTiff = sC.subtract(binTiff, airTiff);
+				waterRoi.nowTiff = sC.subtract(binTiff, airRoi.nowTiff);
 				
 				//calculate properties for air phase
-				RoiHandler.ColumnRoi airRoi = roi.new ColumnRoi();
-				airRoi.nowTiff = airTiff;
-				airRoi.area = colRoi.area;
-				airRoi.pRoi = colRoi.pRoi;
-				MorphologyAnalyzer.ROIMorphoProps myAirProps = morph.getSomeSimpleMorphoProps(mFC, airRoi, mDS.mRSO);
+			    MorphologyAnalyzer.ROIMorphoProps myAirProps = morph.getSomeSimpleMorphoProps(mFC, airRoi, mDS.mRSO);
 				
 				//calculate properties for air phase
-				RoiHandler.ColumnRoi waterRoi = roi.new ColumnRoi();
-				waterRoi.nowTiff = waterTiff;
-				waterRoi.area = colRoi.area;
-				waterRoi.pRoi = colRoi.pRoi;
 				MorphologyAnalyzer.ROIMorphoProps myWaterProps = morph.getSomeSimpleMorphoProps(mFC, waterRoi, mDS.mRSO);
 		
 				//try to free up some memory
@@ -228,10 +226,12 @@ public class SimulateDrainage_ extends ImagePlus implements PlugIn  {
  				depthOfPenetrationInMM_a[j] = myAirProps.depthOfPhasePenetration * mDS.voxelSizeInMicroMeter / 1000;
  				
 				//save image
-				airwaterTiff = sC.subtract(binTiff, sC.subtractNumber(airTiff, 128));				
-				if (mDS.pressureStepsInMM[j] < 0) mFC.fileName = "AnW_At_neg" + String.format("%04.0f",-1 * mDS.pressureStepsInMM[j]) + "mm.tif";
-				else mFC.fileName = "AnW_At_" + String.format("%04.0f",mDS.pressureStepsInMM[j]) + "mm.tif";
-				if (mDS.saveAirWaterImages) jIO.tiffSaver(mFC, airwaterTiff);
+ 				if (mDS.saveAirWaterImages) {
+ 					airwaterTiff = sC.subtract(binTiff, sC.subtractNumber(airRoi.nowTiff, 128));
+ 					if (mDS.pressureStepsInMM[j] < 0) mFC.fileName = "AnW_At_neg" + String.format("%04.0f",-1 * mDS.pressureStepsInMM[j]) + "mm.tif";
+ 					else mFC.fileName = "AnW_At_" + String.format("%04.0f",mDS.pressureStepsInMM[j]) + "mm.tif";
+ 					jIO.tiffSaver(mFC, airwaterTiff);
+ 				}
  				
 			}
 			

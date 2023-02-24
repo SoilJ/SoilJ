@@ -1899,8 +1899,8 @@ public class InputOutput extends ImagePlus implements PlugIn {
             		"theta_w\t" + "sigma_w\t" + "Euler_w\t" + "Gamma_w\t" + "fractalDim_w\t" + "percolates_w\t" + 
             		"ThetaLargestCluster_w\t" + "ThetaPercolatingCluster_w\t" + 
             		"theta_a\t" + "sigma_a\t" + "Euler_a\t" + "Gamma_a\t" + "fractalDim_a\t" + "percolates_a\t" + 
-            		"ThetaLargestCluster_a\t" + "ThetaPercolatingCluster_a\t" + 
-            		"depthOfPenetration_a\t" + "averageDistanceFromAeratedPoreInMM\n";
+            		"ThetaLargestCluster_a\t" + "ThetaPercolatingCluster_a\t" + "depthOfPenetration_a\t" + 
+            		"averageDistanceFromAeratedPoreInMM\t" + "fractionLessThan3MMFromPhaseBoundary\t" + "fractionMoreThan3MMFromPhaseBoundary\n";
             w.write(myPreHeader);
             w.flush();
             
@@ -1938,7 +1938,9 @@ public class InputOutput extends ImagePlus implements PlugIn {
             	integralString += String.format("%1.3f", myWRCProps.thetaLC_a[i]) + "\t";
             	integralString += String.format("%1.3f", myWRCProps.thetaPerc_a[i]) + "\t";          
             	integralString += String.format("%4.2f", myWRCProps.depthOfPenetrationInMM_a[i]) + "\t";
-            	integralString += String.format("%1.3f", myWRCProps.averageDistanceFromAeratedPoreInMM[i]) + "\n";      
+            	integralString += String.format("%1.3f", myWRCProps.averageDistanceFromAeratedPoreInMM[i]) + "\t";   
+            	integralString += String.format("%1.3f", myWRCProps.fractionLessThan3MMFromPhaseBoundary[i]) + "\t";  
+            	integralString += String.format("%1.3f", myWRCProps.fractionMoreThan3MMFromPhaseBoundary[i]) + "\n";  
             	
             	//integralString += String.format("%6.2f", myWRCProps.dc_a) + "\t";
             	//integralString += String.format("%6.2f", myWRCProps.thetaWellAerated_a) + "\t";

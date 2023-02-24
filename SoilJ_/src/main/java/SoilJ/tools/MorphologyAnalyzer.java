@@ -256,10 +256,8 @@ public class MorphologyAnalyzer implements PlugIn {
 		public double[] depthOfPenetrationInMM_a;
 		
 		public double[] averageDistanceFromAeratedPoreInMM; 
-		public double[] fractionLessThan5VXFromAeratedPore;
-		public double[] fraction5to10VXFromAeratedPore;
-		public double[] fraction10to20VXFromAeratedPore;
-		public double[] fractionMoreThan10to20VXFromAeratedPore;
+		public double[] fractionLessThan3MMFromPhaseBoundary;
+		public double[] fractionMoreThan3MMFromPhaseBoundary;
 		
 		public boolean enforceIntegerTensions;
 		
@@ -3153,19 +3151,25 @@ public class MorphologyAnalyzer implements PlugIn {
 		return avgThick;
 	}
 	
-	public double calculateAverageValue(ImagePlus thickTiff, RoiHandler.ColumnRoi pRoi) {
+	public DistanceProps calculatePhaseDistanceProperties(ImagePlus thickTiff, RoiHandler.ColumnRoi pRoi) {
 		
 		DisplayThings disp = new DisplayThings();
+		DistanceProps mDP = new DistanceProps();
 		
 		ArrayList<Float> listOfThicknesses = new ArrayList<Float>();
+		int volumeOfAerobicVoxels = 0;
+		int volumeOfAnaerobicVoxels = 0;
 			
+		//calcluate 3 mm cutoff
+		double my3mm = 3f / (pRoi.voxelSizeInMicron / 1000);
+		
 		for (int z = 0 ; z < thickTiff.getNSlices() ; z++) {
 			
 			thickTiff.setSlice(z + 1);
 			ImageProcessor nowIP = thickTiff.getProcessor().duplicate();
-			
-			nowIP.setRoi(pRoi.pRoi[z]);
-			nowIP.crop();
+		
+			nowIP.setColor(0);
+			nowIP.fillOutside(pRoi.pRoi[z]);
 			
 			//disp.displayIP(nowIP, null);
 			
@@ -3173,7 +3177,11 @@ public class MorphologyAnalyzer implements PlugIn {
 				for (int y = 0 ; y < thickTiff.getHeight() ; y++) {
 					
 					float nowPix = nowIP.getPixelValue(x, y);
-					if (nowPix > 0) listOfThicknesses.add(nowPix);
+					if (nowPix > 0) {
+						listOfThicknesses.add(nowPix);
+						if (nowPix <= my3mm) volumeOfAerobicVoxels++;
+						if (nowPix > my3mm) volumeOfAnaerobicVoxels++;
+					}
 					
 				}
 			}
@@ -3184,7 +3192,12 @@ public class MorphologyAnalyzer implements PlugIn {
 		
 		double avgThick = StatUtils.mean(thickArray);
 		
-		return avgThick;
+		mDP.averageDistance2PhaseBoundaryInMM = avgThick;
+		mDP.fractionLessThan3MMFromPhaseBoundary = volumeOfAerobicVoxels / (pRoi.area * thickTiff.getNSlices());
+		mDP.fractionMoreThan3MMFromPhaseBoundary = volumeOfAnaerobicVoxels / (pRoi.area * thickTiff.getNSlices());;
+		
+		
+		return mDP;
 	}
 	
 	public ImagePlus findClusterConnected2Top(ImagePlus nowTiff, double drainingDepthInVx) {
@@ -3535,10 +3548,8 @@ public class MorphologyAnalyzer implements PlugIn {
 		
 		public double averagePhaseDiameter;
 		public double averageDistance2PhaseBoundary;
-		public double fractionLessThan5VXFromPhaseBoundary;
-		public double fraction5to10VXFromPhaseBoundary;
-		public double fraction10to20VXFromPhaseBoundary;
-		public double fractionMoreThan10to20VXFromPhaseBoundary;
+		public double fractionLessThan3MMFromPhaseBoundary;
+		public double fractionMoreThan3MMFromPhaseBoundary;
 		
 		public double surfaceFractalDimension;					
 		
@@ -3557,6 +3568,14 @@ public class MorphologyAnalyzer implements PlugIn {
 		public double depthOfPhasePenetration;
 
 		public int[] distanceHistogram;		
+		
+	}
+	
+	public class DistanceProps {
+		
+		public double averageDistance2PhaseBoundaryInMM;
+		public double fractionLessThan3MMFromPhaseBoundary;
+		public double fractionMoreThan3MMFromPhaseBoundary;
 		
 	}
 	
@@ -3931,27 +3950,30 @@ public class MorphologyAnalyzer implements PlugIn {
 		float[] floatWeights = ChamferWeights3D.BORGEFORS.getFloatWeights();
 		boolean normalize = true;
 		DistanceTransform3D dt = new DistanceTransform3DFloat(floatWeights, normalize);
-		ImageStack result = dt.distanceMap(distStack);
+		distStack = dt.distanceMap(distStack);
 		
 		//remove topmost slice and set to distTiff
-		result.deleteSlice(1);
-		distTiff.setStack(result);
+		distStack.deleteSlice(1);
+		distTiff.setStack(distStack);
 
 		//distTiff.updateAndDraw();distTiff.show();
 		
 		//calc average distance to aerated pore		
-		myR.averageDistance2PhaseBoundary = calculateAverageValue(distTiff, colRoi);
+		DistanceProps myDP = calculatePhaseDistanceProperties(distTiff, colRoi);
+		myR.averageDistance2PhaseBoundary = myDP.averageDistance2PhaseBoundaryInMM;
+		myR.fractionLessThan3MMFromPhaseBoundary = myDP.fractionLessThan3MMFromPhaseBoundary;
+		myR.fractionMoreThan3MMFromPhaseBoundary = myDP.fractionMoreThan3MMFromPhaseBoundary;
 		
-		//get histogram of distances
-		ImageStack binStack = new ImageStack(colRoi.nowTiff.getWidth(), colRoi.nowTiff.getHeight(),colRoi.nowTiff.getNSlices());			
-		for (int z = 1 ; z < colRoi.nowTiff.getNSlices() ; z++) {  //skip first slice since it was added to sumulate the soil surface..
-			distTiff.setPosition(z + 1);
-			ImageProcessor thIP = distTiff.getProcessor();
-			ImageProcessor cpIP = thIP.duplicate();			
-			ImageProcessor binIP = cpIP.convertToByte(false);
-			binStack.setProcessor(binIP, z);		
-		}
-		ImagePlus binTiff = new ImagePlus("distanceBin", binStack);
+//		//get histogram of distances
+//		ImageStack binStack = new ImageStack(colRoi.nowTiff.getWidth(), colRoi.nowTiff.getHeight(),colRoi.nowTiff.getNSlices());			
+//		for (int z = 1 ; z < colRoi.nowTiff.getNSlices() ; z++) {  //skip first slice since it was added to sumulate the soil surface..
+//			distTiff.setPosition(z + 1);
+//			ImageProcessor thIP = distTiff.getProcessor();
+//			ImageProcessor cpIP = thIP.duplicate();			
+//			ImageProcessor binIP = cpIP.convertToByte(false);
+//			binStack.setProcessor(binIP, z);		
+//		}
+//		ImagePlus binTiff = new ImagePlus("distanceBin", binStack);
 		
 		//binTiff.updateAndDraw();binTiff.show();
 		

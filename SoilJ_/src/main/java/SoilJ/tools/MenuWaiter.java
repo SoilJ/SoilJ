@@ -2508,6 +2508,10 @@ public class MenuWaiter implements PlugIn {
 				
 		public String imagePhase2BeAnalyzed = "255";
 		
+		public boolean calcAir;
+		public boolean calcMatrixDistance;
+		public boolean calcWater;
+		
 	}
 	
 	public class DrainageSimulatorOptions {
@@ -2702,10 +2706,10 @@ public class MenuWaiter implements PlugIn {
 	    gd3.addCheckbox("Do you want to save the images of air and water?", false);
 	    
 		myReference = "If you are using this plugin please cite the following references: \n\n";
-		gd.setInsets(40, 0, 0);gd.addMessage(myReference);
+		gd3.setInsets(40, 0, 0);gd.addMessage(myReference);
 		myReference = "Koestel, J. 2018. SoilJ: An ImageJ plugin for the semiautomatic processing of three-dimensional X-ray images of soils.\n ";
 		myReference += "Vadose Zone Journal, doi:10.2136/vzj2017.03.0062.";
-		gd.setInsets(0, 0, 0);gd.addMessage(myReference);
+		gd3.setInsets(0, 0, 0);gd3.addMessage(myReference);
 	    
 	    gd3.showDialog();
 	    if (gd3.wasCanceled()) return null;	    
@@ -2718,6 +2722,31 @@ public class MenuWaiter implements PlugIn {
 	    }
 	  
 	    mWRC.tensionStepsInMM = tensionSteps;	    
+	    
+//	    //construct objects
+//	    GenericDialog gd4 = new GenericDialog("Water retention curve calculator - reduce memory requirements?");
+//	    
+//	    myText = "Calculating all implemented properties of air, water and matrix phases is very memory intensive.\n ";
+//		myText += "In case you run out of memory, you may want to deselect some of the following calculations.\n";
+//		gd4.setInsets(0, 0, 0);gd4.addMessage(myText);
+//	    
+//	    gd4.addCheckbox("Yes, please calculate morphological properties of the air phase", true);
+//	    gd4.addCheckbox("Yes, please calculate morphological properties of the water phase", true);
+//	    gd4.addCheckbox("Yes, please calculate distances to the next air-filled pore", true);
+//	    
+//	    gd4.showDialog();
+//	    if (gd4.wasCanceled()) return null;	    
+//	    else {	    	
+//	    	mWRC.calcAir = gd4.getNextBoolean();
+//	    	mWRC.calcWater = gd4.getNextBoolean();
+//	    	mWRC.calcMatrixDistance = gd4.getNextBoolean();
+//	    }
+//	    
+//		myReference = "If you are using this plugin please cite the following references: \n\n";
+//		gd4.setInsets(40, 0, 0);gd.addMessage(myReference);
+//		myReference = "Koestel, J. 2018. SoilJ: An ImageJ plugin for the semiautomatic processing of three-dimensional X-ray images of soils.\n ";
+//		myReference += "Vadose Zone Journal, doi:10.2136/vzj2017.03.0062.";
+//		gd4.setInsets(0, 0, 0);gd4.addMessage(myReference);
 	    
 		return mWRC;
 	}

@@ -286,7 +286,7 @@ public class TailoredMaths implements PlugIn {
 		double[][] xy = new double[angleAtThisAngle.length][2];
 	
 		for (j = 0 ; j < angleAtThisAngle.length ; j++) {			
-			double alpha = angleAtThisAngle[j] - theta + Math.PI / 2;
+			double alpha = angleAtThisAngle[j] - theta;// + Math.PI / 2;
 			double a = major;
 			double b = minor;			
 			xy[j][0] = xCenter - a * Math.cos(alpha) * Math.cos(theta) + b * Math.sin(alpha) * Math.sin(theta);
