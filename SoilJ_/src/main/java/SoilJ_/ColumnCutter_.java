@@ -73,7 +73,7 @@ public class ColumnCutter_ extends ImagePlus implements PlugIn  {
 		//create Folder structure
 		InputOutput.MyFileCollection mFC = jIO.createFolders4SubROIData(mRSO);				
 		String myInnerCircleFolder =  mFC.myOutFolder + pathSep + "InnerCircle";
-		new File(mFC.myInnerCircleFolder).mkdir();			
+		new File(myInnerCircleFolder).mkdir();			
 		
 		//loop over 3D images
 		for (i = 0 ; i < mFC.myTiffs.length ; i++) {  //myTiffs.length

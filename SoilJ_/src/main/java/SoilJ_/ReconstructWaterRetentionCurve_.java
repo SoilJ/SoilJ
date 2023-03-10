@@ -92,6 +92,10 @@ public class ReconstructWaterRetentionCurve_ extends ImagePlus implements PlugIn
 		String myOutPath = mFC.myBaseFolder + pathSep + myOutFolder;
 		new File(myOutPath).mkdir();		
 		mFC.myOutFolder = myOutPath;
+		
+	    //monitor memory
+	    Runtime rt = Runtime.getRuntime();
+	    long currInUse = (rt.totalMemory() - rt.freeMemory()) / 1000000000;  //in GB
 						
 		//loop over 3D images
 		for (i = 0 ; i < mFC.myTiffs.length ; i++) {  
@@ -117,7 +121,9 @@ public class ReconstructWaterRetentionCurve_ extends ImagePlus implements PlugIn
 			mFC.startSlice = startStopSlices[0];
 			mFC.stopSlice = startStopSlices[1];
 			RoiHandler.ColumnRoi colRoi = roi.prepareDesiredRoi(mFC, jIO.openTiff3DSomeSlices(mFC, colSlices), mWRC.mRSO, "null", "null");
-						
+			System.gc();System.gc();
+			currInUse = (rt.totalMemory() - rt.freeMemory()) / 1000000000; 	
+			
 			//calculate tension at top, center and bottom of column
 			mWRC.columnHeightInMM = mWRC.voxelSizeInMicroMeter * colRoi.nowTiff.getNSlices() / 1000;
 			
@@ -135,6 +141,15 @@ public class ReconstructWaterRetentionCurve_ extends ImagePlus implements PlugIn
 				binStack.setProcessor(binIP, z+1);		
 			}
 			ImagePlus binTiff = new ImagePlus("bin", binStack);
+			System.gc();System.gc();
+			currInUse = (rt.totalMemory() - rt.freeMemory()) / 1000000000; 
+			
+			//create drainage map...
+			IJ.showStatus("Creating drainage map..");
+			ImagePlus drainageTiff = jOD.createDrainageMap(mWRC.tensionStepsInMM, colRoi.nowTiff, null, mWRC, mFC);
+			colRoi.nowTiff.unlock();colRoi.nowTiff.flush();
+			System.gc();System.gc();
+			currInUse = (rt.totalMemory() - rt.freeMemory()) / 1000000000; 
 			
 			//binTiff.updateAndDraw();binTiff.show();
 			
@@ -178,36 +193,55 @@ public class ReconstructWaterRetentionCurve_ extends ImagePlus implements PlugIn
 			//double[] fraction10to20VXFromAeratedPore = new double[mWRC.tensionStepsInMM.length];
 			//double[] fractionMoreThan10to20VXFromAeratedPore = new double[mWRC.tensionStepsInMM.length];
 			
-			RoiHandler.ColumnRoi airRoi = roi.new ColumnRoi();
 			//find air and water-filled pores	
 			for (int j = 0 ; j < mWRC.tensionStepsInMM.length ; j++) {
 				
-				//extract air-filled pores
-				if (mWRC.tensionStepsInMM[j] <= -mWRC.columnHeightInMM) airRoi.nowTiff = sC.subtractNumber(binTiff, 128);  //if all pores in the image will be air-filled, don't bother to calculate it explicitly.
-				else airRoi.nowTiff = jOD.extractAirFilledPores(mWRC.tensionStepsInMM[j], colRoi.nowTiff, null, mWRC, mFC);
-				//colRoi.nowTiff.unlock();colRoi.nowTiff.flush();
-				//System.gc();System.gc();
-				
-				//airTiff.updateAndDraw();airTiff.show();
-				
-				//calculate properties for air phase
+				//set up calculate properties for air phase		
+				IJ.showStatus("Calc air phase props at h = " + String.format("%03.0f", mWRC.tensionStepsInMM[j]) + " mm");
+				RoiHandler.ColumnRoi airRoi = roi.new ColumnRoi();				
 				airRoi.area = colRoi.area;
 				airRoi.pRoi = colRoi.pRoi;
-				airRoi.voxelSizeInMicron = mWRC.voxelSizeInMicroMeter;
-				MorphologyAnalyzer.ROIMorphoProps myAirProps = morph.getSomeSimpleMorphoProps(mFC, airRoi, mWRC.mRSO);
+				airRoi.voxelSizeInMicron = mWRC.voxelSizeInMicroMeter;	
+				airRoi.nowTiff = jOD.extractAirFilledPores(j, drainageTiff, null, mWRC, mFC);
+				System.gc();System.gc();
+				currInUse = (rt.totalMemory() - rt.freeMemory()) / 1000000000; 
 				
-			
-			    //calculate distances to next air-filled pore.
-			    MorphologyAnalyzer.ROIMorphoProps myDistProps = morph.getDistances2AirFilledPores(mFC, airRoi, mWRC.mRSO);
-	  	  			  
-			    //calculate properties for air phase 
+				//drainageTiff.updateAndDraw();drainageTiff.show();
+				//airRoi.nowTiff.updateAndDraw();airRoi.nowTiff.show();
+			    
+				//save image
+			    if (mWRC.saveAirWaterImages) {			    		    
+			    	airwaterTiff = sC.subtract(binTiff, sC.subtractNumber(airRoi.nowTiff, 128));				
+			    	if (mWRC.tensionStepsInMM[j] < 0) mFC.fileName = "AnW_At_neg" + String.format("%04.0f",-1 * mWRC.tensionStepsInMM[j]) + "mm.tif";
+			    	else mFC.fileName = "AnW_At_" + String.format("%04.0f",mWRC.tensionStepsInMM[j]) + "mm.tif";
+			    	jIO.tiffSaver(mFC, airwaterTiff);		
+			    	airwaterTiff.unlock();airwaterTiff.flush();
+			    	System.gc();System.gc();
+			    }
+				currInUse = (rt.totalMemory() - rt.freeMemory()) / 1000000000; 
+			    
+			    //calculate water phase properties
+			    IJ.showStatus("Calc water morphs at h = " + String.format("%03.0f", mWRC.tensionStepsInMM[j]) + " mm");
 			    RoiHandler.ColumnRoi waterRoi = roi.new ColumnRoi(); 
 			    waterRoi.nowTiff = sC.subtract(binTiff, airRoi.nowTiff);
 			    waterRoi.area = colRoi.area;
 			    waterRoi.pRoi = colRoi.pRoi; 
 			    MorphologyAnalyzer.ROIMorphoProps myWaterProps = morph.getSomeSimpleMorphoProps(mFC, waterRoi, mWRC.mRSO);
+			    waterRoi.nowTiff.unlock();waterRoi.nowTiff.flush();	
+				System.gc();System.gc();
+				currInUse = (rt.totalMemory() - rt.freeMemory()) / 1000000000; 
+	    
+			    //calculate distances to next air-filled pore.
+				IJ.showStatus("Calc distances to air at h = " + String.format("%03.0f", mWRC.tensionStepsInMM[j]) + " mm");
+			    MorphologyAnalyzer.ROIMorphoProps myDistProps = morph.getDistances2AirFilledPores(mFC, airRoi, mWRC.mRSO);
+				System.gc();System.gc();
+				currInUse = (rt.totalMemory() - rt.freeMemory()) / 1000000000; 
 			    
-			    //waterRoi.nowTiff.updateAndDraw();waterRoi.nowTiff.show();
+			    //calculate properties for air phase
+			    IJ.showStatus("Calc air morphs at h = " + String.format("%03.0f", mWRC.tensionStepsInMM[j]) + " mm");
+				MorphologyAnalyzer.ROIMorphoProps myAirProps = morph.getSomeSimpleMorphoProps(mFC, airRoi, mWRC.mRSO);					
+				System.gc();System.gc();
+				currInUse = (rt.totalMemory() - rt.freeMemory()) / 1000000000; 
 				
  				//populate output structure
  				tensionAtBottomInMM[j] = mWRC.tensionStepsInMM[j];
@@ -240,12 +274,6 @@ public class ReconstructWaterRetentionCurve_ extends ImagePlus implements PlugIn
  				averageDistanceFromAeratedPoreInMM[j] = myDistProps.averageDistance2PhaseBoundary * mWRC.voxelSizeInMicroMeter / 1000; 
  				fractionLessThan3MMFromPhaseBoundary[j] = myDistProps.fractionLessThan3MMFromPhaseBoundary;
  				fractionMoreThan3MMFromPhaseBoundary[j] = myDistProps.fractionMoreThan3MMFromPhaseBoundary;
- 				
-				//save image
-				airwaterTiff = sC.subtract(binTiff, sC.subtractNumber(airRoi.nowTiff, 128));				
-				if (mWRC.tensionStepsInMM[j] < 0) mFC.fileName = "AnW_At_neg" + String.format("%04.0f",-1 * mWRC.tensionStepsInMM[j]) + "mm.tif";
-				else mFC.fileName = "AnW_At_" + String.format("%04.0f",mWRC.tensionStepsInMM[j]) + "mm.tif";
-				if (mWRC.saveAirWaterImages) jIO.tiffSaver(mFC, airwaterTiff);
  				
 			}
 			

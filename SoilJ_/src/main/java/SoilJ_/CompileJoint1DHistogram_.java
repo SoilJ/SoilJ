@@ -124,7 +124,7 @@ public class CompileJoint1DHistogram_ extends ImagePlus implements PlugIn  {
 			
 			//apply segmentation	
 			int[] histo = new int[(int)Math.pow(2, mFC.bitDepth)];
-			if (mFC.bitDepth == 16) histo = hist.extractHistograms16(mFC, colRoi.nowTiff);
+			if (mFC.bitDepth == 16) histo = hist.extractHistograms16(colRoi.nowTiff);
 			else histo = hist.extractHistograms8(mFC, colRoi.nowTiff);
 			
 			for (int j = 0 ; j < (int)Math.round(Math.pow(2, mFC.bitDepth)) - 1 ; j++) {

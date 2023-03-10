@@ -3380,6 +3380,48 @@ public class ImageManipulator implements PlugIn {
 		return outTiff;
 		
 	}
+	
+	public ImagePlus binarize3DImage(ImagePlus nowTiff, double lowerThreshold, double upperThreshold) {
+		
+		ImagePlus outTiff = new ImagePlus();
+		ImageStack outStack = new ImageStack(nowTiff.getWidth(), nowTiff.getHeight());
+		
+		for (int z = 0 ; z < nowTiff.getNSlices() ; z++) {
+			
+			nowTiff.setSlice(z + 1);			
+			ImageProcessor nowIP = nowTiff.getProcessor().duplicate();			
+			
+			IJ.showStatus("Binarizing air phase in layer " + (z + 1));
+						
+			ImageProcessor outIP = new ByteProcessor(nowIP.getWidth(), nowIP.getHeight());
+			if (nowTiff.getBytesPerPixel() > 0) {
+				
+				for (int x = 0 ; x < outIP.getWidth() ; x++) {
+					for (int y = 0 ; y < outIP.getHeight() ; y++) {
+						
+						int nowPix = nowIP.getPixel(x, y);
+						
+						if (nowPix > lowerThreshold & nowPix < upperThreshold) outIP.putPixel(x, y, 255);
+						else outIP.putPixel(x, y, 0);	
+						
+					}					
+				}
+				
+			}
+			else {
+				nowIP.threshold(threshold);
+				outIP = nowIP;
+			}			
+					
+			outStack.addSlice(outIP);
+			
+		}
+	
+		outTiff.setStack(outStack);	
+			
+		return outTiff;
+		
+	}
 
 	public ImagePlus binarize3DFloatImage(ImagePlus nowTiff, double threshold) {
 		

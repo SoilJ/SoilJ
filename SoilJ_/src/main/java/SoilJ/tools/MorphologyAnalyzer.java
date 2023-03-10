@@ -48,6 +48,7 @@ import inra.ijpb.binary.ChamferWeights3D;
 import inra.ijpb.binary.conncomp.FloodFillComponentsLabeling3D;
 import inra.ijpb.binary.distmap.DistanceTransform3D;
 import inra.ijpb.binary.distmap.DistanceTransform3DFloat;
+import inra.ijpb.binary.distmap.DistanceTransform3DShort;
 import inra.ijpb.geometry.Box3D;
 import inra.ijpb.label.LabelImages;
 import inra.ijpb.measure.region3d.BoundingBox3D;
@@ -339,6 +340,15 @@ public class MorphologyAnalyzer implements PlugIn {
 		
 		//idImp.updateAndDraw();idImp.show();		
 		
+		//transform List to Array for better preformance
+		IJ.showStatus("Sorting out detected air clusters..");
+		Collections.sort(percolatingClusters);
+		int maximalClusterID = 0;
+		if (percolatingClusters.size() > 0) maximalClusterID = percolatingClusters.get(percolatingClusters.size() - 1);
+		boolean[] myClusters = new boolean[maximalClusterID + 1];		
+		if (maximalClusterID == 0) myClusters[0] = false;
+		else for (int i = 0 ; i < myClusters.length - 1 ; i++) myClusters[percolatingClusters.get(i)] = true;		
+		
 		for (int z = 1 ; z <= idImp.getNSlices() ; z++) {
 			
 			IJ.showStatus("Extracting respective clusters in slice " + z + "/" + idImp.getNSlices());
@@ -352,9 +362,11 @@ public class MorphologyAnalyzer implements PlugIn {
 				for (int y = 0 ; y < binIP.getWidth() ; y++) {
 					
 					int id = (int)Math.round(idIP.getPixelValue(x, y));
-					if (percolatingClusters.contains(id)) binIP.putPixel(x, y, 255);
-					else binIP.putPixel(x, y, 0);
-					
+					if (id > maximalClusterID) binIP.putPixel(x, y, 0);
+					else {
+						if (myClusters[id]) binIP.putPixel(x, y, 255);
+						else binIP.putPixel(x, y, 0);
+					}
 				}
 				
 			}
@@ -3135,49 +3147,27 @@ public class MorphologyAnalyzer implements PlugIn {
 	
 	public DistanceProps calculatePhaseDistanceProperties(ImagePlus thickTiff, RoiHandler.ColumnRoi pRoi) {
 		
-		DisplayThings disp = new DisplayThings();
 		DistanceProps mDP = new DistanceProps();
-		
-		ArrayList<Float> listOfThicknesses = new ArrayList<Float>();
-		int volumeOfAerobicVoxels = 0;
-		int volumeOfAnaerobicVoxels = 0;
+		HistogramStuff hist = new HistogramStuff();
 			
 		//calcluate 3 mm cutoff
 		double my3mm = 3f / (pRoi.voxelSizeInMicron / 1000);
 		
-		for (int z = 0 ; z < thickTiff.getNSlices() ; z++) {
-			
-			thickTiff.setSlice(z + 1);
-			ImageProcessor nowIP = thickTiff.getProcessor().duplicate();
+		//extract histogram
+		int[] myHist = hist.extractHistograms16(thickTiff);
+		myHist[0] = 0;
 		
-			nowIP.setColor(0);
-			nowIP.fillOutside(pRoi.pRoi[z]);
-			
-			//disp.displayIP(nowIP, null);
-			
-			for (int x = 0 ; x < thickTiff.getWidth() ; x++) {
-				for (int y = 0 ; y < thickTiff.getHeight() ; y++) {
-					
-					float nowPix = nowIP.getPixelValue(x, y);
-					if (nowPix > 0) {
-						listOfThicknesses.add(nowPix);
-						if (nowPix <= my3mm) volumeOfAerobicVoxels++;
-						if (nowPix > my3mm) volumeOfAnaerobicVoxels++;
-					}
-					
-				}
-			}
-		}
+		//caclulate aerated voxels
+		float ovox = 0;
+		float avox = 0;
+		for (int i = 0 ; i < my3mm ; i++) ovox += myHist[i];
+		for (int i = (int)Math.ceil(my3mm) ; i < myHist.length ; i++) avox += myHist[i];
 		
-		double[] thickArray = new double[listOfThicknesses.size()]; 
-		for (int i = 0 ; i < thickArray.length ; i++) thickArray[i] = listOfThicknesses.get(i);
-		
-		double avgThick = StatUtils.mean(thickArray);
-		
-		mDP.averageDistance2PhaseBoundaryInMM = avgThick;
-		mDP.fractionLessThan3MMFromPhaseBoundary = volumeOfAerobicVoxels / (pRoi.area * thickTiff.getNSlices());
-		mDP.fractionMoreThan3MMFromPhaseBoundary = volumeOfAnaerobicVoxels / (pRoi.area * thickTiff.getNSlices());;
-		
+		//assign results
+		mDP.averageDistance2PhaseBoundaryInMM = hist.findMeanFromHistogram(myHist);
+		mDP.medianDistance2PhaseBoundaryInMM = hist.findMedianFromHistogram(myHist);
+		mDP.fractionLessThan3MMFromPhaseBoundary = ovox / (pRoi.area * thickTiff.getNSlices());
+		mDP.fractionMoreThan3MMFromPhaseBoundary = avox / (pRoi.area * thickTiff.getNSlices());;
 		
 		return mDP;
 	}
@@ -3189,6 +3179,7 @@ public class MorphologyAnalyzer implements PlugIn {
 		//nowTiff.updateAndDraw();nowTiff.show();
 		
 		//find connected pore clusters
+		IJ.showStatus("Find air phases connected to top..");
 		FloodFillComponentsLabeling3D myFCCL = new FloodFillComponentsLabeling3D(26, 32);
 		ImageStack myLabelStack = myFCCL.computeLabels(nowTiff.getStack());
 		
@@ -3556,6 +3547,9 @@ public class MorphologyAnalyzer implements PlugIn {
 	public class DistanceProps {
 		
 		public double averageDistance2PhaseBoundaryInMM;
+		public double medianDistance2PhaseBoundaryInMM;
+		public double maxDistance2PhaseBoundaryInMM;
+		public double modeDistance2PhaseBoundaryInMM;
 		public double fractionLessThan3MMFromPhaseBoundary;
 		public double fractionMoreThan3MMFromPhaseBoundary;
 		
@@ -3900,10 +3894,6 @@ public class MorphologyAnalyzer implements PlugIn {
 	public ROIMorphoProps getDistances2AirFilledPores(InputOutput.MyFileCollection	mFC, ColumnRoi colRoi, MenuWaiter.ROISelectionOptions mRSO) {
 		
 		MorphologyAnalyzer morph = new MorphologyAnalyzer();
-		InputOutput jIO = new InputOutput();
-		BoundingBox3D mBB = new BoundingBox3D();
-		DisplayThings disp = new DisplayThings();
-		HistogramStuff hist = new HistogramStuff();
 		
 		//init output structure
 		MorphologyAnalyzer.ROIMorphoProps myR = morph.new ROIMorphoProps();
@@ -3922,29 +3912,38 @@ public class MorphologyAnalyzer implements PlugIn {
 			nowIP.invert();
 			distStack.addSlice(nowIP);
 		}
-		ImagePlus distTiff = new ImagePlus("inverted", distStack);
+		
+	    //monitor memory
+	    Runtime rt = Runtime.getRuntime();
+	    long currInUse = (rt.totalMemory() - rt.freeMemory()) / 1000000000;  //in GB		
 		
 		//distTiff.updateAndDraw();distTiff.show();
 		
 		//calculate distance map
 		IJ.showStatus("Performing Euklidean distance transform ...");
 		
-		float[] floatWeights = ChamferWeights3D.BORGEFORS.getFloatWeights();
+		short[] shortWeights = ChamferWeights3D.BORGEFORS.getShortWeights();
 		boolean normalize = true;
-		DistanceTransform3D dt = new DistanceTransform3DFloat(floatWeights, normalize);
+		DistanceTransform3D dt = new DistanceTransform3DShort(shortWeights, normalize);
 		distStack = dt.distanceMap(distStack);
-		
+				
 		//remove topmost slice and set to distTiff
 		distStack.deleteSlice(1);
-		distTiff.setStack(distStack);
+		ImagePlus distTiff = new ImagePlus("DistImage", distStack);
 
 		//distTiff.updateAndDraw();distTiff.show();
 		
-		//calc average distance to aerated pore		
+		//calc average distance to aerated pore
+		currInUse = (rt.totalMemory() - rt.freeMemory()) / 1000000000;  //in GB		
 		DistanceProps myDP = calculatePhaseDistanceProperties(distTiff, colRoi);
 		myR.averageDistance2PhaseBoundary = myDP.averageDistance2PhaseBoundaryInMM;
 		myR.fractionLessThan3MMFromPhaseBoundary = myDP.fractionLessThan3MMFromPhaseBoundary;
 		myR.fractionMoreThan3MMFromPhaseBoundary = myDP.fractionMoreThan3MMFromPhaseBoundary;
+		
+		//delete distTiff
+		distTiff.unlock();distTiff.flush();
+		System.gc();System.gc();
+		currInUse = (rt.totalMemory() - rt.freeMemory()) / 1000000000;  //in GB	
 		
 //		//get histogram of distances
 //		ImageStack binStack = new ImageStack(colRoi.nowTiff.getWidth(), colRoi.nowTiff.getHeight(),colRoi.nowTiff.getNSlices());			

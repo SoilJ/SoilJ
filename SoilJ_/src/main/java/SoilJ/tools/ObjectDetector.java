@@ -5393,61 +5393,24 @@ public ColCoords3D findClosestXYSlice2Bottom(InputOutput.MyFileCollection mFC, C
 		
 	}
 	
-	public ImagePlus extractAirFilledPores(double tension, ImagePlus nowTiff, ImagePlus surfTiff, MenuWaiter.WRCCalculatorMenu mWRC, InputOutput.MyFileCollection mFC) {
+	public ImagePlus extractAirFilledPores(int tensionStep, ImagePlus nowTiff, ImagePlus surfTiff, MenuWaiter.WRCCalculatorMenu mWRC, InputOutput.MyFileCollection mFC) {
 		
+		ImageManipulator jIM = new ImageManipulator();
 		MorphologyAnalyzer mA = new MorphologyAnalyzer();
 		
 		double columnHeight = nowTiff.getNSlices() * mWRC.voxelSizeInMicroMeter;
-		double bboundary = tension * 1000;  //calculate in micrometer
+		double bboundary = mWRC.tensionStepsInMM[tensionStep] * 1000;  //calculate in micrometer
 		double capillaryConstantInMicroMeter = 1.48e7 * Math.cos(mWRC.wettingAngle / 180 * Math.PI);
 		
-		ImagePlus outTiff = new ImagePlus();
-		ImageStack zwischiStack = new ImageStack(nowTiff.getWidth(), nowTiff.getHeight());
-		ImagePlus zwischiTiff = new ImagePlus();
+		ImagePlus airTiff = jIM.binarize3DImage(nowTiff, 0.5, (double)tensionStep + 1.5);
 		
-		//get all pores with a diameter larger than the one corresponding to the respective matrix potential	
-		if (mWRC.choiceOfWRCType.equalsIgnoreCase("drainage")) {
-			
-			for (int z = 1 ; z <= nowTiff.getNSlices() ; z++) {
-				
-				nowTiff.setPosition(z);
-				ImageProcessor nowIP = nowTiff.getProcessor();
-				double columnNow = (nowTiff.getNSlices() - (z - 0.5)) * mWRC.voxelSizeInMicroMeter;  //-0.5 to get to the voxel midpoint
-				double cutoffRadius = capillaryConstantInMicroMeter / (bboundary + columnNow);
-				double cutoffThickness = (2 * cutoffRadius) / mWRC.voxelSizeInMicroMeter;			
-							
-				IJ.showStatus("Extracting air-filled pores at depth " + String.format("%2.2f", (columnHeight - columnNow) / 10000) + " cm");
-				
-				//init out image
-				ImageProcessor outIP = new ByteProcessor(nowTiff.getWidth(), nowTiff.getHeight());
-				
-				for (int x = 0 ; x < outIP.getWidth() ; x++) {
-					for (int y = 0 ; y < outIP.getHeight(); y++) {
-						double nowPix = nowIP.getPixelValue(x, y);
-						if (nowPix <= cutoffThickness) outIP.putPixel(x, y, 0);
-						else outIP.putPixel(x, y, 255);
-					}
-				}
-				
-				zwischiStack.addSlice(outIP);			
-			}
-			
-			zwischiTiff.setStack(zwischiStack);		
-		}
-		else {
-			IJ.error("This option is unfortunately not implemented yet!");
-			return null;
-		}
-		
-		//zwischiTiff.updateAndDraw();zwischiTiff.show();
-					
 		IJ.showStatus("Identifying connected pore-clusters ...");
 		double constant = (2 * capillaryConstantInMicroMeter) / (mWRC.connectingSubresolutionDiameter * mWRC.voxelSizeInMicroMeter);
 		double tensionTerm = (constant - bboundary) / mWRC.voxelSizeInMicroMeter;
 		double columnHeightInVX = columnHeight / mWRC.voxelSizeInMicroMeter;
 		double drainingDepthInVX = columnHeightInVX - tensionTerm + 0.5;
 		if (drainingDepthInVX < 0) drainingDepthInVX = 0;
-		outTiff = mA.findClusterConnected2Top(zwischiTiff, drainingDepthInVX);
+		ImagePlus outTiff = mA.findClusterConnected2Top(airTiff, drainingDepthInVX);
 		
 		return outTiff;
 		
@@ -5504,6 +5467,58 @@ public ColCoords3D findClosestXYSlice2Bottom(InputOutput.MyFileCollection mFC, C
 		outTiff = mA.findClusterConnected2Top(zwischiTiff, drainingDepthInVX);
 		
 		return outTiff;
+		
+	}
+	
+	public ImagePlus createDrainageMap(double[] tension, ImagePlus nowTiff, ImagePlus surfTiff, MenuWaiter.WRCCalculatorMenu mDS, InputOutput.MyFileCollection mFC) {
+			
+		double columnHeight = nowTiff.getNSlices() * mDS.voxelSizeInMicroMeter;
+		double[] bboundary = new double[tension.length];
+		for (int i = 0 ; i < tension.length ; i++) bboundary[i] = tension[i] * 1000;  //calculate in micrometer 
+		double capillaryConstantInMicroMeter = 1.48e7 * Math.cos(mDS.wettingAngle / 180 * Math.PI);
+		
+		ImageStack zwischiStack = new ImageStack(nowTiff.getWidth(), nowTiff.getHeight());
+		ImagePlus zwischiTiff = new ImagePlus();
+		
+		//get all pores with a diameter larger than the one corresponding to the respective matrix potential	
+		for (int z = 1 ; z <= nowTiff.getNSlices() ; z++) {
+			
+			nowTiff.setPosition(z);
+			ImageProcessor nowIP = nowTiff.getProcessor();
+			double columnNow = (nowTiff.getNSlices() - (z - 0.5)) * mDS.voxelSizeInMicroMeter;  //-0.5 to get to the voxel midpoint
+			double[] cutOffRadius = new double[tension.length]; 
+			for (int i = 0 ; i < tension.length ; i++) cutOffRadius[i] = capillaryConstantInMicroMeter / (bboundary[i] + columnNow);
+			double[] cutOffThickness = new double[tension.length]; 
+			for (int i = 0 ; i < tension.length ; i++) cutOffThickness[i] = (2 * cutOffRadius[i]) / mDS.voxelSizeInMicroMeter;			
+						
+			IJ.showStatus("Creating drainage map at depth " + String.format("%2.2f", (columnHeight - columnNow) / 10000) + " cm");
+			
+			//init out image
+			ImageProcessor outIP = new ByteProcessor(nowTiff.getWidth(), nowTiff.getHeight());
+			
+			for (int x = 0 ; x < outIP.getWidth() ; x++) {
+				for (int y = 0 ; y < outIP.getHeight(); y++) {
+					double nowPix = nowIP.getPixelValue(x, y);
+					for (int i = 0 ; i < tension.length ; i++) {
+						if (nowPix > 0) {
+							if (nowPix <= cutOffThickness[i]) outIP.putPixel(x, y, tension.length + 1);
+							else {
+								outIP.putPixel(x, y, i + 1);
+								break;
+							}
+						}
+					}
+				}
+			}
+			
+			zwischiStack.addSlice(outIP);			
+		}
+		
+		zwischiTiff.setStack(zwischiStack);		
+		
+		//zwischiTiff.updateAndDraw();zwischiTiff.show();
+					
+		return zwischiTiff;
 		
 	}
 	

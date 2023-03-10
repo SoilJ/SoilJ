@@ -143,7 +143,7 @@ public class HistogramStuff implements PlugIn {
 		
 	}
 	
-	public int[] extractHistograms16(InputOutput.MyFileCollection mFC, ImagePlus nowTiff) {
+	public int[] extractHistograms16(ImagePlus nowTiff) {
 		
 		RollerCaster rC = new RollerCaster();
 		double[] histo = new double[(int)Math.round(Math.pow(2, 16))];
