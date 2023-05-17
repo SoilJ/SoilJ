@@ -16,6 +16,7 @@ import org.apache.commons.math3.stat.descriptive.rank.Median;
 
 import Utilities.Counter3D;
 import Utilities.Object3D;
+import features.HessianEvalueProcessor;
 import features.TubenessProcessor;
 
 /**
@@ -43,6 +44,7 @@ import ij.ImageStack;
 import ij.gui.OvalRoi;
 import ij.gui.PolygonRoi;
 import ij.gui.Roi;
+import ij.measure.Calibration;
 import ij.plugin.Filters3D;
 import ij.plugin.GaussianBlur3D;
 import ij.plugin.ImageCalculator;
@@ -53,16 +55,24 @@ import ij.plugin.filter.GaussianBlur;
 import ij.process.AutoThresholder;
 import ij.process.ByteProcessor;
 import ij.process.FloatProcessor;
+import ij.process.ImageConverter;
 import ij.process.ImageProcessor;
 import ij.process.ShortProcessor;
 import inra.ijpb.binary.BinaryImages;
+import inra.ijpb.binary.ChamferWeights3D;
 import inra.ijpb.binary.conncomp.FloodFillComponentsLabeling3D;
+import inra.ijpb.binary.distmap.DistanceTransform3D;
+import inra.ijpb.binary.distmap.DistanceTransform3DFloat;
 import inra.ijpb.data.image.Images3D;
+import inra.ijpb.geometry.Ellipsoid;
 import inra.ijpb.label.LabelImages;
+import inra.ijpb.measure.region3d.InertiaEllipsoid;
 import inra.ijpb.plugins.MarkerControlledWatershed3DPlugin;
 import inra.ijpb.watershed.ExtendedMinimaWatershed;
 import mcib3d.image3d.ImageByte;
+import mcib3d.image3d.ImageHandler;
 import mcib3d.image3d.processing.FillHoles3D;
+import mcib3d.image3d.segment.HysteresisSegment;
 import process3d.Dilate_;
 import process3d.Erode_;
 
@@ -110,6 +120,65 @@ public class ImageManipulator implements PlugIn {
 	int threshold = 0;
 	int myPhaseValue = 0;
 	String outName = null;
+	
+	//adapted from FeatureJ to extract Hessian Eigenfalues
+	public class Planarity extends HessianEvalueProcessor {
+
+		public Planarity(boolean useCalibration) {
+			this.useCalibration = useCalibration;
+		}
+
+		public Planarity(double sigma, boolean useCalibration) {
+			this.sigma = sigma;
+			this.useCalibration = useCalibration;
+		}
+
+		public float measureFromEvalues2D( float [] evalues ) {
+			return -1.0f;
+		}
+		
+		public float measureFromEvalues3D( float [] evalues ) {
+
+			/* If either of the two principle eigenvalues is positive then
+			   the curvature is in the wrong direction - towards higher
+			   instensities rather than lower. */
+
+			if( (evalues[1] >= 0) || (evalues[2] >= 0) )
+				return 0;
+			else
+				return calcPlanarity(evalues);
+		}
+		
+		private float calcPlanarity(float[] evas) {
+		
+			//following
+			//Frangi, A. F., Niessen, W. J., Vincken, K. L., and Viergever, M. A., “Multiscale vessel enhancementfiltering,” 
+			//in [Medical Image Computing and Computer-Assisted Intervention - Miccai’98 ], Wells, W. M.,Colchester, A., and 
+			//Delp, S., eds., 1496, 130–137, Springer-Verlag Berlin, Berlin (1998).
+			
+			
+			double eva1 = Math.abs(evas[0]);
+			double eva2 = Math.abs(evas[1]);
+			double eva3 = Math.abs(evas[2]);
+			
+			//double tubeness = ( (Math.abs(eva2) - Math.abs(eva1)) / Math.abs(eva2) ) * ( (Math.abs(eva3) - Math.abs(eva1))  / Math.abs(eva3) );
+			double planarity = (Math.abs(eva3) - Math.abs(eva2)) / Math.abs(eva3);   
+			
+			//Mosaliganti, K. R., R. R. Noche, F. Xiong, I. A. Swinburne, and S. G. Megason (2012), 
+			//ACME: Automated Cell Morphology Extractor for Comprehensive Reconstruction of Cell Membranes, PLoS Computational Biology, 8(12).
+			//double c = 0.01;
+			//double a = eva2 / eva3;
+			//double b = Math.sqrt(eva1 * eva2) / eva3;
+			//double s = Math.sqrt(eva1*eva1 + eva2+eva2 + eva3*eva3);	
+			//double l = 2*c*c / (eva3*eva3); 
+			
+			//double planarity = (1 - Math.exp(-s*s)) * Math.exp(-a*a) * Math.exp(-b*b) * Math.exp(-l);
+						
+			//if ((planarity - tubeness) < 0) return 0;
+			return (float) (planarity) * 100;
+			
+		}
+	}
 	
 	public ImagePlus cutImageInXYPlane(ImagePlus nowTiff, PolygonRoi[] pRoi, boolean cutCanvas) {
 		
@@ -990,15 +1059,130 @@ public class ImageManipulator implements PlugIn {
 		
 	}
 	
+	public ImagePlus removeBlobs(ImagePlus nowTiff, int dyn, double thresholdVesselness, double smallesAllowedElongation) {
+		
+				
+		//get watershed segmentation from binary image
+		String weightLabel = ChamferWeights3D.BORGEFORS.toString();
+		boolean normalize = true;
+		int connectivity = 6;
+		ImageStack dist = BinaryImages.distanceMap( nowTiff.getImageStack(), ChamferWeights3D.fromLabel( weightLabel ).getFloatWeights(), normalize );		
+		Images3D.invert( dist );
+		ImageStack result = ExtendedMinimaWatershed.extendedMinimaWatershed(dist, nowTiff.getImageStack(), dyn, connectivity, 32, false );
+		ImagePlus waterShedImage = new ImagePlus("wsi", result);
+			
+		//get ellipsoids
+		Ellipsoid[] ellipsoids = null;
+		InertiaEllipsoid algo = new InertiaEllipsoid();
+		int[] labels = LabelImages.findAllLabels(waterShedImage);
+		Calibration calib = waterShedImage.getCalibration();
+        ellipsoids = algo.analyzeRegions(waterShedImage.getImageStack(), labels, calib);
+		
+        //calculate vesselness
+        double[] flag = new double[ellipsoids.length];
+        for (int i = 0 ; i < ellipsoids.length ; i++) {
+        	double r1 = ellipsoids[i].radius1();
+        	double r2 = ellipsoids[i].radius2();
+        	double r3 = ellipsoids[i].radius3();
+        	
+        	double Rb = r3 / Math.sqrt(r1*r2);
+        	double Ra = r2 / r1;
+        	
+        	double vesselness = Math.abs(Math.exp(-Rb*Rb)*Math.exp(-Ra*Ra)); 
+        	
+        	if (vesselness > thresholdVesselness & r1 > smallesAllowedElongation) flag[i] = 255;
+        	else flag[i] = 0;
+        	
+        }
+
+        //remove 0 flagged clusters		I
+		ImageStack resultImage = LabelImages.applyLut(waterShedImage.getImageStack(), flag);
+		
+		ImagePlus outTiff = new ImagePlus("filteredTiff", resultImage); 
+		
+		//convert result into 8-bit
+		ImageConverter icon = new ImageConverter(outTiff);
+		icon.convertToGray8();
+			
+		return outTiff;
+		
+	}
+	
+	public ImagePlus removeSmallPlanes(ImagePlus nowTiff, int dyn, double thresholdPlanarity, double smallestAllowedElongation) {
+		
+		
+		//get watershed segmentation from binary image
+		String weightLabel = ChamferWeights3D.BORGEFORS.toString();
+		boolean normalize = true;
+		int connectivity = 6;
+		ImageStack dist = BinaryImages.distanceMap( nowTiff.getImageStack(), ChamferWeights3D.fromLabel( weightLabel ).getFloatWeights(), normalize );		
+		Images3D.invert( dist );
+		ImageStack result = ExtendedMinimaWatershed.extendedMinimaWatershed(dist, nowTiff.getImageStack(), dyn, connectivity, 32, false );
+		ImagePlus waterShedImage = new ImagePlus("wsi", result);
+		
+		FloodFillComponentsLabeling3D myFCCL = new FloodFillComponentsLabeling3D(26, 32);
+		ImageStack myLabelStack = myFCCL.computeLabels(nowTiff.getStack());
+										
+		IJ.freeMemory();IJ.freeMemory();
+		
+		//calculate surface and Euler number.. using MorphoLibJ
+		ImagePlus labelTiff = new ImagePlus();
+		labelTiff.setStack(myLabelStack);
+			
+		//get ellipsoids
+		Ellipsoid[] ellipsoids = null;
+		InertiaEllipsoid algo = new InertiaEllipsoid();
+		int[] labels = LabelImages.findAllLabels(labelTiff);
+		Calibration calib = labelTiff.getCalibration();
+        ellipsoids = algo.analyzeRegions(labelTiff.getImageStack(), labels, calib);
+                
+        labelTiff.show();
+		
+        //calculate vesselness
+        double[] flag = new double[ellipsoids.length];
+        for (int i = 0 ; i < ellipsoids.length ; i++) {
+        	double r1 = ellipsoids[i].radius1();
+        	double r2 = ellipsoids[i].radius2();
+        	double r3 = ellipsoids[i].radius3();
+        	
+        	double Ra = r2 / r1;
+			double Rb = r3 / Math.sqrt(r1 * r2);
+			double Rs = Math.sqrt(r1*r1 + r2+r2 + r3*r3);	
+             	
+        	double planarity = (1 - Math.exp(-Ra*Ra)) * Math.exp(-Rb*Rb);
+        	
+        	if (planarity > thresholdPlanarity & r2 > smallestAllowedElongation) flag[i] = 255;
+        	else flag[i] = 0;
+        	
+        }
+
+        waterShedImage.show();
+        
+        //remove 0 flagged clusters		I
+		ImageStack resultImage = LabelImages.applyLut(waterShedImage.getImageStack(), flag);
+		
+		ImagePlus outTiff = new ImagePlus("filteredTiff", resultImage); 
+		
+		outTiff.show();
+		
+		//convert result into 8-bit
+		ImageConverter icon = new ImageConverter(outTiff);
+		icon.convertToGray8();
+			
+		return outTiff;
+		
+	}
+	
+	
 	public ImagePlus extractBioPores(InputOutput.MyFileCollection mFC, ImagePlus nowTiff, MenuWaiter.BioPoreExtractionOptions mBEO) {
 		
 		ImageCalculator iC = new ImageCalculator();
 		Dilate_ dil = new Dilate_();
-		MorphologyAnalyzer jMA = new MorphologyAnalyzer();
 		
-		//init
-		int lengthThreshold=2;
-		double threshold=60;
+		int dyn = 2;
+		double thresholdVesselness = mBEO.thresholdVesselness; 
+		double smallesAllowedElongation = mBEO.smallesAllowedElongation;
+		double[] sigmas = {2,3,4};
 		
 		//check how large the image is and scale down in case it is too large.. because tubeness crashes if they are too large (comment out if you have 1000^3 voxels or less) 
 		int w = nowTiff.getWidth(), h = nowTiff.getHeight(), d = nowTiff.getNSlices(); 
@@ -1015,120 +1199,318 @@ public class ImageManipulator implements PlugIn {
 		}
 		
 		//*************************CalcTubenessOnLargeImage************************************
-		double sigma = 1;
-		int n_dilations = 1;
+		// GB step 1
+		HysteresisSegment myHS = new HysteresisSegment(55, 65);
+		TubenessProcessor tp = new TubenessProcessor(1, false);
+		ImageHandler hystThresh = null;
+		ImagePlus oldOne = new ImagePlus();
+		ImagePlus smallBiopores = new ImagePlus();
+	
+			
+		int n_dilations = 1;	
 		
-		TubenessProcessor tp = new TubenessProcessor(sigma, false);
-		ImagePlus original = tp.generateImage(nowTiff.duplicate());
+		if (!mBEO.doNotProcessOriginalResolution) {
 		
-		original = binarize3DFloatImage(original, threshold);
-				
-		n_dilations=1;
-		for (int i = 1; i < n_dilations + 1 ; i++) original = dil.dilate(original, 255, true);
+			ImagePlus original = tp.generateImage(nowTiff.duplicate());
 		
-		//double minimum = 3.14 * (sigma + n_dilations) * (sigma + n_dilations) * (sigma + n_dilations) * lengthThreshold;
-		//BoneJParticles myParty = jMA.parallelParticleAnalyzer(original, minimum , Double.POSITIVE_INFINITY);
-		//original = myParty.myPartyPic;
+			//hysteresis Threshold
+			hystThresh = myHS.hysteresis(ImageHandler.wrap(original), true);
+			oldOne = hystThresh.getImagePlus();
+			oldOne = binarize3DImage(oldOne,0);		
+			
+			//oldOne.show();
 		
-		//original = binarize3DFloatImage(original,1);
+			for (int j = 0 ; j < sigmas.length ; j++) {
+			
+				double sigma=sigmas[j];	
+				n_dilations = (int)Math.sqrt((sigma));
+			
+				tp = new TubenessProcessor(sigma, false);
+				ImagePlus newOne = tp.generateImage(nowTiff);
+			
+				hystThresh = myHS.hysteresis(ImageHandler.wrap(newOne), true);
+				newOne = hystThresh.getImagePlus();
+				newOne = binarize3DImage(newOne,0);
+				//newOne = binarize3DFloatImage(original, 60);
+
+				for (int i = 1; i < n_dilations + 1 ; i++) newOne = dil.dilate(newOne, 255, false);
+			
+				oldOne = iC.run("OR create stack", oldOne, newOne);		
+			
+			}
+		
+			//oldOne.show();
+		
+			//remove blobs
+			smallBiopores = removeBlobs(oldOne, dyn, thresholdVesselness, smallesAllowedElongation);
+	
+			//smallBiopores.updateAndDraw();smallBiopores.show();
+		}
 				
 		//*************************initTubenessOndownscaledImage************************************		
 		IJ.showStatus("Reducing image size..");
 		nowTiff = binaryScale2HalfSize(nowTiff);
-		
-		sigma=1;
-		n_dilations = 1;		
-		
-		tp = new TubenessProcessor(sigma, false);
-		ImagePlus miniTiff0 = tp.generateImage(nowTiff);
-		
-		miniTiff0 = binarize3DFloatImage(miniTiff0, threshold);
+		double[] newSigmas = {1,2,3,4,5,6,7,8};
 				
-		n_dilations=1;
-		for (int i = 1; i < n_dilations + 1 ; i++) miniTiff0 = dil.dilate(miniTiff0, 255, false);
-				
-		//minimum = 3.14 * (sigma + n_dilations) * (sigma + n_dilations) * (sigma + n_dilations) * lengthThreshold;
-		//myParty = jMA.parallelParticleAnalyzer(miniTiff0, minimum , Double.POSITIVE_INFINITY);
-		
-		//miniTiff0 = myParty.myPartyPic;
-		//miniTiff0 = binarize3DFloatImage(miniTiff0,1);
-		
-		//*************************loop1************************************
-		double[] sigmas = {2,4,6,8,6,8,11,15};
-		
-		for (int j = 0 ; j < 4 ; j++) {
+		for (int j = 0 ; j < newSigmas.length ; j++) {
 			
-			sigma=sigmas[j];	
-			n_dilations = (int)(sigma);
+			double sigma=newSigmas[j];	
+			n_dilations = (int)Math.sqrt((newSigmas[j]));
 			
 			tp = new TubenessProcessor(sigma, false);
-			ImagePlus miniTiff = tp.generateImage(nowTiff);
+			ImagePlus newOne = tp.generateImage(nowTiff);
 			
-			miniTiff = binarize3DFloatImage(miniTiff,threshold);
-
-			for (int i = 1; i < n_dilations + 1 ; i++) miniTiff = dil.dilate(miniTiff, 255, false);
+			hystThresh = myHS.hysteresis(ImageHandler.wrap(newOne), true);
+			newOne = hystThresh.getImagePlus();
+			newOne = binarize3DImage(newOne,0);
+			//newOne = binarize3DFloatImage(oldOne, 55);
+		
+			for (int i = 1; i < n_dilations + 1 ; i++) newOne = dil.dilate(newOne, 255, false);
 			
-			//minimum = Math.pow(n_dilations, 3) * lengthThreshold;
-			//myParty = jMA.parallelParticleAnalyzer(miniTiff, minimum , Double.POSITIVE_INFINITY);
-			
-			//miniTiff = myParty.myPartyPic;
-			//miniTiff = binarize3DFloatImage(miniTiff,1);
-			
-			//miniTiff.updateAndDraw();miniTiff.show();
-			
-			miniTiff0 = iC.run("OR create stack", miniTiff0, miniTiff);		
-			
-			//miniTiff0.updateAndDraw();miniTiff0.show();
+			if (j == 0) oldOne = newOne;
+			else oldOne = iC.run("OR create stack", oldOne, newOne);		
 			
 		}
 		
+		//oldOne.show();
+		
 		//*************************Rescale, merge with initial round************************************
 		
-		ImagePlus roundOneTiff = scaleWithoutMenu(miniTiff0, wnew, hnew, dnew, ImageProcessor.BILINEAR);
+		ImagePlus mediumBiopores = scaleWithoutMenu(oldOne, wnew, hnew, dnew, ImageProcessor.BILINEAR);
 		
-		roundOneTiff = binarize3DFloatImage(roundOneTiff,128);
+		mediumBiopores = binarize3DFloatImage(mediumBiopores,128);
 		
-		roundOneTiff = iC.run("OR create stack", original, roundOneTiff);
+		//filterout blobs
+		mediumBiopores = removeBlobs(mediumBiopores, dyn, thresholdVesselness, smallesAllowedElongation);
+		
+		//merge with pore network at smallest scale if it was calculateed
+		if (!mBEO.doNotProcessOriginalResolution) mediumBiopores = iC.run("OR create stack", mediumBiopores, smallBiopores);
+		
+		//mediumBiopores.show();
 		
 		//*************************TubenessOn2TimesdownscaledImage************************************		
 		IJ.showStatus("Reducing image size ince more ..");
 		nowTiff = binaryScale2HalfSize(nowTiff);
 		
-		for (int j = 4 ; j < mBEO.numberOfSigmas - 2 ; j++) {
+		double[] lastSigmas = new double[12];
+		for (int i = 0 ; i < lastSigmas.length ; i++) lastSigmas[i] = 4+i;
+		
+		for (int j = 0 ; j < lastSigmas.length ; j++) {
 			
-			sigma=sigmas[j];				
-			n_dilations = (int)(sigma / 2);
+			double sigma=lastSigmas[j];				
+			n_dilations = (int)Math.sqrt((lastSigmas[j]));
 		
 			tp = new TubenessProcessor(sigma, false);
-			ImagePlus miniTiff = tp.generateImage(nowTiff);
-			
-			miniTiff = binarize3DFloatImage(miniTiff,threshold);
+			ImagePlus newOne = tp.generateImage(nowTiff);
+						
+			hystThresh = myHS.hysteresis(ImageHandler.wrap(newOne), true);
+			newOne = hystThresh.getImagePlus();
+			newOne = binarize3DImage(newOne,0);
+			//newOne = binarize3DFloatImage(oldOne, 55);
 
-			for (int i = 1; i < n_dilations + 1 ; i++) miniTiff = dil.dilate(miniTiff, 255, false);
+			for (int i = 1; i < n_dilations + 1 ; i++) newOne = dil.dilate(newOne, 255, false);
 			
-			//minimum = Math.pow(n_dilations, 3) * lengthThreshold;
-			//myParty = jMA.parallelParticleAnalyzer(miniTiff, minimum , Double.POSITIVE_INFINITY);
-			
-			//miniTiff = myParty.myPartyPic;
-			//miniTiff = binarize3DFloatImage(miniTiff,1);
-			
-			//miniTiff.updateAndDraw();miniTiff.show();
-			
-			if (j == 4) miniTiff0 = miniTiff;
-			else miniTiff0 = iC.run("OR create stack", miniTiff0, miniTiff);		
+			if (j == 0) oldOne = newOne;
+			else oldOne = iC.run("OR create stack", oldOne, newOne);		
 			
 			//miniTiff0.updateAndDraw();miniTiff0.show();
 		}
 		
 		//*************************Rescale final round, merge with previous round************************************
 		
-		miniTiff0 = scaleWithoutMenu(miniTiff0, wnew, hnew, dnew, ImageProcessor.BILINEAR);
+		ImagePlus largeBiopores = scaleWithoutMenu(oldOne, wnew, hnew, dnew, ImageProcessor.BILINEAR);
 		
-		miniTiff0 = binarize3DFloatImage(miniTiff0,128);
+		largeBiopores = binarize3DFloatImage(largeBiopores,128);
 		
-		return iC.run("OR create stack", roundOneTiff, miniTiff0);
+		//filterout blobs
+		largeBiopores = removeBlobs(largeBiopores, dyn, thresholdVesselness, smallesAllowedElongation);
+		
+		//merge with medium
+		largeBiopores = iC.run("OR create stack", largeBiopores, mediumBiopores);
+		
+		//*************************TubenessOn2TimesdownscaledImage************************************		
+		IJ.showStatus("Reducing image size ince more ..");
+		nowTiff = binaryScale2HalfSize(nowTiff);
+		
+		double[] veryLastSigmas = new double[12];
+		for (int i = 0 ; i < lastSigmas.length ; i++) lastSigmas[i] = 4+i;
+		
+		for (int j = 0 ; j < lastSigmas.length ; j++) {
+			
+			double sigma=veryLastSigmas[j];				
+			n_dilations = (int)Math.sqrt((veryLastSigmas[j]));
+		
+			tp = new TubenessProcessor(sigma, false);
+			ImagePlus newOne = tp.generateImage(nowTiff);
+						
+			hystThresh = myHS.hysteresis(ImageHandler.wrap(newOne), true);
+			newOne = hystThresh.getImagePlus();
+			newOne = binarize3DImage(newOne,0);
+			//newOne = binarize3DFloatImage(oldOne, 55);
+
+			for (int i = 1; i < n_dilations + 1 ; i++) newOne = dil.dilate(newOne, 255, false);
+			
+			if (j == 0) oldOne = newOne;
+			else oldOne = iC.run("OR create stack", oldOne, newOne);		
+			
+			//miniTiff0.updateAndDraw();miniTiff0.show();
+		}
+		
+		//*************************Rescale final round, merge with previous round************************************
+		
+		ImagePlus veryLargeBiopores = scaleWithoutMenu(oldOne, wnew, hnew, dnew, ImageProcessor.BILINEAR);
+		
+		veryLargeBiopores = binarize3DFloatImage(veryLargeBiopores,128);
+		
+		//filterout blobs
+		veryLargeBiopores = removeBlobs(veryLargeBiopores, dyn, thresholdVesselness, smallesAllowedElongation);
+		
+		return iC.run("OR create stack", largeBiopores, veryLargeBiopores);
 		
 	}
+	
+	public ImagePlus extractCracks(InputOutput.MyFileCollection mFC, ImagePlus nowTiff, MenuWaiter.CrackExtractionOptions mCEO) {
+		
+		ImageCalculator iC = new ImageCalculator();
+		Dilate_ dil = new Dilate_();
+		Erode_ ero = new Erode_();
+
+		//check how large the image is and scale down in case it is too large.. because tubeness crashes if they are too large (comment out if you have 1000^3 voxels or less) 
+		int w = nowTiff.getWidth(), h = nowTiff.getHeight(), d = nowTiff.getNSlices(); 
+		double bulkVol = (double)w * (double)h * (double)d;
+		int wnew = w;
+		int hnew = h;
+		int dnew = d;
+		if (bulkVol > 1200000000) {
+			IJ.showStatus("Reducing image size..");
+			nowTiff = binaryScale2HalfSize(nowTiff);
+			wnew = nowTiff.getWidth();
+			hnew = nowTiff.getHeight();
+			dnew = nowTiff.getNSlices();
+		}
+		
+		//*************************CalcTubenessOnLargeImage************************************
+		// GB step 1
+		HysteresisSegment myHS = new HysteresisSegment(75, 85);
+		Planarity pp = new Planarity(1, false);
+		float[] floatWeights = ChamferWeights3D.BORGEFORS.getFloatWeights();
+		boolean normalize = true;
+		DistanceTransform3D dt = new DistanceTransform3DFloat(floatWeights, normalize);
+		
+		ImageHandler hystThresh = null;
+		ImagePlus oldOne = new ImagePlus();
+		ImagePlus smallCracks = new ImagePlus();
+		
+		if (!mCEO.doNotProcessOriginalResolution) {			
+
+			ImageStack result = dt.distanceMap(nowTiff.getStack());			
+			ImagePlus distTiff = new ImagePlus("dist",result);
+		
+			ImagePlus original = pp.generateImage(distTiff);
+			
+			//original.show();
+		
+			//hysteresis Threshold
+			hystThresh = myHS.hysteresis(ImageHandler.wrap(original), true);
+			oldOne = hystThresh.getImagePlus();
+			oldOne = binarize3DImage(oldOne,0);
+			
+			smallCracks = oldOne;
+			
+			smallCracks = ero.erode(smallCracks, 255, false);
+			smallCracks = dil.dilate(smallCracks, 255, false);
+			smallCracks = dil.dilate(smallCracks, 255, false);
+			
+		}
+		
+		//*************************initTubenessOndownscaledImage************************************		
+		IJ.showStatus("Reducing image size..");
+		nowTiff = binaryScale2HalfSize(nowTiff);
+			
+		double sigma=1;	
+			
+		ImageStack result = dt.distanceMap(nowTiff.getStack());			
+		ImagePlus distTiff = new ImagePlus("dist",result);
+		pp = new Planarity(sigma, false);
+		ImagePlus newOne = pp.generateImage(distTiff);
+		
+		hystThresh = myHS.hysteresis(ImageHandler.wrap(newOne), true);
+		newOne = hystThresh.getImagePlus();
+		newOne = binarize3DImage(newOne,0);
+		
+		ImagePlus mediumCracks = scaleWithoutMenu(newOne, wnew, hnew, dnew, ImageProcessor.BILINEAR);		
+		mediumCracks = binarize3DFloatImage(mediumCracks,128);
+		
+		mediumCracks = ero.erode(mediumCracks, 255, false);
+		mediumCracks = dil.dilate(mediumCracks, 255, false);
+		mediumCracks = dil.dilate(mediumCracks, 255, false);
+		
+		//mediumCracks.show();
+		
+		//merge with pore network at smallest scale if it was calculateed
+		if (!mCEO.doNotProcessOriginalResolution) mediumCracks = iC.run("OR create stack", mediumCracks, smallCracks);
+		
+		//mediumCracks.show();
+		
+		//*************************TubenessOn2TimesdownscaledImage************************************		
+		IJ.showStatus("Reducing image size ince more ..");
+		nowTiff = binaryScale2HalfSize(nowTiff);
+		
+		sigma=1;
+		
+		result = dt.distanceMap(nowTiff.getStack());			
+		distTiff = new ImagePlus("dist",result);
+		pp = new Planarity(sigma, false);
+		newOne = pp.generateImage(distTiff);
+			
+		hystThresh = myHS.hysteresis(ImageHandler.wrap(newOne), true);
+		newOne = hystThresh.getImagePlus();
+		newOne = binarize3DImage(newOne,0);
+		
+		ImagePlus largeCracks = scaleWithoutMenu(newOne, wnew, hnew, dnew, ImageProcessor.BILINEAR);		
+		largeCracks = binarize3DFloatImage(largeCracks,128);
+		
+		largeCracks = ero.erode(largeCracks, 255, false);
+		largeCracks = dil.dilate(largeCracks, 255, false);
+		largeCracks = dil.dilate(largeCracks, 255, false);
+		
+		//merge with medium
+		largeCracks = iC.run("OR create stack", largeCracks, mediumCracks);
+		
+		//largeCracks.show();
+		
+		//*************************TubenessOn2TimesdownscaledImage************************************		
+		IJ.showStatus("Reducing image size ince more ..");
+		nowTiff = binaryScale2HalfSize(nowTiff);
+		
+		sigma=1;
+		
+		result = dt.distanceMap(nowTiff.getStack());			
+		distTiff = new ImagePlus("dist",result);
+		pp = new Planarity(sigma, false);
+		newOne = pp.generateImage(distTiff);
+			
+		hystThresh = myHS.hysteresis(ImageHandler.wrap(newOne), true);
+		newOne = hystThresh.getImagePlus();
+		newOne = binarize3DImage(newOne,0);
+		
+		ImagePlus veryLargeCracks = scaleWithoutMenu(newOne, wnew, hnew, dnew, ImageProcessor.BILINEAR);		
+		veryLargeCracks = binarize3DFloatImage(veryLargeCracks,128);
+		
+		veryLargeCracks = ero.erode(veryLargeCracks, 255, false);
+		veryLargeCracks = dil.dilate(veryLargeCracks, 255, false);
+		veryLargeCracks = dil.dilate(veryLargeCracks, 255, false);
+		
+		veryLargeCracks = iC.run("OR create stack", largeCracks, veryLargeCracks); 
+
+		//remove blobs and tubes
+		veryLargeCracks = removeSmallPlanes(veryLargeCracks, 2, 60, 40);
+		
+		veryLargeCracks.show();	
+		return veryLargeCracks;
+		
+	}
+	
 	
 	public ImagePlus extractGravel(InputOutput.MyFileCollection mFC, ImagePlus nowTiff, MenuWaiter.GravelExtractionOptions mGEO) {
 		

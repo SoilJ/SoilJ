@@ -14,7 +14,7 @@
 
 	<groupId>net.imagej</groupId>
 	<artifactId>SoilJ_</artifactId>
-	<version>1.3.7-SNAPSHOT</version>
+	<version>1.3.8-SNAPSHOT</version>
 
 	<name>SoilJ</name>
 	<description>A Maven project implementing the SoilJ ImageJ 1.x plugin</description>
@@ -120,11 +120,11 @@
 			<groupId>fr.inra.ijpb</groupId> 
 			<artifactId>MorphoLibJ_</artifactId>
 		</dependency>		
-		<dependency>
-			<groupId>com.github.mcib3d</groupId>
-			<artifactId>mcib3d-core</artifactId>	
-			<version>master-SNAPSHOT</version>
-		</dependency>
+<!--		<dependency>-->
+<!--			<groupId>com.github.mcib3d</groupId>-->
+<!--			<artifactId>mcib3d-core</artifactId>	-->
+<!--			<version>master-SNAPSHOT</version>-->
+<!--		</dependency>-->
 		<dependency>
 			<groupId>org.apache.commons</groupId>
 			<artifactId>commons-math3</artifactId>			
@@ -142,12 +142,15 @@
     		<groupId>sc.fiji</groupId>
     		<artifactId>AnalyzeSkeleton_</artifactId>
     	</dependency>
-<!--     	<dependency>
-    		<groupId>mpicbg</groupId>
-    		<artifactId>mpicbg</artifactId>
-   			<version>0.6.1</version>
-		</dependency>	 -->
+<!--		<dependency>-->
+<!--   			<groupId>com.github.mcib3d</groupId>-->
+<!--    		<artifactId>mcib3d-core</artifactId>-->
+<!--    		<version>master-47119b6729-1</version>		-->
+<!--		</dependency>-->
+
 	</dependencies>
+	
+	
 	
 	<repositories>
 		<!-- NB: for project parent -->

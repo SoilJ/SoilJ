@@ -77,9 +77,9 @@ public class ExtractBioPores_ extends ImagePlus implements PlugIn  {
 		InputOutput.MyFileCollection mFC = jIO.createFolders4SubROIData(mRSO);
 		
 		String myOutFolder = mFC.myOutFolder;
-		mFC.myOutFolder = myOutFolder + pathSep + "BioPores" + (int)mBEO.numberOfSigmas + "Sigmas"; 	 	
+		mFC.myOutFolder = myOutFolder + pathSep + "BioPores_V" + (int)(100*mBEO.thresholdVesselness) + "L" + (int)mBEO.smallesAllowedElongation + "M" + mBEO.maximumBlurring; 	 	
 		new File(mFC.myOutFolder).mkdir();
-		mFC.myOutFolder2 = myOutFolder + pathSep + "NonBioPores" + (int)mBEO.numberOfSigmas + "Sigmas"; 	 	
+		mFC.myOutFolder2 = myOutFolder + pathSep + "NonBioPores_V" + (int)(100*mBEO.thresholdVesselness) + "L" + (int)mBEO.smallesAllowedElongation + "M" + mBEO.maximumBlurring; 	 	 	 	 	
 		new File(mFC.myOutFolder2).mkdir();
 					
 		//loop over 3D images
@@ -108,12 +108,14 @@ public class ExtractBioPores_ extends ImagePlus implements PlugIn  {
 			
 			//apply analyzes			
 			ImagePlus outTiff = jIM.extractBioPores(mFC, colRoi.nowTiff, mBEO);		
+			//ImagePlus outTiff = jIM.extractBioPores2(mFC, colRoi.nowTiff, mBEO);
 						
 			//save result
 			jIO.tiffSaver(mFC, outTiff);
 			
 			//also save non-bio pores
-			jIO.tiffSaver2(mFC, jIM.extractNonBioPores(mFC, colRoi.nowTiff, outTiff, mBEO));	
+			//jIO.tiffSaver2(mFC, jIM.extractNonBioPores(mFC, colRoi.nowTiff, outTiff, mBEO));	
+			//jIO.tiffSaver2(mFC, jIM.extractNonBioPores2(mFC, colRoi.nowTiff, outTiff, mBEO));	
 			
 			//try to free up some memory
 			colRoi.nowTiff.unlock();			

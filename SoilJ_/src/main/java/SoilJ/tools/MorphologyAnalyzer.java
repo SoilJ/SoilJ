@@ -342,13 +342,8 @@ public class MorphologyAnalyzer implements PlugIn {
 		
 		//transform List to Array for better preformance
 		IJ.showStatus("Sorting out detected air clusters..");
-		Collections.sort(percolatingClusters);
-		int maximalClusterID = 0;
-		if (percolatingClusters.size() > 0) maximalClusterID = percolatingClusters.get(percolatingClusters.size() - 1);
-		boolean[] myClusters = new boolean[maximalClusterID + 1];		
-		if (maximalClusterID == 0) myClusters[0] = false;
-		else for (int i = 0 ; i < myClusters.length - 1 ; i++) myClusters[percolatingClusters.get(i)] = true;		
-		
+		Collections.sort(percolatingClusters);		
+	
 		for (int z = 1 ; z <= idImp.getNSlices() ; z++) {
 			
 			IJ.showStatus("Extracting respective clusters in slice " + z + "/" + idImp.getNSlices());
@@ -362,11 +357,9 @@ public class MorphologyAnalyzer implements PlugIn {
 				for (int y = 0 ; y < binIP.getWidth() ; y++) {
 					
 					int id = (int)Math.round(idIP.getPixelValue(x, y));
-					if (id > maximalClusterID) binIP.putPixel(x, y, 0);
-					else {
-						if (myClusters[id]) binIP.putPixel(x, y, 255);
-						else binIP.putPixel(x, y, 0);
-					}
+					if (percolatingClusters.contains(id)) binIP.putPixel(x, y, 255);
+					else binIP.putPixel(x, y, 0);
+					
 				}
 				
 			}

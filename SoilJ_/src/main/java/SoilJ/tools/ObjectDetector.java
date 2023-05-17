@@ -337,7 +337,7 @@ public class ObjectDetector implements PlugIn {
 			
 		return myRF;
 		
-	}
+	}	
 	
 	public double[][][] getRadialSteelGrayValues(ImagePlus nowTiff, EggShapedColCoords3D jCO, float radialMappingFactor) {
 		

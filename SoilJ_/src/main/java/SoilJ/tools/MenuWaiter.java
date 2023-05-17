@@ -91,10 +91,22 @@ public class MenuWaiter implements PlugIn {
 	
 	public class BioPoreExtractionOptions {
 		
-		public double numberOfSigmas = 8;
+		public boolean doNotProcessOriginalResolution = false;
+		public double thresholdVesselness; 
+		public double smallesAllowedElongation;
+		public int maximumBlurring;
 		
 	}
 	
+	public class CrackExtractionOptions {
+		
+		public boolean doNotProcessOriginalResolution = false;
+		public double thresholdPlanarity;
+		public double smallesAllowedElongation;
+		public int maximumBlurring;
+				
+	}
+		
 	public class GravelExtractionOptions {
 		
 		public double voxelsize;		
@@ -3481,33 +3493,49 @@ public class MenuWaiter implements PlugIn {
 		GenericDialog gd = new GenericDialog("Give me some biopore extraction parameters, please.");
 
 		//prepare radio box with the choices
-		String[] choiceOfSigmas = new String[4];
-		choiceOfSigmas[0] = "sigma = 1, 2, 4, 8, 12, 16, 24 voxel";
-		choiceOfSigmas[1] = "sigma = 1, 2, 4, 8, 12, 16, 24, 32 voxel";
-		choiceOfSigmas[2] = "sigma = 1, 2, 4, 8, 12, 16, 24, 32, 44 voxel";	
-		choiceOfSigmas[3] = "sigma = 1, 2, 4, 8, 12, 16, 24, 32, 44, 60 voxel";
-		gd.addRadioButtonGroup("Please choose the sigmas you want to use for the biopore extraction", choiceOfSigmas, 4, 1, choiceOfSigmas[1]);		
+		gd.addCheckbox("Do you want to skip calculating on the original image resoluttion (check if your image sizes are large)", false);
+		gd.addNumericField("Please enter the minimum vesselness a biopore must have", 0.6, 1);
+		gd.addNumericField("Please enter the minimum length in voxels a biopore must have", 20, 1);
+		//gd.addNumericField("Please enter maximum footprint of the Gaussian Blur", 100, 0);
 		
 		//show dialog
 		gd.showDialog();
 	    if (gd.wasCanceled()) return null;
 	    else {
 	    	//get ROI typ
-	    	String myChoice = gd.getNextRadioButton();
-	    	int myChoiceIndex = 0;
-	    	for (int i = 0 ; i < choiceOfSigmas.length ; i++) if (myChoice.equalsIgnoreCase(choiceOfSigmas[i])) {
-	    		myChoiceIndex = i;
-	    		break;
-	    	}
-	    	switch (myChoiceIndex) {
-	    		case 0: mBEO.numberOfSigmas = 7 ; break;
-	    		case 1: mBEO.numberOfSigmas = 8 ; break;
-	    		case 2: mBEO.numberOfSigmas = 9 ; break;
-	    		case 3: mBEO.numberOfSigmas = 10 ; 
-	    	}
+	    	mBEO.doNotProcessOriginalResolution = gd.getNextBoolean();
+	    	mBEO.thresholdVesselness = gd.getNextNumber();
+	    	mBEO.smallesAllowedElongation = gd.getNextNumber();
+	    	//mBEO.maximumBlurring = (int)gd.getNextNumber();
 	    }
 		
 		return mBEO;
+	}
+	
+	public CrackExtractionOptions showCrackExtractionMenu() {
+		
+		CrackExtractionOptions mCEO = new CrackExtractionOptions();
+		
+		GenericDialog gd = new GenericDialog("Give me some biopore extraction parameters, please.");
+
+		//prepare radio box with the choices
+		gd.addCheckbox("Do you want to skip calculating on the original image resoluttion (check if your image sizes are large)", false);
+		gd.addNumericField("Please enter the minimum platyness a crack must have", 0.3, 1);
+		gd.addNumericField("Please enter the minimum extension in voxels a crack must have", 20, 1);
+		//gd.addNumericField("Please enter maximum footprint of the Gaussian Blur", 100, 0);
+		
+		//show dialog
+		gd.showDialog();
+	    if (gd.wasCanceled()) return null;
+	    else {
+	    	//get ROI typ
+	    	mCEO.doNotProcessOriginalResolution = gd.getNextBoolean();
+	    	mCEO.thresholdPlanarity = gd.getNextNumber();
+	    	mCEO.smallesAllowedElongation = gd.getNextNumber();
+	    	//mCEO.maximumBlurring = (int)gd.getNextNumber();
+	    }
+		
+		return mCEO;
 	}
 	
 	public GravelExtractionOptions showGravelExtractionMenu() {
