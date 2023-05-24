@@ -38,7 +38,7 @@ import ij.plugin.PlugIn;
  *
  */
 
-public class ExtractHistogram_ extends ImagePlus implements PlugIn  {
+public class Extract32BitHistogram_ extends ImagePlus implements PlugIn  {
 
 	public void run(String arg) {
 
@@ -87,7 +87,7 @@ public class ExtractHistogram_ extends ImagePlus implements PlugIn  {
 			RoiHandler.ColumnRoi colRoi = roi.prepareDesiredRoi(mFC, jIO.openTiff3DSomeSlices(mFC, colSlices), mRSO, "null", "all");
 			
 			//load image
-			String myName = mFC.fileName.substring(0,mFC.fileName.length()-4) + ".psd";
+			String myName = mFC.fileName.substring(0,mFC.fileName.length()-4) + ".hist";
 		
 			//define class bounds.. needed due to sphere fitting artefacts..
 			double[] maximum = {colRoi.nowTiff.getWidth(), colRoi.nowTiff.getHeight()};
@@ -95,7 +95,7 @@ public class ExtractHistogram_ extends ImagePlus implements PlugIn  {
 			for (int j = 0 ; j < classBounds.length ; j++) classBounds[j] = j;				
 			
 			//apply segmentation							}
-			morph.extractPoresizeDistroOldSchool(mFC.myOutFolder + pathSep + myName, colRoi.nowTiff, classBounds);			
+			morph.extract32BitHisto(mFC.myOutFolder + pathSep + myName, colRoi.nowTiff, classBounds);			
 			
 		}
 		

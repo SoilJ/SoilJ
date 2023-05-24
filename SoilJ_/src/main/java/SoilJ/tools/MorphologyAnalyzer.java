@@ -300,7 +300,7 @@ public class MorphologyAnalyzer implements PlugIn {
 		jIO.writePoreSizeDistribution(savePath, psd, classBounds);
 	}	
 	
-	public void extractPoresizeDistroOldSchool(String savePath, ImagePlus nowTiff, double[] classBounds) {
+	public void extract32BitHisto(String savePath, ImagePlus nowTiff, double[] classBounds) {
 		
 		
 		InputOutput jIO = new InputOutput();
