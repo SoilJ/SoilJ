@@ -1597,7 +1597,7 @@ public class ObjectDetector implements PlugIn {
 		IJ.showStatus("Trying to find top of column ...");
 				
 		InputOutput jIO = new InputOutput();
-		RankFilters rF=new RankFilters();
+		RankFilters rF = new RankFilters();
 		
 		//find topmost found column part in samCoords
 		int soFarOnTop = 99999;
@@ -1850,7 +1850,7 @@ public class ObjectDetector implements PlugIn {
 		
 	}
 	
-public ColCoords3D findClosestXYSlice2Top(InputOutput.MyFileCollection mFC, ColCoords3D samCoords, MenuWaiter.ColumnFinderMenuReturn jCFS) {
+	public ColCoords3D findClosestXYSlice2Top(InputOutput.MyFileCollection mFC, ColCoords3D samCoords, MenuWaiter.ColumnFinderMenuReturn jCFS) {
 		
 		IJ.showStatus("Looking for column coordinates close to the top ... ...");
 		
@@ -2300,7 +2300,7 @@ public ColCoords3D findClosestXYSlice2Top(InputOutput.MyFileCollection mFC, ColC
 		
 	}
 	
-public ColCoords3D findClosestXYSlice2Bottom(InputOutput.MyFileCollection mFC, ColCoords3D samCoords, MenuWaiter.ColumnFinderMenuReturn jCFS) {
+	public ColCoords3D findClosestXYSlice2Bottom(InputOutput.MyFileCollection mFC, ColCoords3D samCoords, MenuWaiter.ColumnFinderMenuReturn jCFS) {
 		
 		IJ.showStatus("Looking for column coordinates close to the bottom ...");
 				
@@ -3082,6 +3082,7 @@ public ColCoords3D findClosestXYSlice2Bottom(InputOutput.MyFileCollection mFC, C
 	
 
 	public ColCoords2D findColumnWalls2D(int sliceNum, ImageProcessor myIP, ColCoords2D prelimCC, MenuWaiter.ColumnFinderMenuReturn jCFS) {
+	// takes image, slice number, preliminary Column guesses and menu inputs to return the 2D coordinates	
 		
 //		ImagePlus test = new ImagePlus("",myIP);
 //		test.updateAndDraw();
@@ -3106,7 +3107,7 @@ public ColCoords3D findClosestXYSlice2Bottom(InputOutput.MyFileCollection mFC, C
 		for (double angle = 0 ; angle < 2 * Math.PI - Math.PI/400 ; angle = angle + 2 * Math.PI / (maxAlpha / dAlpha)) 
 			{myAngle[cc] = angle; cc++;}
 	
-		int footprintOfMedianFilter = 5; // 1-D median filter
+		int footprintOfMedianFilter = 5; // 1-D median filter		// settings for median filter: smaller "window" for smaller images
 		if (myIP.getWidth() < 1200) footprintOfMedianFilter = 3;
 		
 		double xmid = prelimCC.xCenter;
@@ -3114,7 +3115,7 @@ public ColCoords3D findClosestXYSlice2Bottom(InputOutput.MyFileCollection mFC, C
 		double radius = (prelimCC.outerMajorRadius + prelimCC.outerMinorRadius) / 2;
 		
 		//catch if prelimCC did not work
-		if (xmid != xmid) xmid = myIP.getWidth() / 2;
+		if (xmid != xmid) xmid = myIP.getWidth() / 2;				// if there are no preliminary Oulines, take the center of the image as ROI center. and assume radius of 
 		if (ymid != ymid) ymid = myIP.getHeight() / 2;
 		if (radius != radius) radius = 0.85 * (myIP.getWidth() + myIP.getHeight()) / 4;
 		
@@ -3122,12 +3123,12 @@ public ColCoords3D findClosestXYSlice2Bottom(InputOutput.MyFileCollection mFC, C
 		int myWindowSize = (int)Math.ceil(0.003 * radius) + 1;
 
 		//init coordinates of found wall / not-wall interfaces
-		float[] xOD = new float[maxAlpha/dAlpha]; // x of outer diameter
-		float[] yOD = new float[maxAlpha/dAlpha]; // y of outer diameter
-		int[] locationOD = new int[maxAlpha/dAlpha]; // y of outer diameter
-		float[] xID = new float[maxAlpha/dAlpha]; // x of inner diameter
-		float[] yID = new float[maxAlpha/dAlpha]; // y of inner diameter
-		double[] locationID = new double[maxAlpha/dAlpha]; // y of inner diameter
+		float[] xOD = new float[maxAlpha/dAlpha]; 			// x of outer diameter (what is alpha?? some angles of 360 and 5 but I dont get it)
+		float[] yOD = new float[maxAlpha/dAlpha]; 			// y of outer diameter
+		int[] locationOD = new int[maxAlpha/dAlpha]; 		// y of outer diameter ?????
+		float[] xID = new float[maxAlpha/dAlpha]; 			// x of inner diameter
+		float[] yID = new float[maxAlpha/dAlpha]; 			// y of inner diameter
+		double[] locationID = new double[maxAlpha/dAlpha]; 	// y of inner diameter ?????
 	
 		//init startin values for finding the wall
 		double oRelAirWallContrast = prelimCC.airWallContrast;
@@ -3138,7 +3139,7 @@ public ColCoords3D findClosestXYSlice2Bottom(InputOutput.MyFileCollection mFC, C
 		double rDStdThresh = oRDStdThresh;	//standard contrast for inner Wall find
 		double adaptedCVWallThicknessThresh = jCFS.maxCVOfWallThickness; 	
 		double stdThreshold = jCFS.stdThreshold;
-				
+		
 		//init parameter bounds
 		double rAWC_Top = 3;  //relativeAirWallContrast
 		double rAWC_Bot = 0.1;
@@ -3157,9 +3158,9 @@ public ColCoords3D findClosestXYSlice2Bottom(InputOutput.MyFileCollection mFC, C
 		HistogramStuff.IlluminationInfo jII = probeIlluminationLevel(myIP, prelimCC, true);
 		double expectedCVOfWallgrayValues = 0.5; //empirically.. (formerly: colCon.jCFS.convInterCVOfWallBrightness * colCon.jCFS.coeffVarOfWallBrightness;)
 		int myContrast = jII.quantile99 - jII.lowerQuartile; //evaluates image containing the outside of the wall and half the wall... therefore, q99 corresponds to wall brightness2
-		int minAirColGradient = (int)Math.round(relativeAirWallContrast * (double)myContrast);			
-		int minWallBrightness = (int)Math.round((double)(1 - expectedCVOfWallgrayValues) * (double)jII.quantile99);
-		int maxWallBrightness = (int)Math.round((double)(1 + expectedCVOfWallgrayValues) * (double)jII.quantile99);
+		int minAirColGradient = (int) Math.round(relativeAirWallContrast * (double) myContrast);			
+		int minWallBrightness = (int) Math.round((double)(1 - expectedCVOfWallgrayValues) * (double)jII.quantile99);
+		int maxWallBrightness = (int) Math.round((double)(1 + expectedCVOfWallgrayValues) * (double)jII.quantile99);
 		
 		//adjust min and max wall brightnesses to predefined values
 		if (jCFS.minColGV > 0) minWallBrightness = jCFS.minColGV;
@@ -3189,7 +3190,7 @@ public ColCoords3D findClosestXYSlice2Bottom(InputOutput.MyFileCollection mFC, C
 			
 			trialCounter++;
 			
-			for (int j = 0 ; j < myAngle.length ; j++) {
+			for (int j = 0 ; j < myAngle.length ; j++) {			// angle from which to find outside wall
 			
 				double[] grayAtThisAngle = new double[(int)Math.round(startingPoint + 1)];
 				locationOD[j] = 0; //nil it!
@@ -3818,17 +3819,19 @@ public ColCoords3D findClosestXYSlice2Bottom(InputOutput.MyFileCollection mFC, C
 	
 	
 	public ColCoords3D findColumnWalls3D(ImagePlus nowTiff, ColCoords3D prelimCC, MenuWaiter.ColumnFinderMenuReturn jCFS, int[] sampleSlices) {
-
-		RankFilters rF=new RankFilters();
-		ImageManipulator jIM = new ImageManipulator();
-		ImageManipulator.FloatIPCalculator iC = jIM.new FloatIPCalculator();
-		HistogramStuff hS = new HistogramStuff();
+	// ************** routine to define the column walls (sample + cylinder)
+	// ****************** - 
+		
+		RankFilters rF = new RankFilters();					// implements Mean, Minimum, Maximum, Variance, Median, Remove Outliers, Remove NaNs, Despeckle commands
+		ImageManipulator jIM = new ImageManipulator();		// contains cutImageInXYPlane, calibrate grey values, createROIFromInnerCircle, beam dehardening, biopores, fill holes, etc, stack functions
+		ImageManipulator.FloatIPCalculator iC = jIM.new FloatIPCalculator();  // class containing add & substract for image processors
+		HistogramStuff hS = new HistogramStuff();			// contains functions for illumination, percentiles, etc.
 		
 		//init column wall coordinates
 		ColCoords3D preciseCC = new ColCoords3D();
 		int colHeight = nowTiff.getNSlices();
 				
-		double[] xCenter = new double[colHeight];
+		double[] xCenter = new double[colHeight];			// all innerCircle varibles (inner = sample, outer = cylinder) as arrays with length of image "height"
 		double[] yCenter = new double[colHeight];
 		double[] zCenter = new double[colHeight];
 		double[] outerMinorRadius = new double[colHeight];
@@ -3851,20 +3854,20 @@ public ColCoords3D findClosestXYSlice2Bottom(InputOutput.MyFileCollection mFC, C
 		double[] wallSoilStdContrastThreshold = new double[colHeight];	
 		
 		//best ColCoords so far
-		ColCoords2D bestCoords = median3DCoords(prelimCC);
+		ColCoords2D bestCoords = median3DCoords(prelimCC);			// take the median coordinates of the perliminary Column outlines for a first best guess
 		
 		//init wall finder parameters
-		bestCoords.airWallContrast = jCFS.airWallContrast;
-		bestCoords.wallSoilStdContrastThreshold = jCFS.wallSoilStdContrastThreshold;
+		bestCoords.airWallContrast = jCFS.airWallContrast;			// take the air / wall contrast that was entered by the user in the menu (jCFS)
+		bestCoords.wallSoilStdContrastThreshold = jCFS.wallSoilStdContrastThreshold;	// take the contrast of soil sample vs. cylinder wall entered by user (jCFS)
 					
 		//probe illumination level for 3-D column
-		HistogramStuff.IlluminationInfo jII = hS.new IlluminationInfo(); 
-		for (int i = 0 ; i < colHeight ; i++) {  
+		HistogramStuff.IlluminationInfo jII = hS.new IlluminationInfo(); 	// IlluminationInfo contains ints with different quantiles, mean, median, ect. (of grey values I guess)
+		for (int i = 0 ; i < colHeight ; i++) {  							// loop through the 3Dtiff (ImagePlus) nowTiff and probe Illumination Level
 			nowTiff.setPosition(i+1);
 			ImageProcessor nowIP = nowTiff.getProcessor();		
 			ImageProcessor myIP = nowIP.duplicate();
-			jII = probeIlluminationLevel(myIP, bestCoords, true);
-		}
+			jII = probeIlluminationLevel(myIP, bestCoords, true);			// probeIlluminationLevel = ????????????????
+		} // end colHeight
 		
 		//re-find the column's outer wall		
 		for (int i = 0 ; i < colHeight ; i++) {  
@@ -3875,14 +3878,14 @@ public ColCoords3D findClosestXYSlice2Bottom(InputOutput.MyFileCollection mFC, C
 			nowTiff.setPosition(i+1);
 			ImageProcessor nowIP = nowTiff.getProcessor();		
 			ImageProcessor myIP = nowIP.duplicate();
-			int[] myHist = myIP.getHistogram();
+			int[] myHist = myIP.getHistogram();						// get the single slice (image processor), duplicate it and get histogram
 			
 			//ImagePlus tesImg = new ImagePlus("", myIP); tesImg.show();
 			
 			//fill zero values with background if image is not already calibrated...
-			if (!jCFS.isAlreadyNormalized & myHist[0] > 0) {
+			if (!jCFS.isAlreadyNormalized & myHist[0] > 0) {		// user can say whether image is already calibrated (user settings in jCFS)
 			
-				ImageProcessor zeroIP = myIP.duplicate();
+				ImageProcessor zeroIP = myIP.duplicate();			// if not, duplicate and do so now
 				zeroIP.scaleAndSetThreshold(0, 1, 1);
 				zeroIP.threshold(2000);
 				zeroIP.invert();
@@ -3929,14 +3932,12 @@ public ColCoords3D findClosestXYSlice2Bottom(InputOutput.MyFileCollection mFC, C
 			
                     
 			//find the wall;
-			ColCoords2D i2D = findColumnWalls2D(sampleSlices[i], myIP, bestCoords, jCFS);
+			ColCoords2D i2D = findColumnWalls2D(sampleSlices[i], myIP, bestCoords, jCFS);	// for the sample sclies find the column wall outlines, returns 2D elliptical coordinates
 			
 			//catch bug that makes first fit worse than other due to bad initial parameter estimation
 			if (!i2D.columnIsAtThisDepth & i2D.outerR2 > 0.98) {
-				
 				bestCoords = i2D;
 				i2D = findColumnWalls2D(sampleSlices[i], myIP, bestCoords, jCFS);
-				
 			}
 											
 			//transfer fitting results to vectors for export
@@ -3967,7 +3968,7 @@ public ColCoords3D findClosestXYSlice2Bottom(InputOutput.MyFileCollection mFC, C
 			
 			wallSoilStdContrastThreshold[i] = i2D.wallSoilStdContrastThreshold;
 		
-		}
+		} // loop through all image slices
 		
 		//assign results to colCon
 		preciseCC.xmid = xCenter;		
@@ -4019,10 +4020,6 @@ public ColCoords3D findClosestXYSlice2Bottom(InputOutput.MyFileCollection mFC, C
 		}
 		
 		return preciseCC;
-		
-		
-
-		
 	}
 	
 	public ColCoords2D median3DCoords(ColCoords3D thD) {
@@ -4394,11 +4391,12 @@ public ColCoords3D findClosestXYSlice2Bottom(InputOutput.MyFileCollection mFC, C
 		//find layers with complete values
 		ArrayList<Integer> hasOuterPerimeter = new ArrayList<Integer>();
 		ArrayList<Integer> hasInnerPerimeter = new ArrayList<Integer>();
+		
 		for (int z = 0 ; z < samCoords.zmid.length ; z++) {
 			if (samCoords.outerR2[z] >= jCFS.r2Thresh) hasOuterPerimeter.add(z);
 			if (jCFS.isAlu & samCoords.innerR2[z] >= jCFS.r2Thresh) hasInnerPerimeter.add(z);
 			else if (jCFS.isPVC & samCoords.outerR2[z] >= jCFS.r2Thresh) hasInnerPerimeter.add(z);
-		}
+		} // 0 to zmid.length
 		
 		//impute the missing values for inner perimeter...
 		for (int z = 0 ; z < samCoords.zmid.length ; z++) {
@@ -5519,9 +5517,18 @@ public ColCoords3D findClosestXYSlice2Bottom(InputOutput.MyFileCollection mFC, C
 		//zwischiTiff.updateAndDraw();zwischiTiff.show();
 					
 		return zwischiTiff;
+	}	
+
+	public class easyAccessTable_2DMV {
+	// 2d matrices with easy-access functions to get 1D array (column), access multiple columns combined with row, etc. (a little like in R but not thought through as well =)
 		
+		public double [][] tab2D;
+		
+		public double[][] getColumnA (double [][] tab2D, String columnName, int rownumber){
+			return tab2D;
+		}
+				
 	}
-	
 }
 	
 //public RadialModes getRadialPVCIlluminationDEPRECATED(ImagePlus nowTiff, ColCoords3D jCO, MenuWaiter.BeamDeHardeningReturn mBDH) {
