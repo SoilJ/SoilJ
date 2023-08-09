@@ -279,19 +279,30 @@ public class TailoredMaths implements PlugIn {
 		return smoothie;
 	}
 
-	public double[][] getXYOfEllipseFromAngle(double[] angleAtThisAngle, double xCenter, double yCenter, double major, double minor, double theta) {
+	
+	/**
+	 * Function to calculate the x and y coordinates of an ellipse based on its center and axis lengths
+	 * @param angleAtThisAngle	all angles for which x and y of ellipse should be calculated [double [] ]
+	 * @param xCenter			x coordinate of ellipse center [double]
+	 * @param yCenter			y coordinate of ellipse center [double]
+	 * @param major				length (pixel) of the major ellipse axis [double]
+	 * @param minor				length (pixel) of the minor ellipse axis [double]
+	 * @param theta				angle (deviation from horizontal, Bogenmass) of the major axis
+	 * @return xy[][]
+	 */
+	public double[][] getXYOfEllipseFromAngle(double[] angleAtThisAngle, double xCenter, double yCenter, 
+			double major, double minor, double theta) {
 		
-		int j;
+		double[][] xy = new double[angleAtThisAngle.length][2];			// array for storing x and y; rows according to number of angles, 2 columns for x and y 
 	
-		double[][] xy = new double[angleAtThisAngle.length][2];
-	
-		for (j = 0 ; j < angleAtThisAngle.length ; j++) {			
-			double alpha = angleAtThisAngle[j] - theta + Math.PI / 2;
+		for (int j = 0 ; j < angleAtThisAngle.length ; j++) {			// for each angle
+			
+			double alpha = angleAtThisAngle[j] - theta + Math.PI / 2;   // Why????
 			double a = major;
 			double b = minor;			
-			xy[j][0] = xCenter - a * Math.cos(alpha) * Math.cos(theta) + b * Math.sin(alpha) * Math.sin(theta);
-			xy[j][1] = yCenter + a * Math.cos(alpha) * Math.sin(theta) + b * Math.sin(alpha) * Math.cos(theta);			
-		}
+			xy[j][0] = xCenter - a * Math.cos(alpha) * Math.cos(theta) + b * Math.sin(alpha) * Math.sin(theta); // according to ellipse function (implementing the angle theta of the major axis)
+			xy[j][1] = yCenter + a * Math.cos(alpha) * Math.sin(theta) + b * Math.sin(alpha) * Math.cos(theta);	// why not x = ... a ... - b???		
+		} // for each angle
 	
 		return xy;
 	}
@@ -365,5 +376,67 @@ public class TailoredMaths implements PlugIn {
 		
 	}
 	
+	public static double interpolate(double[] start, double[] end, int x) {
+		// function for interpolating the column walls entered by user. Actually int would be better, but currently everything stored as double...
+		double y = start[1] + (end[1] - start[1]) / (end[0] - start[0]) * (x - start[0]);
+		//hier noch warnmeldung: wenn wert nicht im intervall liegt
+	    return y;
+	}
+	
+	public static double [] seqStep(double start, double end, int step) {
+		// function for generating an array sequence starting at start, ending at end, with step-length step
+		int x = (int) (end - start) / step;
+		double [] y = new double [x];
+		for (int i = 0; i < x; i++) {
+			y[i] = start + i * step; 
+		}
+		return y;
+	}
+	
+	public static double [] seqfixedLength(double start, double end, int l) {
+		// function for generating an array sequence starting at start, ending at end, with fixed number of elements
+		double step = (end - start) / l;
+		double [] y = new double [l];
+		for (int i = 0; i < l; i++) {
+			y[i] = start + i * step; 
+		}
+		return y;
+	}
+	
+	public static double [][] ellipseCoords2DfromAngle(double[] angles, double majo, double mino, double x, double y, double rot) {
+		// function that gives you some x and y coordinates with the "angles" resolution
+		
+		double [][] ellipticCoords = new double [angles.length][3];
+		for (int i = 0; i < angles.length; i++) {
+			ellipticCoords[i][0] = angles[i];
+			double xx = majo / 2. * Math.cos(angles[i]) ;
+			double yy = mino / 2. * Math.sin(angles[i]);
+			
+			ellipticCoords[i][1] = xx * Math.cos(rot) - yy * Math.sin(rot) + x;		
+			ellipticCoords[i][2] = yy * Math.cos(rot) + xx * Math.sin(rot) + y;
+		}
+		
+		return ellipticCoords;
+	}
+	
+	
+	/**
+	 * get 1d array out of column of 2d array
+	 * @param coordMatrix 	2D matrix (with coordniates, but doesn't have to be coordinates) [float [][] ]
+	 * @param columnNr		index of the column of coordMatrix that you want [int]
+	 * @return double[]		Array containing the (double) values of the columnNr'ths column in coordMatrix
+	 */
+	public static double[] getColumn ( float[][] coordMatrix, int columnNr){
+	    double column [] = new double [coordMatrix.length];
+	    for (int i = 0; i < column.length; i++){
+	       column[i] = (double) coordMatrix[i][columnNr];
+	    }
+	    return column;
+	} // get column values as array
+
+	public static Object getColumn(float outerXY, int columnNr) {
+		// TODO Auto-generated method stub
+		return null;
+	}
 }
 	

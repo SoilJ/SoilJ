@@ -44,59 +44,57 @@ public class FindColumnOutlines_ extends ImagePlus implements PlugIn  {
 
 	public void run(String arg) {
 
-		String pathSep = "\\";
-		
-		//probe operating system and adjust PathSep if necessary
-		String myOS = System.getProperty("os.name");
-		if (myOS.equalsIgnoreCase("Linux")) pathSep = "/";
+		String pathSep = System.getProperty("file.separator");
+//		String pathSep = "\\";
+//		//probe operating system and adjust PathSep if necessary
+//		String myOS = System.getProperty("os.name");
+//		if (myOS.equalsIgnoreCase("Linux")) pathSep = "/";
 		
 		//construct biggish objects
 		InputOutput jIO = new InputOutput();		
-		ObjectDetector jOD = new ObjectDetector();
+		ObjectDetector jOD = new ObjectDetector();		// contains ColCoords3D, but also illumination, find orientation, etc. 
 		MenuWaiter menu = new MenuWaiter();
 		DisplayThings disp = new DisplayThings();
 		ImageManipulator jIM = new ImageManipulator();
-				
-		// init variables
-		int i;
 					
 		//get details on PVC column finding
-		MenuWaiter.ColumnFinderMenuReturn jCFS = menu.new ColumnFinderMenuReturn(); 
-		jCFS = menu.showColumnFinderDialog();
+		MenuWaiter.ColumnFinderMenuReturn jCFS = menu.new ColumnFinderMenuReturn(); 	// get "user settings" selected in the menu
+		jCFS = menu.showColumnFinderDialog();											// menu where user chooses whether to find top & bottom, whether z-axis, good or bad contrast, steel cylinder, etc.
 		if (jCFS == null) return;
 		
 		//read file or files
-		InputOutput.MyFileCollection mFC = jIO.fileSelector("Please choose a file or folder with your image data");
+		InputOutput.MyFileCollection mFC = jIO.fileSelector("Please choose a file or folder with your image data"); 	// chose the images for which to find outline
 	 		
 		//create output folder 
 		String myOutFolderName = "WallCoordinateIdentified";
 		String myOutFolder = mFC.myBaseFolder + pathSep + myOutFolderName;
-		new File(myOutFolder).mkdir();
-		mFC.myOutFolder = myOutFolder;
+		new File(myOutFolder).mkdir();	// create the folder
+		mFC.myOutFolder = myOutFolder;	// store the information in the mFC (mFC is kind of info storage for everything about current image and total of images
 		
 		//create innerCircle Folder
 		String myInnerCircleFolder = myOutFolder + pathSep + "InnerCircle";
-		new File(myInnerCircleFolder).mkdir();
-		mFC.myInnerCircleFolder = myInnerCircleFolder;
+		new File(myInnerCircleFolder).mkdir();			// create the folder
+		mFC.myInnerCircleFolder = myInnerCircleFolder;	// store name in mFC info collection
 		
 		//remember failed column detections
-		ArrayList<String> failedColumnDetection = new ArrayList<String>();
+		ArrayList<String> failedColumnDetection = new ArrayList<String>();	// create array for storing "failures"
 		
-		//loop over 3D images
+		//loop over 3D images >> look for column outlines in each image separately
 		int errorCounts = 0;
-		for (i = 0 ; i < mFC.myTiffs.length ; i++) {  				
+		for (int i = 0 ; i < mFC.myTiffs.length ; i++) {
 	
 			//assign tiff file
-			mFC.fileName = mFC.myTiffs[i];
-			mFC = jIO.addCurrentFileInfo(mFC);
-			mFC.startSlice = 1;
-			mFC.stopSlice = mFC.nOfSlices + 1;
-			if (!jCFS.try2FindColumnTopAndBottom) {
-				mFC.startSlice = jCFS.topOfColumn;			
-				if (jCFS.bottomOfColumn > 1) mFC.stopSlice = jCFS.bottomOfColumn;
+			mFC.fileName = mFC.myTiffs[i];				// fileName in mFC conatins current information that is then overwritten for next image
+			mFC = jIO.addCurrentFileInfo(mFC);	
+			
+			mFC.startSlice = 1;							// start at top
+			mFC.stopSlice = mFC.nOfSlices + 1;			// to bottom
+			if (!jCFS.try2FindColumnTopAndBottom) {		// promting settings (chosen by user in menu) >> should program try to find the top and the bottom ? only either currently not possible
+				mFC.startSlice = jCFS.topOfColumn;			// if it should not look for bottom >> take top as given in menu
+				if (jCFS.bottomOfColumn > 1) mFC.stopSlice = jCFS.bottomOfColumn; // if entered bottom > 1 >> take bottom as indicated by user in menu
 			}
-			mFC.pathSep = pathSep;
-			mFC = jIO.addCurrentFileInfo(mFC);
+			mFC.pathSep = pathSep; // (why?)
+			mFC = jIO.addCurrentFileInfo(mFC); 	//again???		
 			
 			//check if everything is in order
 			if (mFC.somethingIsWrong) {
@@ -106,28 +104,27 @@ public class FindColumnOutlines_ extends ImagePlus implements PlugIn  {
 			
 			//reslice in case that the column is looked at from the wrong angle
 			mFC.imageHasBeenLoaded = false;
-			ImagePlus nowTiff = new ImagePlus();
+			ImagePlus nowTiff = new ImagePlus();			// nowTiff is current tiff to look at
 			if (jCFS.doAResliceFirst) {
 				
-				Slicer sly = new Slicer();
+				Slicer sly = new Slicer();					// slicer:  image is sampled at constant _pixel_ increments (distance 1)
 				
 				mFC.imageHasBeenLoaded = true;				
+				nowTiff = jIO.openTiff3D(mFC);				// open the current image (in image loop)  >> probably uses the variable fileName in mFC which is current image
 				
-				nowTiff = jIO.openTiff3D(mFC);	
-				
-				Calibration cal = nowTiff.getCalibration();				
+				Calibration cal = nowTiff.getCalibration();	// returns the imagecalibration (if e.g. mm voxel size)  >> store that info in mFC
 				mFC.caliZ = cal.pixelDepth;
 				mFC.caliX = cal.pixelWidth;
 				mFC.caliY = cal.pixelHeight;
 				cal.disableDensityCalibration();
-				cal.pixelDepth = 1;
+				cal.pixelDepth = 1;							// set the calibration to 1 (voxel size is always 1 voxel) instead of anything else
 				cal.pixelWidth = 1;
 				cal.pixelHeight = 1;
 				nowTiff.setCalibration(cal);
 				
-				ImagePlus reslicedTiff = sly.reslice(nowTiff);		
+				ImagePlus reslicedTiff = sly.reslice(nowTiff);	// then reslice the current tiff
 						
-				mFC.nowTiff = reslicedTiff;
+				mFC.nowTiff = reslicedTiff;					// overwrite the current tiff to analyze with the resliced version of itself
 				
 			}
 			
@@ -135,17 +132,17 @@ public class FindColumnOutlines_ extends ImagePlus implements PlugIn  {
 			try {
 				
 				//if column is not a steel column
-				if (!jCFS.isSteel) {
+				if (!jCFS.isSteel) {					// menu selection whether steel cylinder
 		
 					//load a stack of sample images			
-					InputOutput.SampleTiffWrapper sTW = jIO.assembleRepresentativeSample(mFC);
+					InputOutput.SampleTiffWrapper sTW = jIO.assembleRepresentativeSample(mFC);		// returns class sampleTiffWrapper (class of public ImagePlus, int[] samTiffSliceNumbers, int[] samSlices, boolean hasConverged)
 									
 					//re-determine the column outlines			
 					boolean look4PreciseCoords = true;
-					ObjectDetector.ColCoords3D prelimCC = jOD.findOrientationOfPVCOrAluColumn(sTW.samTiff, jCFS, look4PreciseCoords);
+					ObjectDetector.ColCoords3D prelimCC = jOD.findOrientationOfPVCOrAluColumn(sTW.samTiff, jCFS, look4PreciseCoords);  // returns ColCoords3D object
 					
 					//find some outlines seriously
-					ObjectDetector.ColCoords3D samCoords = jOD.findColumnWalls3D(sTW.samTiff, prelimCC, jCFS, sTW.samSlices);
+					ObjectDetector.ColCoords3D samCoords = jOD.findColumnWalls3D(sTW.samTiff, prelimCC, jCFS, sTW.samSlices);			// returns ColCoords3D object with the "definitive" ROIs
 					
 					//check if column stands straight and if it should be rotated upright into the center of the canvas
 					if (jCFS.putColumnStraight) {
@@ -178,7 +175,7 @@ public class FindColumnOutlines_ extends ImagePlus implements PlugIn  {
 					if (jCFS.try2FindColumnTopAndBottom) roughCoords = jOD.findColumnsBottom(mFC, topCoords, jCFS);
 					else roughCoords = jOD.findClosestXYSlice2Bottom(mFC, topCoords, jCFS);				
 			
-					//find bevel
+					//find bevel (abgeschrägt)
 					ObjectDetector.ColCoords3D bevCoords = jOD.new ColCoords3D();
 					if (jCFS.hasBevel) bevCoords = jOD.findColumnsBevel(mFC, roughCoords, jCFS);
 					else bevCoords = roughCoords;
@@ -225,7 +222,7 @@ public class FindColumnOutlines_ extends ImagePlus implements PlugIn  {
 					//free memory
 					myTiff.flush();
 					IJ.freeMemory();IJ.freeMemory();		
-				}
+				} // if not steel
 				
 				else {			// if it is a steel column				
 					
@@ -261,7 +258,7 @@ public class FindColumnOutlines_ extends ImagePlus implements PlugIn  {
 		}
 		else {
 			String eMsg = "No column could be detected for the following samples:\n\n";
-			for (i = 0 ; i < failedColumnDetection.size() ; i++) eMsg += failedColumnDetection.get(i) + "\n";
+			for (int i = 0 ; i < failedColumnDetection.size() ; i++) eMsg += failedColumnDetection.get(i) + "\n";
 			eMsg += "\n Please re-run the column detection for these columns using a lower R2 value "
 					+ "or using less strict criteria for a successful column find. ";					
 		}

@@ -161,7 +161,14 @@ public class RoiHandler implements PlugIn {
 		return pRoi;		
 		
 	}
-	
+	/**
+	 * 
+	 * @param innerOrOuter		[String]
+	 * @param wideTightOrExact	[String]
+	 * @param jCO				[Object.Detector.EggShapedColCoord3D]
+	 * @param cutAwayFromWalls	[int]
+	 * @return
+	 */
 	public PolygonRoi[] makeMeAPolygonRoiStack(String innerOrOuter, String wideTightOrExact, ObjectDetector.EggShapedColCoords3D jCO, int cutAwayFromWalls) {
 
 		TailoredMaths math = new TailoredMaths();
@@ -234,23 +241,32 @@ public class RoiHandler implements PlugIn {
 		return nRoi;
 	}
 	
+	
+	/**
+	 * 
+	 * @param innerOrOuter			[String]	cut away from inner or from outer wall?
+	 * @param wideTightOrExact		[String]	
+	 * @param preciseCC				[ObjectDetector.ColCoords3D]	The column outlines as in innerCircle files
+	 * @param cutAwayFromWalls		[int]		voxels to cut away
+	 * @return PolygonRoi[heigthOfColumn] 
+	 */
 	public PolygonRoi[] makeMeAPolygonRoiStack(String innerOrOuter, String wideTightOrExact, ObjectDetector.ColCoords3D preciseCC, int cutAwayFromWalls) {
 
 		TailoredMaths math = new TailoredMaths();
 		
-		int i, j, cc;
-		int maxAlpha = 360;
-		int dAlpha = 5;	
-		double[] myAngles = new double[maxAlpha/dAlpha];
-		float[] x = new float[maxAlpha/dAlpha];
+		int cc;
+		int maxAlpha = 360;		// one full round
+		int dAlpha = 5;			//steps
+		double[] myAngles = new double[maxAlpha/dAlpha];	// to store all angles
+		float[] x = new float[maxAlpha/dAlpha];				// to store x from each angle
 		float[] y = new float[maxAlpha/dAlpha];
-		double[][] xy = new double[maxAlpha/dAlpha][2];	
+		double[][] xy = new double[maxAlpha/dAlpha][2];		// to store x and y from each angle
 		double majRad = 0;
 		double minRad = 0;
-		double clipper0 = -100;		
+		double clipper0 = -100;								// how much to cut away? depending on wide/tight/exact >> set on some random number(?) for now 
 		double clipper = clipper0;
 		
-		PolygonRoi[] nRoi = new PolygonRoi[preciseCC.heightOfColumn];
+		PolygonRoi[] nRoi = new PolygonRoi[preciseCC.heightOfColumn];	// to store polygon with entry for each slice
 		
 		cc = 0;
 		for (double angle = 0 ; angle < 2 * Math.PI - Math.PI/400 ; angle = angle + 2 * Math.PI / (maxAlpha/dAlpha)) {myAngles[cc] = angle; cc++;}
@@ -260,36 +276,49 @@ public class RoiHandler implements PlugIn {
 		if (wideTightOrExact.contentEquals("exact")) clipper0 = 0;
 		if (wideTightOrExact.contentEquals("manual")) clipper0 = cutAwayFromWalls;
 		
-		for (i = 0 ; i < preciseCC.heightOfColumn ; i++) { 
+		for (int i = 0 ; i < preciseCC.heightOfColumn ; i++) { // loop through column
 			
 			if (innerOrOuter.contentEquals("inner")) {
 				majRad = preciseCC.innerMajorRadius[i];
 				minRad = preciseCC.innerMinorRadius[i];
 				clipper = clipper0;
-			} 
+			} // inner
 			if (innerOrOuter.contentEquals("outer")) {
 				majRad = preciseCC.outerMajorRadius[i];
 				minRad = preciseCC.outerMinorRadius[i];
 				clipper = -clipper0;
-			}
-			if (innerOrOuter.contentEquals("outerFromInner")) {
+			} // outer
+			if (innerOrOuter.contentEquals("outerFromInner")) {  // what is outerFromInner?
 				majRad = preciseCC.innerMajorRadius[i];
 				minRad = preciseCC.innerMinorRadius[i];
 				if (preciseCC.wallThickness[i] - 10 > 3) clipper = preciseCC.wallThickness[i] - clipper0 ;
 				else clipper = 3;
-			}
+			} // outerFromInner (???)
 			
-			xy = math.getXYOfEllipseFromAngle(myAngles, preciseCC.xmid[i], preciseCC.ymid[i], majRad + clipper, minRad + clipper, preciseCC.theta[i]);
+			xy = math.getXYOfEllipseFromAngle(					// calculate the ROI outlines
+					myAngles, preciseCC.xmid[i], 
+					preciseCC.ymid[i], 
+					majRad + clipper, 
+					minRad + clipper, 
+					preciseCC.theta[i]
+			);
 		
-			for (j = 0 ; j < myAngles.length ; j++) x[j] = (float)xy[j][0];
-			for (j = 0 ; j < myAngles.length ; j++) y[j] = (float)xy[j][1]; 
+			for (int j = 0 ; j < myAngles.length ; j++) x[j] = (float)xy[j][0];		// in each slice the x coordinates of all angles
+			for (int j = 0 ; j < myAngles.length ; j++) y[j] = (float)xy[j][1]; 
 					
-			nRoi[i - preciseCC.topOfColumn] = new PolygonRoi(x, y, Roi.POLYGON);
-		}
+			nRoi[i - preciseCC.topOfColumn] = new PolygonRoi(x, y, Roi.POLYGON);	//  at height - top of column
+		} // loop through column
 		
 		return nRoi;
 	}
 	
+	
+	/**
+	 * 
+	 * @param imageDimensions
+	 * @param mRSO
+	 * @return
+	 */
 	public PolygonRoi makeMeAnIndependentRoi(int[] imageDimensions, MenuWaiter.ROISelectionOptions mRSO) {
 
 		TailoredMaths math = new TailoredMaths();
@@ -447,7 +476,18 @@ public class RoiHandler implements PlugIn {
 		return pRoi;
 	}
 
-	public ColumnRoi prepareDesiredRoi(InputOutput.MyFileCollection mFC, ImagePlus nowTiff, MenuWaiter.ROISelectionOptions mRSO, String imagePhase2BeAnalyzed, String nameOfAnalyzedPhase) {
+	
+	/**
+	 * 
+	 * @param mFC  					[InputOutput.MyFileCollection]
+	 * @param nowTiff				[ImagePlus]
+	 * @param mRSO					[MenuWater.ROISelectionOptions]
+	 * @param imagePhase2BeAnalyzed	[String]
+	 * @param nameOfAnalyzedPhase	[String]
+	 * @return ColumnRoi() colRoi
+	 */
+	public ColumnRoi prepareDesiredRoi(InputOutput.MyFileCollection mFC, ImagePlus nowTiff, MenuWaiter.ROISelectionOptions mRSO, 
+			String imagePhase2BeAnalyzed, String nameOfAnalyzedPhase) {
 		
 		String pathSep = "/";
 		
@@ -458,7 +498,7 @@ public class RoiHandler implements PlugIn {
 		HistogramStuff hist = new HistogramStuff();
 		RoiHandler roi = new RoiHandler();
 		RollerCaster rC = new RollerCaster();
-		ColumnRoi colRoi = new ColumnRoi();
+		ColumnRoi colRoi = new ColumnRoi();				// contains ColCoords3D, PolygonRoi pRoi & iRoi, nowTiff, surfaceNotCut (ImagePlus)
 		
 		//init some important variables
 		int startSlice = 0;
@@ -487,43 +527,43 @@ public class RoiHandler implements PlugIn {
 			//read InnerCircle file and create outline ROI
 			if (GandS[0].contains("Gauge")) {
 				
-				ObjectDetector.ColCoords3D jCO = jOD.new ColCoords3D();				
-				int versio = jIO.checkInnerCircleFileVersion(mFC.nowInnerCirclePath);			
+				ObjectDetector.ColCoords3D jCO = jOD.new ColCoords3D();						// initiate new ColCoords3D for ROI	
+				int versio = jIO.checkInnerCircleFileVersion(mFC.nowInnerCirclePath);		// 
 				if (versio == 0) jCO = jIO.readInnerCircleVer0(mFC.nowInnerCirclePath);	
-				else jCO = jIO.readInnerCircleVer1(mFC.nowInnerCirclePath);	
-				colRoi.jCO = jCO;
+				else jCO = jIO.readInnerCircleVer1(mFC.nowInnerCirclePath);					// read inner circle file
+				colRoi.jCO = jCO;															// 
 				
 				//check if cut away from wall is given in percent
-				int cutAwayFromXY = mRSO.cutAwayFromWall;
+				int cutAwayFromXY = mRSO.cutAwayFromWall;									// as selected by user in menu
 				if (mRSO.cutXYPercent) {
-					double myRadius = (StatUtils.mean(jCO.innerMajorRadius) + StatUtils.mean(jCO.innerMinorRadius)) / 2;
-					cutAwayFromXY = (int)Math.floor(mRSO.cutAwayFromWall * myRadius / 100); 					
+					double myRadius = (StatUtils.mean(jCO.innerMajorRadius) + StatUtils.mean(jCO.innerMinorRadius)) / 2; // mean radius of major and minor inner circle
+					cutAwayFromXY = (int) Math.floor(mRSO.cutAwayFromWall * myRadius / 100); // caluculate voxels to cut away >> why not inner & outer je zB 10% wegschneiden?
 				}
 
 				//calculate average area
-				double[] avgRadius = new double[jCO.innerMajorRadius.length];
+				double[] avgRadius = new double[jCO.innerMajorRadius.length];				// array for storing avg radius in each slice
 				for (int radiusFinder = 0 ; radiusFinder < jCO.innerMajorRadius.length ; radiusFinder++) {
-					avgRadius[radiusFinder] = (jCO.innerMajorRadius[radiusFinder] + jCO.innerMinorRadius[radiusFinder]) / 2;
+					avgRadius[radiusFinder] = (jCO.innerMajorRadius[radiusFinder] + jCO.innerMinorRadius[radiusFinder]) / 2; // avg of major and minor inner radius
 				}
-				double myRadius = StatUtils.mean(avgRadius) - cutAwayFromXY;			
-				area = myRadius * myRadius * Math.PI;
+				double myRadius = StatUtils.mean(avgRadius) - cutAwayFromXY;				// mean of the slice-averages
+				area = myRadius * myRadius * Math.PI;										// > area
 				
-				int averageRadius = (int)Math.round(myRadius);
-				PolygonRoi[] pRoi = roi.makeMeAPolygonRoiStack("inner", "manual", jCO, -cutAwayFromXY);
+				int averageRadius = (int)Math.round(myRadius);								// int
+				PolygonRoi[] pRoi = roi.makeMeAPolygonRoiStack("inner", "manual", jCO, -cutAwayFromXY);	// returns coordinates from all (chosen) angles for each slice
 				PolygonRoi[] iRoi = null;
-				if (cutAwayFromXY == 0) iRoi = roi.makeMeAPolygonRoiStack("inner", "manual", jCO, 10);
-				if (mRSO.cutAwayFromCenter > 0) {
+				if (cutAwayFromXY == 0) iRoi = roi.makeMeAPolygonRoiStack("inner", "manual", jCO, 10);	// if cutAwayFromY is 0 then add 10???
+				if (mRSO.cutAwayFromCenter > 0) {											// cutAwayFromCenter: number of voxels or percent
 					int cutAwayFromCenter = mRSO.cutAwayFromCenter;
 					if (mRSO.cutXYPercent) {
-						cutAwayFromCenter = (int)Math.floor(averageRadius * mRSO.cutAwayFromCenter / 100);
+						cutAwayFromCenter = (int)Math.floor(averageRadius * mRSO.cutAwayFromCenter / 100);	// adapt to voxels if in percent
 					}
-					iRoi = roi.makeMeAPolygonRoiStack("inner", "manual", jCO, -averageRadius + cutAwayFromCenter);
+					iRoi = roi.makeMeAPolygonRoiStack("inner", "manual", jCO, -averageRadius + cutAwayFromCenter); // -Radius+cutAwayFromCenter
 				}
 				
 				colRoi.pRoi = pRoi;
 				colRoi.iRoi = iRoi;
 				
-			}			
+			}	// if (GandS[0].contains("Gauge"))		
 			else {
 
 				//read column coordinates
@@ -543,7 +583,7 @@ public class RoiHandler implements PlugIn {
 				colRoi.pRoi = pRoi;
 				colRoi.iRoi = iRoi;
 			
-			}			
+			}	// else if (GandS[0].contains("Gauge"))		
 					
 			//load surfaces
 			if (mRSO.includeSurfaceTopography) {
@@ -551,8 +591,10 @@ public class RoiHandler implements PlugIn {
 				soilSurface = jIO.openTiff3D(surfPath);
 			}
 			
-			//if the ROI is defined by the choice of layer below the surface and the height of the ROI
-			if ((mRSO.cutAwayFromTop > 0 & mRSO.cutAwayFromBottom == 0 ) & mRSO.includeSurfaceTopography & mRSO.heightOfRoi > 0 & mRSO.heightOfRoi < 4000) {
+	// + + + + + + + + + + if the ROI is defined by the choice of layer below the surface
+	// + + + + + + + + + + and the height of the ROI
+			if ((mRSO.cutAwayFromTop > 0 & mRSO.cutAwayFromBottom == 0 ) & 
+					mRSO.includeSurfaceTopography & mRSO.heightOfRoi > 0 & mRSO.heightOfRoi < 4000) {  // ROI below top and height of column
 				
 				//assign soil top and bottom surfaces		
 				ImageStack surStack = soilSurface.getStack();						
@@ -579,7 +621,7 @@ public class RoiHandler implements PlugIn {
 					colRoi.pRoi[i - mFC.startSlice] = colRoi.pRoi[i];
 					if (colRoi.iRoi != null) colRoi.iRoi[i - mFC.startSlice] = colRoi.iRoi[i];
 				}				
-			}
+			} // if ROI below top and height of column
 			
 			//if only bottom voxels need to be removed below surface
 			if ((mRSO.cutAwayFromTop > 0 & mRSO.cutAwayFromBottom == 0 ) & mRSO.includeSurfaceTopography & (mRSO.heightOfRoi == 0 | mRSO.heightOfRoi > 4000)) {

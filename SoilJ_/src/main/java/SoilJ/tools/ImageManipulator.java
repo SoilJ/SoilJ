@@ -934,6 +934,14 @@ public class ImageManipulator implements PlugIn {
 		
 	}
 	
+	
+	/**
+	 * 
+	 * @param mFC			[InputOutplut.MyFileCollection]
+	 * @param nowTiff		[ImagePlus]
+	 * @param mBEO			[MenuWaiter.BioPoreExtractionOptions]
+	 * @return	iC.run("OR create stack", roundOneTiff, miniTiff0);
+	 */
 	public ImagePlus extractBioPores(InputOutput.MyFileCollection mFC, ImagePlus nowTiff, MenuWaiter.BioPoreExtractionOptions mBEO) {
 		
 		ImageCalculator iC = new ImageCalculator();
@@ -944,16 +952,17 @@ public class ImageManipulator implements PlugIn {
 		int lengthThreshold=2;
 		double threshold=60;
 		
-		//check how large the image is and scale down in case it is too large.. because tubeness crashes if they are too large (comment out if you have 1000^3 voxels or less) 
+		//check how large the image is and scale down in case it is too large.. because tubeness 
+		// crashes if they are too large (comment out if you have 1000^3 voxels or less) 
 		int w = nowTiff.getWidth(), h = nowTiff.getHeight(), d = nowTiff.getNSlices(); 
-		double bulkVol = (double)w * (double)h * (double)d;
+		double bulkVol = (double) w * (double) h * (double) d;
 		int wnew = w;
 		int hnew = h;
 		int dnew = d;
 		if (bulkVol > 1200000000) {
 			IJ.showStatus("Reducing image size..");
 			nowTiff = binaryScale2HalfSize(nowTiff);
-			wnew = nowTiff.getWidth();
+			wnew = nowTiff.getWidth();					// why not overwrite w, h, d?
 			hnew = nowTiff.getHeight();
 			dnew = nowTiff.getNSlices();
 		}
@@ -963,12 +972,12 @@ public class ImageManipulator implements PlugIn {
 		int n_dilations = 1;
 		
 		TubenessProcessor tp = new TubenessProcessor(sigma, false);
-		ImagePlus original = tp.generateImage(nowTiff.duplicate());
+		ImagePlus original = tp.generateImage(nowTiff.duplicate());	// gives scores for how tube-like a pore is >> non-binary!
 		
-		original = binarize3DFloatImage(original, threshold);
+		original = binarize3DFloatImage(original, threshold);		// binarize (0 / 255) the generated image with the above-defined threshold (60)
 				
 		n_dilations=1;
-		for (int i = 1; i < n_dilations + 1 ; i++) original = dil.dilate(original, 255, true);
+		for (int i = 1; i < n_dilations + 1 ; i++) original = dil.dilate(original, 255, true);	// add 1 voxel (dilation) to the 255-phase
 		
 		//double minimum = 3.14 * (sigma + n_dilations) * (sigma + n_dilations) * (sigma + n_dilations) * lengthThreshold;
 		//BoneJParticles myParty = jMA.parallelParticleAnalyzer(original, minimum , Double.POSITIVE_INFINITY);
@@ -977,8 +986,8 @@ public class ImageManipulator implements PlugIn {
 		//original = binarize3DFloatImage(original,1);
 				
 		//*************************initTubenessOndownscaledImage************************************		
-		IJ.showStatus("Reducing image size..");
-		nowTiff = binaryScale2HalfSize(nowTiff);
+		IJ.showStatus("Reducing image size..");						// >> do the same again, but on the image that has a reduced size!
+		nowTiff = binaryScale2HalfSize(nowTiff);					// reduce image size (even if not reduced before)
 		
 		sigma=1;
 		n_dilations = 1;		
@@ -989,7 +998,7 @@ public class ImageManipulator implements PlugIn {
 		miniTiff0 = binarize3DFloatImage(miniTiff0, threshold);
 				
 		n_dilations=1;
-		for (int i = 1; i < n_dilations + 1 ; i++) miniTiff0 = dil.dilate(miniTiff0, 255, false);
+		for (int i = 1; i < n_dilations + 1 ; i++) miniTiff0 = dil.dilate(miniTiff0, 255, false); // what does the false refer to??'
 				
 		//minimum = 3.14 * (sigma + n_dilations) * (sigma + n_dilations) * (sigma + n_dilations) * lengthThreshold;
 		//myParty = jMA.parallelParticleAnalyzer(miniTiff0, minimum , Double.POSITIVE_INFINITY);
@@ -998,7 +1007,8 @@ public class ImageManipulator implements PlugIn {
 		//miniTiff0 = binarize3DFloatImage(miniTiff0,1);
 		
 		//*************************loop1************************************
-		double[] sigmas = {2,4,6,8,6,8,11,15};
+		double[] sigmas =   {2,4,6,8,
+							6,8,11,15};  		// ???
 		
 		for (int j = 0 ; j < 4 ; j++) {
 			
@@ -1064,15 +1074,17 @@ public class ImageManipulator implements PlugIn {
 			//miniTiff0.updateAndDraw();miniTiff0.show();
 		}
 		
-		//*************************Rescale final round, merge with previous round************************************
+		//************************* Re-scale final round, merge with previous round************************************
 		
 		miniTiff0 = scaleWithoutMenu(miniTiff0, wnew, hnew, dnew, ImageProcessor.BILINEAR);
 		
 		miniTiff0 = binarize3DFloatImage(miniTiff0,128);
 		
-		return iC.run("OR create stack", roundOneTiff, miniTiff0);
+		return iC.run("OR create stack", roundOneTiff, miniTiff0);    // take roundOneTiff and miniTiff0 and combine them with the OR-Operator, create a new image
 		
 	}
+	
+	
 	
 	public ImagePlus extractGravel(InputOutput.MyFileCollection mFC, ImagePlus nowTiff, MenuWaiter.GravelExtractionOptions mGEO) {
 		
@@ -3325,6 +3337,13 @@ public class ImageManipulator implements PlugIn {
 		
 	}
 
+	
+	/** 
+	 * Puts each pixel in each slice to 0 if below threshold, otherwise to 255
+	 * @param nowTiff
+	 * @param threshold
+	 * @return ImagePlus outTiff
+	 */
 	public ImagePlus binarize3DFloatImage(ImagePlus nowTiff, double threshold) {
 		
 		ImageStack outStack = new ImageStack(nowTiff.getWidth(), nowTiff.getHeight());
@@ -3981,7 +4000,6 @@ public class ImageManipulator implements PlugIn {
 				pRoi = roi.makeMeAPolygonRoiStack("inner", "manual", jCO, 4);		
 				oRoi = roi.makeMeAPolygonRoiStack("outer", "manual", jCO, 4);
 				ooRoi = roi.makeMeAPolygonRoiStack("outerFromInner", "manual", jCO, -wallThickness-6);
-				
 			}
 			
 			else {
