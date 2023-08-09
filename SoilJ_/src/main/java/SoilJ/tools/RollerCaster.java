@@ -422,6 +422,15 @@ public class RollerCaster implements PlugIn {
 		return out;
 	}
 	
+	public double[] castFloat2Double(float[] myArray) {
+		
+		double[] out = new double[myArray.length];
+		
+		for (int i = 0 ; i < out.length ; i++) out[i] = (double)myArray[i];
+		
+		return out;
+	}
+	
 	public int[][] castFloatFloat2IntInt(float[][] myArray) {
 		
 		int[][] out = new int[myArray.length][myArray[0].length];

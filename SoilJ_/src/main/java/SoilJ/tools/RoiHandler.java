@@ -49,44 +49,50 @@ public class RoiHandler implements PlugIn {
 	public class ColumnRoi {
 		
 		public double area;
+		public double voxelSizeInMicron;
 		public ObjectDetector.ColCoords3D jCO;
+		public ObjectDetector.ColCoords3D outCO;
 		public PolygonRoi[] pRoi;
 		public PolygonRoi[] iRoi;
+		public PolygonRoi[] outRoi;
 		public ImagePlus nowTiff;
 		public ImagePlus surfaceNotCut;
 		
+		public int oldWidth;
+		public int oldHeight;
+		
 	}
 	
-	public ObjectDetector.ColCoords3D scaleColumnCoordinates(double[] iDims, ObjectDetector.ColCoords3D inCo, MenuWaiter.PoreSpaceAnalyzerOptions mPSA, double scalingFactor, double[] oddVoxelContribution) {
+	public ObjectDetector.ColCoords3D scaleColumnCoordinates(double[] iDims, ObjectDetector.ColCoords3D inCo, MenuWaiter.ROISelectionOptions mRSO, double scalingFactor, double[] oddVoxelContribution) {
 		
 		ObjectDetector jOD = new ObjectDetector();
 		ObjectDetector.ColCoords3D outCo = jOD.new ColCoords3D();
 		
-		int cFT = mPSA.mRSO.cutAwayFromTop;
-		int iHeight = mPSA.mRSO.heightOfRoi;
+		int cFT = mRSO.cutAwayFromTop;
+		int iHeight = mRSO.heightOfRoi;
 		
 		//check if height of ROI is definedin percent of original height
 		if (iHeight == 0) {
-			if (mPSA.mRSO.cutZPercent == true) {
-				if ((mPSA.mRSO.cutAwayFromTop == 50 & mPSA.mRSO.cutAwayFromBottom == 0) | (mPSA.mRSO.cutAwayFromTop == 0 & mPSA.mRSO.cutAwayFromBottom == 50)) {							
+			if (mRSO.cutZPercent == true) {
+				if ((mRSO.cutAwayFromTop == 50 & mRSO.cutAwayFromBottom == 0) | (mRSO.cutAwayFromTop == 0 & mRSO.cutAwayFromBottom == 50)) {							
 					iHeight = inCo.xmid.length / 2;
-					if (mPSA.mRSO.cutAwayFromTop == 50) cFT = inCo.xmid.length / 2 - 1; 
+					if (mRSO.cutAwayFromTop == 50) cFT = inCo.xmid.length / 2 - 1; 
 				}			
 				else {
-					iHeight = inCo.xmid.length - (mPSA.mRSO.cutAwayFromTop + mPSA.mRSO.cutAwayFromBottom) * inCo.xmid.length / 100;
-					cFT = inCo.xmid.length - mPSA.mRSO.cutAwayFromTop * inCo.xmid.length / 100;
+					iHeight = inCo.xmid.length - (mRSO.cutAwayFromTop + mRSO.cutAwayFromBottom) * inCo.xmid.length / 100;
+					cFT = inCo.xmid.length - mRSO.cutAwayFromTop * inCo.xmid.length / 100;
 				}
 			}
 			else {
-				iHeight = inCo.xmid.length - mPSA.mRSO.cutAwayFromTop - mPSA.mRSO.cutAwayFromBottom;
+				iHeight = inCo.xmid.length - mRSO.cutAwayFromTop - mRSO.cutAwayFromBottom;
 			}
 		}
 		
 		//check if radius of ROI is defined in percent of original radius
-		double cutAwayFromXY = mPSA.mRSO.cutAwayFromWall;
-		if (mPSA.mRSO.cutXYPercent == true) {
+		double cutAwayFromXY = mRSO.cutAwayFromWall;
+		if (mRSO.cutXYPercent == true) {
 			double myRadius = (StatUtils.mean(inCo.innerMajorRadius) + StatUtils.mean(inCo.innerMinorRadius)) / 2;
-			cutAwayFromXY = mPSA.mRSO.cutAwayFromWall * myRadius / 100; 
+			cutAwayFromXY = mRSO.cutAwayFromWall * myRadius / 100; 
 		}
 		
 		double[] innerMajorRadius = new double[iHeight];
@@ -508,6 +514,7 @@ public class RoiHandler implements PlugIn {
 		double area = 0;
 		boolean hasSurface = mRSO.includeSurfaceTopography;
 		
+		
 		//check if mFC and mRSO values match
 		if (mRSO.cutAwayFromTop != mFC.startSlice) mFC.startSlice = mRSO.cutAwayFromTop;
 		if (mRSO.cutAwayFromBottom > 0 & mRSO.cutAwayFromBottom != nowTiff.getNSlices() - mFC.stopSlice) mFC.stopSlice = nowTiff.getNSlices() - mRSO.cutAwayFromBottom;
@@ -755,6 +762,21 @@ public class RoiHandler implements PlugIn {
 			ImageStack cutStack1 = new ImageStack(maxX-minX, maxY-minY);
 			
 			//nowTiff.updateAndDraw();nowTiff.show();			
+			double[] offsetX = new double[outTiffs[0].getNSlices()];
+			double[] offsetY = new double[outTiffs[0].getNSlices()];
+			double[] ixmid = new double[outTiffs[0].getNSlices()];
+			double[] iymid = new double[outTiffs[0].getNSlices()];			
+			double[] innerMajorRadius = new double[outTiffs[0].getNSlices()];
+			double[] innerMinorRadius = new double[outTiffs[0].getNSlices()];	
+			double[] outerMajorRadius = new double[outTiffs[0].getNSlices()];
+			double[] outerMinorRadius = new double[outTiffs[0].getNSlices()];	
+			double[] theta = new double[outTiffs[0].getNSlices()];
+			double[] wallThickness = new double[outTiffs[0].getNSlices()];
+			double[] nowZ = new double[outTiffs[0].getNSlices()];
+			double[] dummy = new double[outTiffs[0].getNSlices()];
+					
+			PolygonRoi[] outRoi = new PolygonRoi[outTiffs[0].getNSlices()];
+			ObjectDetector.ColCoords3D nowCoords = jOD.new ColCoords3D();
 		
 			for (int i = 0 ; i < outTiffs[0].getNSlices() ; i++) {
 				
@@ -775,6 +797,27 @@ public class RoiHandler implements PlugIn {
 				
 				nowIP.setRoi(cutRoi);
 				ImageProcessor cutIP = nowIP.crop();
+			
+				//make new ColumnRoi
+				offsetX[i] = colRoi.pRoi[i].getXBase() - cutRoi.getXBase();		
+				offsetY[i] = colRoi.pRoi[i].getYBase() - cutRoi.getYBase();		
+
+				if (GandS[0].contains("Gauge")) {
+					ixmid[i] = colRoi.jCO.xmid[i + mFC.startSlice] - cutRoi.getXBase();						
+					iymid[i] = colRoi.jCO.ymid[i + mFC.startSlice] - cutRoi.getYBase();
+					innerMajorRadius[i] = colRoi.jCO.innerMajorRadius[i + mFC.startSlice] - mRSO.cutAwayFromWall;
+					innerMinorRadius[i] = colRoi.jCO.innerMinorRadius[i + mFC.startSlice] - mRSO.cutAwayFromWall;
+					outerMajorRadius[i] = colRoi.jCO.outerMajorRadius[i + mFC.startSlice] - mRSO.cutAwayFromWall;
+					outerMinorRadius[i] = colRoi.jCO.outerMinorRadius[i + mFC.startSlice] - mRSO.cutAwayFromWall;
+					theta[i] = colRoi.jCO.theta[i + mFC.startSlice];
+					wallThickness[i] = colRoi.jCO.wallThickness[i + mFC.startSlice];
+					nowZ[i] = i + 1;
+					dummy[i] = 0;
+				}
+				
+				//remember old image canvas dimensions
+				//double oldX = cutRoi.getXBase();
+				//colRoi.oldHeight = nowTiff.getHeight();
 				
 				cutStack0.addSlice(cutIP);
 				
@@ -788,7 +831,26 @@ public class RoiHandler implements PlugIn {
 					
 					cutStack1.addSlice(cutIP1);					
 				}
+				
 			}
+
+			nowCoords.xmid = ixmid;
+			nowCoords.ymid = iymid;
+			nowCoords.zmid = nowZ;
+			nowCoords.innerMajorRadius = innerMajorRadius;
+			nowCoords.innerMinorRadius = innerMinorRadius;
+			nowCoords.outerMajorRadius = outerMajorRadius;
+			nowCoords.outerMinorRadius = outerMinorRadius;
+			nowCoords.theta = theta;
+			nowCoords.itheta = theta;
+			nowCoords.heightOfColumn = outTiffs[0].getNSlices();
+			nowCoords.wallThickness = wallThickness;
+			nowCoords.ixmid = ixmid;
+			nowCoords.iymid = iymid;
+			nowCoords.innerR2 = dummy;
+			nowCoords.outerR2 = dummy;
+			colRoi.outCO = nowCoords;
+			colRoi.outRoi = makeMeAPolygonRoiStack("inner", "exact", nowCoords, 0);	
 			
 			outTiffs[0].setStack(cutStack0);
 			if (outTiffs[1] != null) outTiffs[1].setStack(cutStack1);

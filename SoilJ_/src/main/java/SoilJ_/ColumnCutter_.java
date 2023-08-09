@@ -2,8 +2,6 @@ package SoilJ_;
 
 import java.io.File;
 
-import org.apache.commons.math3.stat.StatUtils;
-
 import SoilJ.tools.InputOutput;
 import SoilJ.tools.MenuWaiter;
 import SoilJ.tools.MorphologyAnalyzer;
@@ -27,18 +25,23 @@ import SoilJ.tools.RoiHandler;
  *along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+import ij.IJ;
 import ij.ImagePlus;
 import ij.plugin.PlugIn;
 
 /** 
- * ExtractPoresizeDistributio is a SoilJ plugin that extracts the pore size distribution from an
- * image depicting pore diameters (thicknesses) and writes it into an ASCII file.
+ * PoreSpaceAnalyzer is a SoilJ plugin that calculates several morphologic properties from 
+ * binary images. To a large part it makes use of plugins collected in the BoneJ library:
+ * Doube M, Kłosowski MM, Arganda-Carreras I, Cordeliéres F, Dougherty RP, Jackson J, Schmid B, Hutchinson JR, Shefelbine SJ. (2010) BoneJ: free and extensible bone image analysis in ImageJ. Bone 47:1076-9. doi: 10.1016/j.bone.2010.08.023 
+ * www.bonej.org
+ * 
+ * The results of the analyses are written into image and ASCII files. 
  * 
  * @author John Koestel
  *
  */
 
-public class ExtractHistogram_ extends ImagePlus implements PlugIn  {
+public class ColumnCutter_ extends ImagePlus implements PlugIn  {
 
 	public void run(String arg) {
 
@@ -55,49 +58,54 @@ public class ExtractHistogram_ extends ImagePlus implements PlugIn  {
 		System.setProperty("plugins.dir", pluginsDir);
 		
 		//construct biggish objects
-		InputOutput jIO = new InputOutput();
+		InputOutput jIO = new InputOutput();	
 		MenuWaiter menu = new MenuWaiter();
 		RoiHandler roi = new RoiHandler();
-		MorphologyAnalyzer morph = new MorphologyAnalyzer();
+		MorphologyAnalyzer morph = new MorphologyAnalyzer();	
 		
-		//select ROI
+		// init variables
+		int i;
+		
+		//tell me what I should do!
 		MenuWaiter.ROISelectionOptions mRSO = menu.regionOfInterestSelection();
+		if (mRSO == null) return;
 		
-		//choose files
-		InputOutput.MyFileCollection mFC = jIO.fileSelector("Please choose a file or folder with your image data");
-
-		mFC.myOutFolder = mFC.myBaseFolder + pathSep + "Histograms"; 
-		new File(mFC.myOutFolder).mkdir();
+		//create Folder structure
+		InputOutput.MyFileCollection mFC = jIO.createFolders4SubROIData(mRSO);				
+		String myInnerCircleFolder =  mFC.myOutFolder + pathSep + "InnerCircle";
+		new File(myInnerCircleFolder).mkdir();			
 		
 		//loop over 3D images
-		for (int i = 0 ; i < mFC.myTiffs.length ; i++) {  //myTiffs.length
-
+		for (i = 0 ; i < mFC.myTiffs.length ; i++) {  //myTiffs.length
+			
 			//assemble image for analyses
 			mFC.fileName = mFC.myTiffs[i];
-			mFC = jIO.addCurrentFileInfo(mFC);
+			mFC = jIO.addCurrentFileInfo8Bit(mFC);
+			String nowInnerCirclePath = myInnerCircleFolder + pathSep + "Gauge" + mFC.colName + ".txt";
 			
 			//load file			
 			int[] startStopSlices = jIO.findStartAndStopSlices(mFC, mRSO);
-			int[] colSlices = new int[startStopSlices[1]  - startStopSlices[0]];
+			int[] colSlices = new int[startStopSlices[1] - startStopSlices[0]];
 			for (int j = 0 ; j < colSlices.length ; j++) colSlices[j] = startStopSlices[0] + j;
 		
 			//cut roi		
 			mFC.startSlice = startStopSlices[0];
 			mFC.stopSlice = startStopSlices[1];
-			RoiHandler.ColumnRoi colRoi = roi.prepareDesiredRoi(mFC, jIO.openTiff3DSomeSlices(mFC, colSlices), mRSO, "null", "all");
+			RoiHandler.ColumnRoi colRoi = roi.prepareDesiredRoi(mFC, jIO.openTiff3DSomeSlices(mFC, colSlices), mRSO, "null", "null");
 			
-			//load image
-			String myName = mFC.fileName.substring(0,mFC.fileName.length()-4) + ".psd";
-		
-			//define class bounds.. needed due to sphere fitting artefacts..
-			double[] maximum = {colRoi.nowTiff.getWidth(), colRoi.nowTiff.getHeight()};
-			double[] classBounds = new double[(int)StatUtils.max(maximum)];
-			for (int j = 0 ; j < classBounds.length ; j++) classBounds[j] = j;				
+//			colRoi.nowTiff.setPosition(1);
+//			ImageProcessor myIP = colRoi.nowTiff.getProcessor();
+//			myIP.setColor(Color.YELLOW);
+//			myIP.draw(colRoi.outRoi[0]);
+//			colRoi.nowTiff.updateAndDraw();colRoi.nowTiff.show();
+	
+			jIO.writeInnerCircleVer1(nowInnerCirclePath, colRoi.outCO);
 			
-			//apply segmentation							}
-			morph.extractPoresizeDistroOldSchool(mFC.myOutFolder + pathSep + myName, colRoi.nowTiff, classBounds);			
+			//and save... oufff!!
+			jIO.tiffSaver(mFC.myOutFolder, mFC.fileName, colRoi.nowTiff);
 			
-		}
-		
+			IJ.showStatus("Column and InnerCircle File have been cut");
+			
+		}		
 	}
 }

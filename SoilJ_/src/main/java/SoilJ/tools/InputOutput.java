@@ -91,8 +91,11 @@ public class InputOutput extends ImagePlus implements PlugIn {
 	
 		public int histogramClasses;
 		public int numberOfHistograms;
-		public int[][] histograms;
+		public int[][] histograms;		
 		public ArrayList<String> sampleNames;
+		public float[][] floatHistograms;
+		public float[] jHisto; 				//joint histogram
+		public float[] jHistoSD; 			//standard deviation of joint histogram
 		
 	}
 	
@@ -115,10 +118,13 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		public String myMatrixFolder;
 		public String myMineralFolder;
 		public String myFloyWarshallFolder;
+		public String myHistogram;
 		
 		public String[] myTiffs;
 		public String[] mySurfaceFileNames;
 		public String[] myInnerCircleFiles;
+		
+		public String[] myHistograms;
 		
 		public String nowTiffPath;
 		public FileInfo[] fileInfo;
@@ -526,6 +532,49 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		
 		return mFC;
 	}	
+  
+	public MyFileCollection selectAHistogramFile(String heading) {
+	
+		String pathSep = "\\";
+		
+		//probe operating system and adjust PathSep if necessary
+		String myOS = System.getProperty("os.name");
+		if (myOS.equalsIgnoreCase("Linux")) pathSep = "/";
+		
+		//selects a file or a folder (and thus all files in it)		
+		MyFileCollection mFC = new MyFileCollection();
+		MenuWaiter mW = new MenuWaiter();
+		
+		String myPath = chooseAFile(heading);
+		
+		File myFile = new File(myPath);
+		myPath = myFile.getParent();
+		if (myPath.endsWith("/")) myPath = myPath.substring(0, myPath.length() - 1);
+		if (myPath.endsWith("\\")) myPath = myPath.substring(0, myPath.length() - 2);
+		
+		//open menu asking whether selected files or all files should be processed. 
+		String checkString = myFile.toString().substring(myFile.toString().length() - 2);
+		if (checkString.compareToIgnoreCase("8b") == 0 & checkString.compareToIgnoreCase("6b") == 0) IJ.error("Please select a histogram file (.8b or .16b)");
+		MenuWaiter.SelectFiles mFS = mW.new SelectFiles();
+		if (checkString == "8b") mFS = mW.showHistogramSelectionMenu(myFile, 8);		
+		else mFS =  mW.showHistogramSelectionMenu(myFile, 16);			
+		
+		mFC.myHistogramFolder = myPath;
+		
+		if (!mFS.selectChosen) {		
+			File myPathAsFile = new File(myPath);
+			if (checkString == "8b") mFC.myHistograms = listHistsInFolder8(myPathAsFile);
+			else mFC.myHistograms = listHistsInFolder(myPathAsFile);
+			mFC.bitDepth = 8;
+		}		
+		else {			
+			mFC.myHistogram = myFile.toString();
+			mFC.bitDepth = 16;
+		}
+		mFC.pathSep = pathSep;
+		
+		return mFC;
+	}	
 	
 	public MyFileCollection fileSelectorAll(String heading) {
 		
@@ -735,6 +784,62 @@ public class InputOutput extends ImagePlus implements PlugIn {
 				if (testFile.length() >= 3) {
 					subString = testFile.substring(testFile.length() - 3,testFile.length());
 					if (subString.equals("tif")) myTiffs.add(testFile);									
+				}			
+			}
+			
+			Collections.sort(myTiffs);
+			
+			String[] myFiles = new String[myTiffs.size()];
+						
+			for (int i = 0 ; i < myFiles.length ; i++) myFiles[i] = myTiffs.get(i); 
+			
+			return myFiles;
+		}
+		
+		else return null;				
+		
+	}
+	
+	public String[] listHistsInFolder8(File folder) {
+
+		String testFile, subString;
+	
+		ArrayList<String> myTiffs = new ArrayList<String>();
+		
+		if (folder.listFiles().length > 0) {
+			for (final File fileEntry : folder.listFiles()) {
+				testFile = fileEntry.getName();
+				if (testFile.length() >= 3) {
+					subString = testFile.substring(testFile.length() - 2,testFile.length());
+					if (subString.equals("8b")) myTiffs.add(testFile);									
+				}			
+			}
+			
+			Collections.sort(myTiffs);
+			
+			String[] myFiles = new String[myTiffs.size()];
+						
+			for (int i = 0 ; i < myFiles.length ; i++) myFiles[i] = myTiffs.get(i); 
+			
+			return myFiles;
+		}
+		
+		else return null;				
+		
+	}
+	
+	public String[] listHistsInFolder(File folder) {
+
+		String testFile, subString;
+	
+		ArrayList<String> myTiffs = new ArrayList<String>();
+		
+		if (folder.listFiles().length > 0) {
+			for (final File fileEntry : folder.listFiles()) {
+				testFile = fileEntry.getName();
+				if (testFile.length() >= 3) {
+					subString = testFile.substring(testFile.length() - 3,testFile.length());
+					if (subString.equals("16b")) myTiffs.add(testFile);									
 				}			
 			}
 			
@@ -1191,7 +1296,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
 			IJ.showStatus("Opening sample slice " + (i + 1) + "/" + sampleSlices.length + " ...");
 			
 			try {
-				ImageProcessor nowIP = oT3D.openImage(mFC.nowTiffPath, sampleSlices[i] + 1).getProcessor();
+				ImageProcessor nowIP = oT3D.openImage(mFC.nowTiffPath, sampleSlices[i]).getProcessor();
 				outStack.addSlice(nowIP);
 			}	
 			catch(Exception e){
@@ -1818,37 +1923,145 @@ public class InputOutput extends ImagePlus implements PlugIn {
         
     }
 	
-	public boolean writeWRCResultsInASCII(MyFileCollection mFC, MenuWaiter.WRCCalculatorMenu mWRC, int[] air, int[] water, double[] aSM, double[] wSM) {
+	public boolean writeWRCResultsInASCII(MyFileCollection mFC, MorphologyAnalyzer.WRCPhaseProps myWRCProps) {
 	       
 		try{
 			
-			String pathSep = "\\";
-			
-			//probe operating system and adjust PathSep if necessary
-			String myOS = System.getProperty("os.name");
-			if (myOS.equalsIgnoreCase("Linux")) pathSep = "/";
-            
 			//open file
-			String path = mFC.myOutFolder + pathSep + mFC.colName + ".asc"; 
+			String path = mFC.myOutFolder + mFC.pathSep + mFC.colName + ".asc"; 
 			
 			FileOutputStream fos = new FileOutputStream(path);
             Writer w = new BufferedWriter(new OutputStreamWriter(fos));
             
             //write header
-            String myPreHeader = "tensionAtTop\t" + "tensionAtCenter\t" + "tensionAtBottom\t" +
-            		"airVolume (vx)\t" + "waterVolume (vx)\t" + "airSaturation\t" + "waterSaturation\n";
+            String myPreHeader = "tensionAtTopInMM\t" + "tensionAtCenterInMM\t" + "tensionAtBottomInMM\t" +
+            		"areaInMM2\t" + "heightInMM\t" + "bulkVolumeInMM3\t" +
+            		"theta_w\t" + "sigma_w\t" + "Euler_w\t" + "Gamma_w\t" + "fractalDim_w\t" + "percolates_w\t" + 
+            		"ThetaLargestCluster_w\t" + "ThetaPercolatingCluster_w\t" + 
+            		"theta_a\t" + "sigma_a\t" + "Euler_a\t" + "Gamma_a\t" + "fractalDim_a\t" + "percolates_a\t" + 
+            		"ThetaLargestCluster_a\t" + "ThetaPercolatingCluster_a\t" + "depthOfPenetration_a\t" + 
+            		"averageDistanceFromAeratedPoreInMM\t" + "fractionLessThan3MMFromPhaseBoundary\t" + "fractionMoreThan3MMFromPhaseBoundary\n";
             w.write(myPreHeader);
             w.flush();
             
-            //write results
-            for (int i = 0 ; i < air.length ; i++) {
-            	String integralString = String.format("%3.2f", mWRC.tensionAtTop[i]) + "\t" +
-            							String.format("%3.2f", mWRC.tensionAtCenter[i]) + "\t" +
-            							String.format("%3.2f", mWRC.tensionAtBottom[i]) + "\t" +
-            							air[i] + "\t" + water[i] + "\t" +
-            							String.format("%1.4f", aSM[i]) + "\t" +
-            							String.format("%1.4f", wSM[i]) + "\n";
+            //set tension precision
+            String tensionFormat = "%4.2f";
+            if (myWRCProps.enforceIntegerTensions) tensionFormat = "%4.0f";
             
+            //write results
+            for (int i = 0 ; i < myWRCProps.tensionAtTopInMM.length ; i++) {
+            	
+            	String integralString = String.format(tensionFormat, myWRCProps.tensionAtTopInMM[i]) + "\t";
+            	integralString += String.format(tensionFormat, myWRCProps.tensionAtCenterInMM[i]) + "\t";
+            	integralString += String.format(tensionFormat, myWRCProps.tensionAtBottomInMM[i]) + "\t";
+            	
+            	integralString += String.format("%4.2f", myWRCProps.areaInMM2[i]) + "\t";
+            	integralString += String.format("%4.2f", myWRCProps.heightInMM[i]) + "\t";
+            	integralString += String.format("%4.2f", myWRCProps.bulkVolumeInMM3[i]) + "\t";
+            	
+            	integralString += String.format("%1.3f", myWRCProps.theta_w[i]) + "\t";
+            	integralString += String.format("%3.3f", myWRCProps.sigma_w[i]) + "\t";
+            	integralString += String.format("%6.0f", myWRCProps.chi_w[i]) + "\t";
+            	integralString += String.format("%1.3f", myWRCProps.gamma_w[i]) + "\t";
+            	integralString += String.format("%1.3f", myWRCProps.fractalDim_w[i]) + "\t";
+            	integralString += String.format("%1.0f", myWRCProps.percolates_w[i]) + "\t";
+            	integralString += String.format("%1.3f", myWRCProps.thetaLC_w[i]) + "\t";
+            	integralString += String.format("%1.3f", myWRCProps.thetaPerc_w[i]) + "\t";
+            	//integralString += String.format("%6.2f", myWRCProps.dc_w) + "\t";
+            	
+            	integralString += String.format("%1.3f", myWRCProps.theta_a[i]) + "\t";
+            	integralString += String.format("%3.3f", myWRCProps.sigma_a[i]) + "\t";
+            	integralString += String.format("%6.0f", myWRCProps.chi_a[i]) + "\t";
+            	integralString += String.format("%1.3f", myWRCProps.gamma_a[i]) + "\t";
+            	integralString += String.format("%1.3f", myWRCProps.fractalDim_a[i]) + "\t";
+            	integralString += String.format("%1.0f", myWRCProps.percolates_a[i]) + "\t";
+            	integralString += String.format("%1.3f", myWRCProps.thetaLC_a[i]) + "\t";
+            	integralString += String.format("%1.3f", myWRCProps.thetaPerc_a[i]) + "\t";          
+            	integralString += String.format("%4.2f", myWRCProps.depthOfPenetrationInMM_a[i]) + "\t";
+            	integralString += String.format("%1.3f", myWRCProps.averageDistanceFromAeratedPoreInMM[i]) + "\t";   
+            	integralString += String.format("%1.3f", myWRCProps.fractionLessThan3MMFromPhaseBoundary[i]) + "\t";  
+            	integralString += String.format("%1.3f", myWRCProps.fractionMoreThan3MMFromPhaseBoundary[i]) + "\n";  
+            	
+            	//integralString += String.format("%6.2f", myWRCProps.dc_a) + "\t";
+            	//integralString += String.format("%6.2f", myWRCProps.thetaWellAerated_a) + "\t";
+
+            	String cIntegralString = integralString.replace(',', '.');  
+            	w.write(cIntegralString);
+            	w.flush();
+            }
+            
+            //close file
+            w.close();
+            
+        } 
+		catch (Exception e) {
+        
+        	return true;
+        	
+        }
+        
+		return false;
+        
+    }
+	
+	public boolean writeDrainageSimulationResultsInASCII(MyFileCollection mFC, MorphologyAnalyzer.WRCPhaseProps myWRCProps) {
+	       
+		try{
+			
+			//open file
+			String path = mFC.myOutFolder + mFC.pathSep + mFC.colName + ".asc"; 
+			
+			FileOutputStream fos = new FileOutputStream(path);
+            Writer w = new BufferedWriter(new OutputStreamWriter(fos));
+            
+            //write header
+            String myPreHeader = "pressureAtTopInMM\t" + "pressureAtCenterInMM\t" + "pressureAtBottomInMM\t" +
+            		"areaInMM2\t" + "heightInMM\t" + "bulkVolumeInMM3\t" +
+            		"theta_w\t" + "sigma_w\t" + "Euler_w\t" + "Gamma_w\t" + "fractalDim_w\t" + "percolates_w\t" + 
+            		"ThetaLargestCluster_w\t" + "ThetaPercolatingCluster_w\t" + 
+            		"theta_a\t" + "sigma_a\t" + "Euler_a\t" + "Gamma_a\t" + "fractalDim_a\t" + "percolates_a\t" + 
+            		"ThetaLargestCluster_a\t" + "ThetaPercolatingCluster_a\t" + 
+            		"depthOfPenetration_a\n";
+            w.write(myPreHeader);
+            w.flush();
+            
+            //set tension precision
+            String tensionFormat = "%4.2f";
+            if (myWRCProps.enforceIntegerTensions) tensionFormat = "%4.0f";
+            
+            //write results
+            for (int i = 0 ; i < myWRCProps.pressureAtTopInMM.length ; i++) {
+            	
+            	String integralString = String.format(tensionFormat, myWRCProps.pressureAtTopInMM[i]) + "\t";
+            	integralString += String.format(tensionFormat, myWRCProps.pressureAtCenterInMM[i]) + "\t";
+            	integralString += String.format(tensionFormat, myWRCProps.pressureAtBottomInMM[i]) + "\t";
+            	
+            	integralString += String.format("%4.2f", myWRCProps.areaInMM2[i]) + "\t";
+            	integralString += String.format("%4.2f", myWRCProps.heightInMM[i]) + "\t";
+            	integralString += String.format("%4.2f", myWRCProps.bulkVolumeInMM3[i]) + "\t";
+            	
+            	integralString += String.format("%1.3f", myWRCProps.theta_w[i]) + "\t";
+            	integralString += String.format("%3.3f", myWRCProps.sigma_w[i]) + "\t";
+            	integralString += String.format("%6.0f", myWRCProps.chi_w[i]) + "\t";
+            	integralString += String.format("%1.3f", myWRCProps.gamma_w[i]) + "\t";
+            	integralString += String.format("%1.3f", myWRCProps.fractalDim_w[i]) + "\t";
+            	integralString += String.format("%1.0f", myWRCProps.percolates_w[i]) + "\t";
+            	integralString += String.format("%1.3f", myWRCProps.thetaLC_w[i]) + "\t";
+            	integralString += String.format("%1.3f", myWRCProps.thetaPerc_w[i]) + "\t";
+            	//integralString += String.format("%6.2f", myWRCProps.dc_w) + "\t";
+            	
+            	integralString += String.format("%1.3f", myWRCProps.theta_a[i]) + "\t";
+            	integralString += String.format("%3.3f", myWRCProps.sigma_a[i]) + "\t";
+            	integralString += String.format("%6.0f", myWRCProps.chi_a[i]) + "\t";
+            	integralString += String.format("%1.3f", myWRCProps.gamma_a[i]) + "\t";
+            	integralString += String.format("%1.3f", myWRCProps.fractalDim_a[i]) + "\t";
+            	integralString += String.format("%1.0f", myWRCProps.percolates_a[i]) + "\t";
+            	integralString += String.format("%1.3f", myWRCProps.thetaLC_a[i]) + "\t";
+            	integralString += String.format("%1.3f", myWRCProps.thetaPerc_a[i]) + "\t";          
+            	integralString += String.format("%4.2f", myWRCProps.depthOfPenetrationInMM_a[i]) + "\n";
+            	//integralString += String.format("%6.2f", myWRCProps.dc_a) + "\t";
+            	//integralString += String.format("%6.2f", myWRCProps.thetaWellAerated_a) + "\t";
+
             	String cIntegralString = integralString.replace(',', '.');  
             	w.write(cIntegralString);
             	w.flush();
@@ -4214,6 +4427,70 @@ public class InputOutput extends ImagePlus implements PlugIn {
 	    
 	}
 	
+	public void writeJointHistogram8(MyFileCollection mFC, int[] myHist) {
+		
+		String savePath = mFC.myHistogramFolder + mFC.pathSep + "Histograms.8b"; 
+		
+		try {
+			
+            //open file
+			BufferedWriter w = null;			
+			w = new BufferedWriter(new FileWriter(savePath,false));
+		
+			String colName = "JointHistogram";
+			String nowLine = colName + "\t";
+			
+			for (int i = 0 ; i < myHist.length - 1 ; i++) {
+								
+				nowLine += Integer.toString(myHist[i]) + "\t";
+					
+			}
+				
+			nowLine += Integer.toString(myHist[myHist.length - 1]) + "\n";
+				
+			w.write(nowLine);
+			w.close();
+            
+        }
+		
+		catch(Exception e){
+			IJ.error("Exception " + e.toString() + "\nSaving path: " + savePath);
+		}
+	    
+	}
+	
+	public void writeJointHistogram(MyFileCollection mFC, int[] myHist) {
+		
+		String savePath = mFC.myHistogramFolder + mFC.pathSep + "JointHistograms.16b"; 
+		
+		try {
+			
+            //open file
+			BufferedWriter w = null;			
+			w = new BufferedWriter(new FileWriter(savePath,false));
+		
+			String colName = "JointHistogram";
+			String nowLine = colName + "\t";
+			
+			for (int i = 0 ; i < myHist.length - 1 ; i++) {
+								
+				nowLine += Integer.toString(myHist[i]) + "\t";
+					
+			}
+				
+			nowLine += Integer.toString(myHist[myHist.length - 1]) + "\n";
+				
+			w.write(nowLine);
+			w.close();
+            
+        }
+		
+		catch(Exception e){
+			IJ.error("Exception " + e.toString() + "\nSaving path: " + savePath);
+		}
+	    
+	}
+	
 	public void writeMultiThresholds(MyFileCollection mFC, int[][] myThresholds, MenuWaiter.MultiRegionSegmentation mRS) {
 		
 		String savePath = mFC.myOutFolder + mFC.pathSep + mFC.colName;
@@ -4445,6 +4722,63 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		
 	}
 	
+	public Histograms readHistogram(InputOutput.MyFileCollection mFC) {
+		
+		Histograms hists = new Histograms();
+		
+		String readPath = mFC.myHistogram; 
+		
+		int histogramNumber = returnLinesInAsciiFile(readPath);
+		int histogramClasses = returnHistogramClassesFromFile(readPath);
+		
+		try {
+			
+			FileReader fr = new FileReader(readPath);		
+	        BufferedReader br = new BufferedReader(fr);
+	        
+			int[][] myHists = new int[histogramNumber][histogramClasses]; 
+			
+			//read data
+			ArrayList<String> samples = new ArrayList<>();
+			
+			for (int i = 0 ; i < histogramNumber ; i++) {
+				
+				String line = br.readLine();			
+				String[] wordsArray = line.split("\t");
+				ArrayList<String> words = new ArrayList<>(); 
+				
+				for(String each : wordsArray){
+					if(!"".equals(each)){
+						words.add(each);
+					}					
+				}
+				
+				//only start at line 1 to skip the header
+				samples.add(words.get(0));
+				for (int j = 1 ; j < histogramClasses ; j++) myHists[i][j] = Integer.parseInt(words.get(j));
+				
+			}
+		
+			br.close();
+			fr.close();
+			
+			hists.histogramClasses = histogramClasses;
+			hists.numberOfHistograms = histogramNumber;
+			hists.histograms = myHists;
+			hists.sampleNames = samples;
+			
+			return hists;
+			
+		}
+		catch(Exception e) {
+        			
+			IJ.error("Something went wrong when reading from the histogram file...");
+			return null;
+			
+        }
+		
+	}
+	
 	public int[][] readHistogram(String nowGaugePath, ObjectDetector.ColCoords3D jCO) {
 		
 		String pathSep = "\\";
@@ -4558,5 +4892,4 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		
 		return myDoubles;
 	}
-		
 }

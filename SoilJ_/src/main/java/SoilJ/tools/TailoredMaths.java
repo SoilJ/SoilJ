@@ -246,7 +246,7 @@ public class TailoredMaths implements PlugIn {
 		
 	}
 
-	public double[] LinearLOESSFilter(double[] data, int windowHalfSize) {
+	public double[] linearLOESSFilter(double[] data, int windowHalfSize) {
 				
 		FitStuff fs =  new FitStuff();
 		
@@ -278,7 +278,6 @@ public class TailoredMaths implements PlugIn {
 		
 		return smoothie;
 	}
-
 	
 	/**
 	 * Function to calculate the x and y coordinates of an ellipse based on its center and axis lengths
@@ -295,9 +294,8 @@ public class TailoredMaths implements PlugIn {
 		
 		double[][] xy = new double[angleAtThisAngle.length][2];			// array for storing x and y; rows according to number of angles, 2 columns for x and y 
 	
-		for (int j = 0 ; j < angleAtThisAngle.length ; j++) {			// for each angle
-			
-			double alpha = angleAtThisAngle[j] - theta + Math.PI / 2;   // Why????
+		for (int j = 0 ; j < angleAtThisAngle.length ; j++) {			
+			double alpha = angleAtThisAngle[j] - theta;// + Math.PI / 2;
 			double a = major;
 			double b = minor;			
 			xy[j][0] = xCenter - a * Math.cos(alpha) * Math.cos(theta) + b * Math.sin(alpha) * Math.sin(theta); // according to ellipse function (implementing the angle theta of the major axis)
