@@ -1013,7 +1013,6 @@ public class InputOutput extends ImagePlus implements PlugIn {
 				
 				String myCompareString = myGaugeFolder.substring(end-11, end);
 				if (!myCompareString.equalsIgnoreCase("InnerCircle")) myGaugeFolder = null;
-				else myGaugeFolder = myGaugeFolder;
 				
 				if (myCompareString.substring(myCompareString.length()-1).equalsIgnoreCase(pathSep)) {
 					myCompareString = myGaugeFolder.substring(end-12, end-1);
@@ -2445,8 +2444,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
     }*/
 	
 	public int checkInnerCircleFileVersion(String nowInnerCirclePath) {
-		
-		int cc = 0;
+
 		String line;
 		
 		try{
@@ -2456,13 +2454,13 @@ public class InputOutput extends ImagePlus implements PlugIn {
 	            
             //read header line 1
             line = br.readLine();
+            br.close();
             
 		} catch(Exception e) {return -1;}
 		
 		String checkString = line.substring(0, 6);
         if (checkString.equalsIgnoreCase("height")) return 1;
         else return 0;
-		
 	}
 	
 	public ObjectDetector.EggShapedColCoords3D readInnerCircleSteel(MyFileCollection mFC) {
