@@ -58,8 +58,13 @@ public class SoilJ_ implements PlugInFilter {
 		// see: https://stackoverflow.com/a/7060464/1207769
 		//Class<?> clazz = SoilJ_.class;	
 		
-		System.setProperty("plugins.dir", "D:\\Eclipse\\NewMaven");
-		//System.setProperty("plugins.dir", "C:\\Users\\F80864840\\git\\plugins");
+		String user = System.getProperty("user.name");
+		if (user.equals("F80864840")) { 
+			System.setProperty("plugins.dir", "C:\\Users\\F80864840\\git\\plugins");
+		} else {
+			System.setProperty("plugins.dir", "D:\\Eclipse\\NewMaven");
+		}
+		System.out.println(System.getProperty("plugins.dir"));
 		//Debug.run("Soil_", "");
 		
 		// start ImageJ
