@@ -41,7 +41,6 @@ import javax.swing.JRadioButton;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 
-import SoilJ.tools.DisplayThings;
 import SoilJ.tools.ImageManipulator;
 import SoilJ.tools.InputOutput;
 import SoilJ.tools.InputOutput.MyFileCollection;
@@ -107,8 +106,8 @@ public class DefineColumnOutlinesManually2_ extends ImagePlus implements PlugIn 
 			mFC = jIO.addCurrentFileInfo(mFC);
 
 			// load image
-			ImagePlus nowTiff = jIO.openVirtualStack3D(mFC.myBaseFolder + mFC.pathSep + mFC.myTiffs[i]);
-			nowTiff.show();
+			ImagePlus nowTiff = jIO.openTiff3D(mFC.myBaseFolder + mFC.pathSep + mFC.myTiffs[i]);
+			// nowTiff.show();
 			inputImage = nowTiff;			
 
 			// Here I would like to open the image as virtual stack - 
@@ -328,12 +327,15 @@ public class DefineColumnOutlinesManually2_ extends ImagePlus implements PlugIn 
 						
 						// create a frequency map for each z. Each slice (z) should have exactly 2 ROIs: 1 soil + 1 wall
 						HashMap<Integer, Integer> freqMap = new HashMap<Integer, Integer>();
-						for (int i=0; i<zValues_wt.length; i++) {
+						for (int i=0; i < zValues_wt.length; i++) {
 				            if (freqMap.containsKey(zValues_wt[i])) {freqMap.put(zValues_wt[i], freqMap.get(zValues_wt[i]) + 1);}
 				            else {freqMap.put(zValues_wt[i], 1);}
 				        }
 						// check if exactly two per slice, otherwise do not create innerCircle
-						for (Map.Entry entry : freqMap.entrySet()) {
+						
+						
+						for (Map.Entry<Integer, Integer> entry : freqMap.entrySet()) {
+						// for (Map.Entry entry : freqMap.entrySet()) {
 				            int freq = (int) entry.getValue();
 							if (freq != 2) {
 								JOptionPane.showMessageDialog(null, "Exactly two ROIs (soil + wall) in each marked slice needed!");
@@ -463,7 +465,7 @@ public class DefineColumnOutlinesManually2_ extends ImagePlus implements PlugIn 
 	
 						InputOutput jIO = new InputOutput();
 						ImageManipulator jIM = new ImageManipulator();
-						DisplayThings disp = new DisplayThings();
+						// DisplayThings disp = new DisplayThings();
 						
 						// load image and cut out vertical ROI... // save a tiff with top and bottom cut off
 						mFC.nowTiff = jIO.openTiff3D(mFC.myBaseFolder + System.getProperty("file.separator") + mFC.fileName);
