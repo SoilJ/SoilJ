@@ -59,11 +59,14 @@ public class SoilJ_ implements PlugInFilter {
 		//Class<?> clazz = SoilJ_.class;	
 		
 		String user = System.getProperty("user.name");
+		System.setProperty("plugins.dir", "D:\\Eclipse\\NewMaven");
 		if (user.equals("F80864840")) { 
 			System.setProperty("plugins.dir", "C:\\Users\\F80864840\\git\\plugins");
-		} else {
-			System.setProperty("plugins.dir", "D:\\Eclipse\\NewMaven");
+		} 
+		if (user.equals("johnk")) { 
+			System.setProperty("plugins.dir", "D:\\GitSoilJ");
 		}
+		
 		System.out.println(System.getProperty("plugins.dir"));
 		//Debug.run("Soil_", "");
 		

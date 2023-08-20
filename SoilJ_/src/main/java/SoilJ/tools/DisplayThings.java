@@ -386,17 +386,17 @@ public class DisplayThings implements PlugIn {
 		double midX = nowTiff.getWidth() / 2;
 		double midY = nowTiff.getHeight() / 2;
 		
-		float[] x = new float[8];
-		float[] y = new float[8];
-		float[] xo = new float[8];
-		float[] yo = new float[8];
+		float[] x = new float[8];																	// X-coordinates of the inner column outlines in the 4 vertical cross section at depth z  
+		float[] y = new float[8];																	// Y-coordinates of the inner column outlines in the 4 vertical cross section at depth z
+		float[] xo = new float[8];																	// X-coordinates of the outer column outlines in the 4 vertical cross section at depth z
+		float[] yo = new float[8];																	// Y-coordinates of the outer column outlines in the 4 vertical cross section at depth z
 		
 		// init output images
 		ImageProcessor[] outIP = new ImageProcessor[4];												// four output 2d images (only initiate)
 		ImageProcessor standardIP = new ShortProcessor(2 * radius - 1, nowTiff.getNSlices());		// average of height & width of nowTiff (why?)
 		for (int i = 0 ; i < outIP.length ; i++) outIP[i] = standardIP.duplicate();					// set this size for all four output 2D images
 		
-		float[][][] inner = new float[colCoords.bottomOfColumn - colCoords.topOfColumn][4][2];		// 3D array: height as column, 4x2 matrix angle + x/y?
+		float[][][] inner = new float[colCoords.bottomOfColumn - colCoords.topOfColumn][4][2];		// 3D array: i) z, ii) the 4 vertical cross sections, iii) ?? .. of inner outline
 		float[][][] outer = new float[colCoords.bottomOfColumn - colCoords.topOfColumn][4][2];
 		
 		for (int z = 0 ; z < nowTiff.getNSlices() ; z++) {											// loop through all slices
@@ -415,9 +415,10 @@ public class DisplayThings implements PlugIn {
 				double majRad = colCoords.innerMajorRadius[z];										// get the INNER Major & Minor radius at this slice
 				double minRad = colCoords.innerMinorRadius[z];
 				
+				//create the ellipse describing the inner column outlines at depth z
 				xy = math.getXYOfEllipseFromAngle(allAngels, colCoords.ixmid[z], colCoords.iymid[z], majRad, minRad, colCoords.itheta[z]);	// fill xy
 				
-				for (int j = 0 ; j < allAngels.length ; j++) {										// loop through all angles 
+				for (int j = 0 ; j < allAngels.length ; j++) {										// loop through all angles: note that they correspond to the outlines being drawn in in the 4 vertical cross-sections
 					x[j] = (float)xy[j][0];															// set x according to xy
 					y[j] = (float)xy[j][1];
 				} // loop through angles
@@ -426,6 +427,7 @@ public class DisplayThings implements PlugIn {
 				majRad = colCoords.outerMajorRadius[z];												// get the OUTER Major & Minor radius at this slice			
 				minRad = colCoords.outerMinorRadius[z];
 				
+				//create the ellipse describing the outer column outlines at depth z
 				xy = math.getXYOfEllipseFromAngle(allAngels, colCoords.xmid[z], colCoords.ymid[z], majRad, minRad, colCoords.theta[z]);	// fill OUTER xy with coordinates 
 				
 				for (int j = 0 ; j < allAngels.length ; j++) {										// loop throgh all angles
@@ -434,32 +436,32 @@ public class DisplayThings implements PlugIn {
 				} // loop through all angles				
 			} // if z in detected column
 			
-			for (int angle = 0 ; angle < myAngels.length ; angle++) {								// loop through all angles again
+			for (int angle = 0 ; angle < myAngels.length ; angle++) {								// loop through the 4 first angles
 				
 				double alpha = myAngels[angle];														// current angle alpha
-				float[][] nowPX = new float[2 * radius - 1][4];										// PX = 2D array with # rows = average width/height of nowTiff, 4 columns
-				float[][] nowPY = new float[2 * radius - 1][4];
+				float[][] nowPX = new float[2 * radius - 1][4];										// nowPX = stores the X values along the cross-section described by angle alpha at depth z
+				float[][] nowPY = new float[2 * radius - 1][4];										// nowPY = stores the Y values along the cross-section described by angle alpha at depth z 
 				
 				//get profile				
 				int cc = 0;
 				double[] minDist = {radius, radius};												// array of 2
-				double[] edgeCoord = new double[2];													// array of 2
+				double[] edgeCoord = new double[2];													// array of 2 --> remembers the index in nowPX at which the inner outline the cross-section is positioned 
 				double[] monDist = {radius, radius};												// array of 2
 				double[] odgeCoord = new double[2];													// array of 2
 				
 				for (int r = -radius + 1; r < radius ; r++) {										// for image -half image size to +half image size (0 in the middle of the picture!)
 					
-					nowPX[cc][angle] = (float)(midX + r * Math.sin(alpha));							// nowPX at current angle and index cc[0...image width/height] is in the middle + sin(current angle)
-					nowPY[cc][angle] = (float)(midY + r * Math.cos(alpha));					
+					nowPX[cc][angle] = (float)(midX + r * Math.sin(alpha - Math.PI / 2));			// nowPX at current angle and index cc [0...image width/height] is in the middle + sin(current angle).. starts at midpoint - radius.. stops at midpoint + radius
+					nowPY[cc][angle] = (float)(midY + r * Math.cos(alpha - Math.PI / 2));					
 					
 					//if z within the detected column
 					if (z >= 0 & z < colCoords.zmid.length) {										// if z in column:
 					
-						//check whether one of the INNER edges is crossed by the profile
-						double distance1 = Math.sqrt(Math.pow(nowPX[cc][angle] - x[angle],2) + Math.pow(nowPY[cc][angle] - y[angle],2));
-						double distance2 = Math.sqrt(Math.pow(nowPX[cc][angle] - x[angle + 4],2) + Math.pow(nowPY[cc][angle] - y[angle + 4],2));
-						
-						if (distance1 < minDist[0]) {
+						//check whether one of the INNER edges are crossed by the profile
+						double distance1 = Math.sqrt(Math.pow(nowPX[cc][angle] - x[angle],2) + Math.pow(nowPY[cc][angle] - y[angle],2)); 			//calculate distance between left inner edge and current coordinate along the transsect defined by angle 
+						double distance2 = Math.sqrt(Math.pow(nowPX[cc][angle] - x[angle + 4],2) + Math.pow(nowPY[cc][angle] - y[angle + 4],2));    //calculate distance between right inner edge and current coordinate along the transsect defined by angle 
+												
+						if (distance1 < minDist[0]) {    //if distance is smaller than the inner detected column radius
 							minDist[0] = distance1;
 							edgeCoord[0] = cc;
 						}
@@ -563,17 +565,16 @@ public class DisplayThings implements PlugIn {
 			myCE.stretchHistogram(outIP[j], 0.5);													// set contrast
 			
 			ImageProcessor zIP = outIP[j].duplicate();												// (j >> angle-loop); duplicate the image at teh current angle
-			ImageProcessor rgbIP = zIP.convertToRGB();												// and convert it to RGB (better for export)
-																	// set drawing color (outline) to red										
-	
+			ImageProcessor rgbIP = zIP.convertToRGB();			      								// and convert it to RGB (better for export)
+																								    
 			PolygonRoi pRoi = new PolygonRoi(inin, Z, Roi.POLYGON);									// outlines "left & right"	
 			PolygonRoi oRoi1 = new PolygonRoi(l1, ZO, Roi.FREELINE);								// outline top and bottom (???)
 			PolygonRoi oRoi2 = new PolygonRoi(l2, ZO, Roi.FREELINE);
 						
 			rgbIP.setLineWidth(2);																	// line width of ROI (colCoord3D)
 			rgbIP.setColor(Color.YELLOW);	
-			pRoi.drawPixels(rgbIP);			// Polygon around soil													// actually draw the outlines (not only store them >> really manipulate image pRoi)
-			rgbIP.setColor(Color.RED);	
+			pRoi.drawPixels(rgbIP);			// Polygon around soil									// actually draw the outlines (not only store them >> really manipulate image pRoi)
+			rgbIP.setColor(Color.RED);		// set drawing color (outline) to red
 			oRoi1.drawPixels(rgbIP);		// outer line right
 			rgbIP.setColor(Color.CYAN);
 			oRoi2.drawPixels(rgbIP);		// outer line left
