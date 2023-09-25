@@ -4229,7 +4229,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
 	
 	public void writeHistogram(MyFileCollection mFC, int[] myHist) {
 	
-		String savePath = mFC.myOutFolder + mFC.pathSep + "Histo_" + mFC.colName + "." + mFC.bitDepth + "b"; 
+		String savePath = mFC.myHistogramFolder + mFC.pathSep + "Histo_" + mFC.colName + "." + mFC.bitDepth + "b"; 
 		
 		try {
 			
@@ -4346,7 +4346,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
 	
 	public void writeHistogram8(MyFileCollection mFC, int[][] myHist) {
 		
-		String savePath = mFC.myOutFolder + mFC.pathSep + "Histograms.8b"; 
+		String savePath = mFC.myHistogramFolder + mFC.pathSep + "Histo_" + mFC.colName + "." + mFC.bitDepth + "b"; 
 		
 		try {
 			
@@ -4386,7 +4386,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
 	
 	public void writeJointHistogram8(MyFileCollection mFC, int[] myHist) {
 		
-		String savePath = mFC.myHistogramFolder + mFC.pathSep + "Histograms.8b"; 
+		String savePath = mFC.myHistogramFolder + mFC.pathSep + "JointHistograms.8b"; 
 		
 		try {
 			

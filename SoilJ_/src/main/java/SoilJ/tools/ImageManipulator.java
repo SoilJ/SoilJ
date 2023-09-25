@@ -1182,7 +1182,7 @@ public class ImageManipulator implements PlugIn {
 		int dyn = 2;
 		double thresholdVesselness = mBEO.thresholdVesselness; 
 		double smallesAllowedElongation = mBEO.smallesAllowedElongation;
-		double[] sigmas = {2,3,4};
+		double[] sigmas = {1,2,3,4};
 		
 		//check how large the image is and scale down in case it is too large.. because tubeness crashes if they are too large (comment out if you have 1000^3 voxels or less) 
 		int w = nowTiff.getWidth(), h = nowTiff.getHeight(), d = nowTiff.getNSlices(); 
@@ -1250,7 +1250,7 @@ public class ImageManipulator implements PlugIn {
 		//*************************initTubenessOndownscaledImage************************************		
 		IJ.showStatus("Reducing image size..");
 		nowTiff = binaryScale2HalfSize(nowTiff);
-		double[] newSigmas = {1,2,3,4,5,6,7,8};
+		double[] newSigmas = {1,2,3,4,5,6,7,8,9,10,11};
 				
 		for (int j = 0 ; j < newSigmas.length ; j++) {
 			
@@ -1289,7 +1289,7 @@ public class ImageManipulator implements PlugIn {
 		//mediumBiopores.show();
 		
 		//*************************TubenessOn2TimesdownscaledImage************************************		
-		IJ.showStatus("Reducing image size ince more ..");
+		IJ.showStatus("Reducing image size once more ..");
 		nowTiff = binaryScale2HalfSize(nowTiff);
 		
 		double[] lastSigmas = new double[12];

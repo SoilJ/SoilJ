@@ -324,7 +324,9 @@ public class MorphologyAnalyzer implements PlugIn {
 //						for (int i = 0 ; i < classBounds.length - 1 ; i++) { 
 //							if (nowPix >= classBounds[i] & nowPix < classBounds[i+1]) value2PutIn = i; 
 //						}
-						if (nowPix >= 0) psd[(int)Math.round(nowPix)]++;
+						int myEntry = (int)Math.round(nowPix);
+						if (myEntry >= classBounds.length) myEntry = classBounds.length - 1;
+						if (nowPix >= 0) psd[myEntry]++;
 					}
 				}
 			}				

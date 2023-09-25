@@ -89,6 +89,7 @@ public class CompileJoint1DHistogram_ extends ImagePlus implements PlugIn  {
 		//probe type of images that are going to be processed..
 		mFC.fileName = mFC.myTiffs[0];
 		mFC = jIO.addCurrentFileInfo(mFC);
+		mFC.myHistogramFolder = mFC.myOutFolder;
 		
 		float[][] allHists = new float[mFC.myTiffs.length][(int)Math.round(Math.pow(2, mFC.bitDepth))];
 		

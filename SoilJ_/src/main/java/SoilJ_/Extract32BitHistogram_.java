@@ -90,7 +90,7 @@ public class Extract32BitHistogram_ extends ImagePlus implements PlugIn  {
 			String myName = mFC.fileName.substring(0,mFC.fileName.length()-4) + ".hist";
 		
 			//define class bounds.. needed due to sphere fitting artefacts..
-			double[] maximum = {colRoi.nowTiff.getWidth(), colRoi.nowTiff.getHeight()};
+			double[] maximum = {colRoi.nowTiff.getWidth(), colRoi.nowTiff.getHeight(), colRoi.nowTiff.getNSlices()};
 			double[] classBounds = new double[(int)StatUtils.max(maximum)];
 			for (int j = 0 ; j < classBounds.length ; j++) classBounds[j] = j;				
 			
