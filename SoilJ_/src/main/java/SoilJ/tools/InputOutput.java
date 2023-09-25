@@ -166,6 +166,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		int width;
 		int height;
 	}
+	
 	public MyFileCollection addCurrentFileInfo8Bit(MyFileCollection mFC) {
 		
 		String pathSep = "\\";
@@ -310,7 +311,9 @@ public class InputOutput extends ImagePlus implements PlugIn {
 	}
 	
 	public SampleTiffWrapper assembleRepresentativeSample(MyFileCollection mFC) {
-		
+	// ******* e.g. for the column wall finder*******************
+	// ** takes subsamples (image processors) of the imagePlus (3d tiff) but first checks whether the histrogram/greyvalue distribution is more or less representative
+	// ** returns sampleTiffWrapper (class of public ImagePlus, int[] samTiffSliceNumbers, int[] samSlices, boolean hasConverged;
 		MorphologyAnalyzer morpho = new MorphologyAnalyzer();
 		SampleTiffWrapper sTW = new SampleTiffWrapper();
 		RankFilters rF = new RankFilters();
@@ -463,11 +466,12 @@ public class InputOutput extends ImagePlus implements PlugIn {
 	
 	public MyFileCollection fileSelector(String heading) {
 		
-		String pathSep = "\\";
+		// String pathSep = "\\";
 		
 		//probe operating system and adjust PathSep if necessary
-		String myOS = System.getProperty("os.name");
-		if (myOS.equalsIgnoreCase("Linux")) pathSep = "/";
+		// String myOS = System.getProperty("os.name");
+		// if (myOS.equalsIgnoreCase("Linux")) pathSep = "/";
+		String pathSep = System.getProperty("file.separator");
 		
 		//selects a file or a folder (and thus all files in it)		
 		MyFileCollection mFC = new MyFileCollection();
@@ -505,6 +509,30 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		return mFC;
 	}	
 	
+	public MyFileCollection fileSelectorOneFile(String heading) {
+		String pathSep = System.getProperty("file.separator");
+		
+		//selects a file or a folder (and thus all files in it)		
+		MyFileCollection mFC = new MyFileCollection();
+		
+		String myPath = chooseAFile(heading);
+		
+		File myFile = new File(myPath);
+		myPath = myFile.getParent();
+		if (myPath.endsWith("/")) myPath = myPath.substring(0, myPath.length() - 1);
+		if (myPath.endsWith("\\")) myPath = myPath.substring(0, myPath.length() - 2);
+		
+		//DO NOT open menu asking whether selected files or all files should be processed. 
+		String[] myTiff = new String[1]; 
+		myTiff[0] = myFile.getName();
+					
+		mFC = getAllMyNeededFolders(myPath, myTiff, "", false, false);
+		
+		mFC.pathSep = pathSep;
+		
+		return mFC;
+	}	
+  
 	public MyFileCollection selectAHistogramFile(String heading) {
 	
 		String pathSep = "\\";
@@ -543,7 +571,6 @@ public class InputOutput extends ImagePlus implements PlugIn {
 			mFC.myHistogram = myFile.toString();
 			mFC.bitDepth = 16;
 		}
-		
 		mFC.pathSep = pathSep;
 		
 		return mFC;
@@ -986,7 +1013,6 @@ public class InputOutput extends ImagePlus implements PlugIn {
 				
 				String myCompareString = myGaugeFolder.substring(end-11, end);
 				if (!myCompareString.equalsIgnoreCase("InnerCircle")) myGaugeFolder = null;
-				else myGaugeFolder = myGaugeFolder;
 				
 				if (myCompareString.substring(myCompareString.length()-1).equalsIgnoreCase(pathSep)) {
 					myCompareString = myGaugeFolder.substring(end-12, end-1);
@@ -1243,6 +1269,19 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		
 	}
 	
+
+	public ImagePlus openVirtualStack3D(MyFileCollection mFC) {
+		ImagePlus nowTiff;
+		nowTiff = IJ.openVirtual(mFC.nowTiffPath);
+		return nowTiff;
+	}
+	public ImagePlus openVirtualStack3D(String nowTiffPath) {
+		ImagePlus nowTiff;
+		nowTiff = IJ.openVirtual(nowTiffPath);
+		return nowTiff;
+	}
+
+	
 	public ImagePlus openTiff3DSomeSlices(MyFileCollection mFC, int[] sampleSlices) {
 		
 		Opener oT3D = new Opener();
@@ -1491,7 +1530,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
             myString += "volume fraction connected to top:  "   + String.format("%1.4e",rMP.volumeFractionConnected2Top) + "\n";
             myString += "mean curvature:                    "	+ String.format("%1.4e",rMP.meanCurvature) + "\n";
             
-            myString += "percolation threshold              "   + String.format("%1.4e",rMP.percolationThreshold) + "\n";
+            myString += "percolation threshold:              "   + String.format("%1.4e",rMP.percolationThreshold) + "\n";
             
             String cMyString = myString.replace(',', '.');
             w.write(cMyString);
@@ -2230,12 +2269,13 @@ public class InputOutput extends ImagePlus implements PlugIn {
     }
 	
 	public boolean writeInnerCircleVer1(String path, ObjectDetector.ColCoords3D jCO) {
-	       
+	//*************************** Take the ColCoords3D and write a text file in the InnerCircle folder *************************     
 		try{
+			//new File(path).mkdirs();
             //open file
 			FileOutputStream fos = new FileOutputStream(path);
             Writer w = new BufferedWriter(new OutputStreamWriter(fos));
- 
+            
             //write header 1
         	String myHeader0 = "heightOfColumn\n";        	
         	w.write(myHeader0);
@@ -2257,6 +2297,8 @@ public class InputOutput extends ImagePlus implements PlugIn {
         	w.write(myHeader);
         	w.flush();
             
+        	System.out.println("So far so good");
+        	
             //write the data2
             for (int i = 0 ; i < jCO.xmid.length ; i++) {
             	 
@@ -2402,8 +2444,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
     }*/
 	
 	public int checkInnerCircleFileVersion(String nowInnerCirclePath) {
-		
-		int cc = 0;
+
 		String line;
 		
 		try{
@@ -2413,13 +2454,13 @@ public class InputOutput extends ImagePlus implements PlugIn {
 	            
             //read header line 1
             line = br.readLine();
+            br.close();
             
 		} catch(Exception e) {return -1;}
 		
 		String checkString = line.substring(0, 6);
         if (checkString.equalsIgnoreCase("height")) return 1;
         else return 0;
-		
 	}
 	
 	public ObjectDetector.EggShapedColCoords3D readInnerCircleSteel(MyFileCollection mFC) {
@@ -2695,61 +2736,61 @@ public class InputOutput extends ImagePlus implements PlugIn {
             //init all data string
             StringBuilder sb = new StringBuilder();
             
-            //skip header1
+            //skip header1:  read first line (which is header ColumnHeight)
             String line = br.readLine();
             
-            //read scalars
-            scalars = br.readLine();
+            //read scalars: read second line (which is scalar: actual column height)
+            scalars = br.readLine(); 
             
-            //skip header2
-            line = br.readLine();
+            //skip header2: read third line which are headers of the InnerCircleFile
+            line = br.readLine(); 
             
-            //read data    
+            //read data: all the following lines
             cc = 0;
-            while (line != null) {
+            while (line != null) {  		// wieso while??? Wieso nicht einfach for dokumentenlänge??? ah, evtl. nicht so einfach dokumentenlänge abzufragen?
             	if (cc > 0) {
-            		sb.append(line + "\n");
+            		sb.append(line + "\n"); // stringBuilder nächste Linie anhängen
             	}            	
-            	line = br.readLine();
-            	cc++;
+            	line = br.readLine(); 		// bufferedReader reads next line
+            	cc++;						// at the end corresponds to the file length
             }
             vectors = sb.toString();
                  
-            br.close();
+            br.close(); // close the BufferedReader
             
 		} catch(Exception e) {return null;}
 		
 		//parse data
-		String corrScalars = scalars.replace(',','.');		
-		jCO.heightOfColumn = Integer.parseInt(corrScalars);		
+		String corrScalars = scalars.replace(',','.');	// Replace any commas with dots (german to international decimal)
+		jCO.heightOfColumn = Integer.parseInt(corrScalars);		// hand the ColumnHeight to the ColCoords3D jCO
 		
 		//parse data2			
-		double[] xmid = new double[cc - 1];			//x midpoint
-		double[] ymid = new double[cc - 1];			//y midpoint
-		double[] zmid = new double[cc - 1];			//y midpoint		
-		double[] ixmid = new double[cc - 1];			//x midpoint (inner circle)
-		double[] iymid = new double[cc - 1];			//y midpoint (inner circle)		
-		double[] outerMajorRadius = new double[cc - 1];
-		double[] innerMajorRadius = new double[cc - 1];
-		double[] outerMinorRadius = new double[cc - 1];
-		double[] innerMinorRadius = new double[cc - 1];
-		double[] wallThickness = new double[cc - 1];
-		double[] theta = new double[cc - 1];  //angle of major ellipse axis
-		double[] itheta = new double[cc - 1];  //angle of major ellipse axis (inner circle)
-		double[] outerR2 = new double[cc - 1];
+		double[] xmid = new double[cc - 1];				//new array of length cc-1 (=file length) for x midpoint
+		double[] ymid = new double[cc - 1];				//new array of length cc-1 (=file length) for y midpoint
+		double[] zmid = new double[cc - 1];				//new array of length cc-1 (=file length) for y midpoint		
+		double[] ixmid = new double[cc - 1];			//for x midpoint (inner circle = "sample circle", not "sampler cylinder circle")
+		double[] iymid = new double[cc - 1];			// for y midpoint (inner circle)		
+		double[] outerMajorRadius = new double[cc - 1];	// for major axis of the ellipse (cylinder) 
+		double[] innerMajorRadius = new double[cc - 1];	// for major axis of the ellipse (sample)
+		double[] outerMinorRadius = new double[cc - 1]; // for minor axis of the ellipse (cylinder)
+		double[] innerMinorRadius = new double[cc - 1]; // for minor axis of the ellipse (sample
+		double[] wallThickness = new double[cc - 1];	// wall thicknes of the cylinder
+		double[] theta = new double[cc - 1];  			//angle of major ellipse axis (cylinder)
+		double[] itheta = new double[cc - 1];  			//angle of major ellipse axis (inner circle = sample)
+		double[] outerR2 = new double[cc - 1];			// R2 of the found ROI (only for the automatically detected ellipse)
 		double[] innerR2 = new double[cc - 1];
 		
-		int[] lineBreaks = findLineBreaks(vectors, cc);
+		int[] lineBreaks = findLineBreaks(vectors, cc);	// returns array of linebreak positions (?)
 		cc = 0;
 		for (int i = 0 ; i < lineBreaks.length - 1 ; i++) {
 			
-			String myLine0 = vectors.substring(lineBreaks[i], lineBreaks[i + 1]);
-			String myLine1 = myLine0.replace('\n', ' ');
-			String myLine = myLine1.replace(',', '.');
+			String myLine0 = vectors.substring(lineBreaks[i], lineBreaks[i + 1]);	// first line between the first linebreaks
+			String myLine1 = myLine0.replace('\n', ' ');							// in this read line replace the newline break \n with " "
+			String myLine = myLine1.replace(',', '.');								// again in this line replace any , with . >> myLine
 			
-			int[] tabPos2 = findTabPositions(myLine);
+			int[] tabPos2 = findTabPositions(myLine);								// file is tab delimited >> find the "breaks" in the line (array of breakpoints)
 	
-			wallThickness[cc] = Double.parseDouble(myLine.substring(tabPos2[0] + 1, tabPos2[1]));	
+			wallThickness[cc] = Double.parseDouble(myLine.substring(tabPos2[0] + 1, tabPos2[1]));	// directly fill the arrays created above with the read numbers (for some reason cc and not i, but is the same)
 			
 			zmid[cc] = Double.parseDouble(myLine.substring(tabPos2[1] + 1, tabPos2[2]));
 			xmid[cc] = Double.parseDouble(myLine.substring(tabPos2[2] + 1, tabPos2[3]));
@@ -2767,10 +2808,10 @@ public class InputOutput extends ImagePlus implements PlugIn {
 			outerR2[cc] = Double.parseDouble(myLine.substring(tabPos2[12] + 1, tabPos2[13]));	
 			innerR2[cc] = Double.parseDouble(myLine.substring(tabPos2[13] + 1));
 					
-			cc++;
+			cc++;										// cc is essentially i. so why have both??
 		}
 			
-		jCO.xmid = xmid;
+		jCO.xmid = xmid;							// hand the values of the arrays over to the ColCoords3D jCO (why not fill directly?)
 		jCO.ymid = ymid;
 		jCO.zmid = zmid;
 		jCO.ixmid = ixmid;
@@ -2785,7 +2826,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		jCO.outerR2 = outerR2;
 		jCO.innerR2 = innerR2;
 		
-		return jCO;
+		return jCO;									// result of the readInnerCircleVer1 is to create a ColCoords3D object out of the innerCircle files
 		
 	}
 	
@@ -4849,5 +4890,4 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		
 		return myDoubles;
 	}
-		
 }

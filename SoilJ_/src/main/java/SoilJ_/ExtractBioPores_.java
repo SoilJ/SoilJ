@@ -45,59 +45,59 @@ public class ExtractBioPores_ extends ImagePlus implements PlugIn  {
 
 	public void run(String arg) {
 
-		String pathSep = "\\";
-		
-		//probe operating system and adjust PathSep if necessary
-		String myOS = System.getProperty("os.name");
-		if (myOS.equalsIgnoreCase("Linux")) pathSep = "/";
+//		String pathSep = "\\";
+//		
+//		//probe operating system and adjust PathSep if necessary
+//		String myOS = System.getProperty("os.name");
+//		if (myOS.equalsIgnoreCase("Linux")) pathSep = "/";
+		String pathSep =  System.getProperty("file.separator");						// system dependent folder/file separator
 		
 		// set the plugins.dir property to make the plugin appear in the Plugins menu
-		Class<?> clazz = PoreSpaceAnalyzer_.class;
+		Class<?> clazz = PoreSpaceAnalyzer_.class;									// 
 		String url = clazz.getResource("/" + clazz.getName().replace('.', '/') + ".class").toString();
 		String pluginsDir = url.substring(5, url.length() - clazz.getName().length() - 6);
 		System.setProperty("plugins.dir", pluginsDir);
 		
 		//construct biggish objects
-		InputOutput jIO = new InputOutput();	
-		MenuWaiter menu = new MenuWaiter();
-		RoiHandler roi = new RoiHandler();
-		ImageManipulator jIM = new ImageManipulator(); 
-		
-		// init variables
-		int i;
+		InputOutput jIO = new InputOutput();										// contains e.g. function to choose files
+		MenuWaiter menu = new MenuWaiter();											// contains e.g. function to store users choises
+		RoiHandler roi = new RoiHandler();											
+		ImageManipulator jIM = new ImageManipulator();
 		
 		//tell me what I should do!
-		MenuWaiter.ROISelectionOptions mRSO = menu.regionOfInterestSelection();
+		MenuWaiter.ROISelectionOptions mRSO = menu.regionOfInterestSelection();		// stores where to analyse (inner circle, full cylinder, sub-cylinder, ...)
 		if (mRSO == null) return;
 		
 		//get some bio pore extraction parameters
-		MenuWaiter.BioPoreExtractionOptions mBEO = menu.showBioPoreExtractionMenu();
+		MenuWaiter.BioPoreExtractionOptions mBEO = menu.showBioPoreExtractionMenu();	// 
 		
 		//create Folder structure
 		InputOutput.MyFileCollection mFC = jIO.createFolders4SubROIData(mRSO);
 		
 		String myOutFolder = mFC.myOutFolder;
 		mFC.myOutFolder = myOutFolder + pathSep + "BioPores_V" + (int)(100*mBEO.thresholdVesselness) + "L" + (int)mBEO.smallesAllowedElongation + "M" + mBEO.maximumBlurring; 	 	
+
 		new File(mFC.myOutFolder).mkdir();
 		mFC.myOutFolder2 = myOutFolder + pathSep + "NonBioPores_V" + (int)(100*mBEO.thresholdVesselness) + "L" + (int)mBEO.smallesAllowedElongation + "M" + mBEO.maximumBlurring; 	 	 	 	 	
 		new File(mFC.myOutFolder2).mkdir();
 					
 		//loop over 3D images
-		for (i = 0 ; i < mFC.myTiffs.length ; i++) {  //myTiffs.length
+		for (int i = 0 ; i < mFC.myTiffs.length ; i++) {
 			
 			//assemble image for analyses
-			mFC.fileName = mFC.myTiffs[i];
-			mFC = jIO.addCurrentFileInfo8Bit(mFC);
+			mFC.fileName = mFC.myTiffs[i];										// mFC stores all the file infos, always overwrite currnent fileaneme in mFC with ith element in mFC
+			mFC = jIO.addCurrentFileInfo8Bit(mFC);								// store current file info
 			
 			//load file			
-			int[] startStopSlices = jIO.findStartAndStopSlices(mFC, mRSO);
-			int[] colSlices = new int[startStopSlices[1]  - startStopSlices[0]];
-			for (int j = 0 ; j < colSlices.length ; j++) colSlices[j] = startStopSlices[0] + j;
+			int[] startStopSlices = jIO.findStartAndStopSlices(mFC, mRSO);		// 
+			int[] colSlices = new int[startStopSlices[1]  - startStopSlices[0]];// column height
+			for (int j = 0 ; j < colSlices.length ; j++) colSlices[j] = startStopSlices[0] + j;		// add slice numbers (why?)
 		
 			//cut roi		
-			mFC.startSlice = startStopSlices[0];
+			mFC.startSlice = startStopSlices[0];								// add top and bottom to mFC
 			mFC.stopSlice = startStopSlices[1];
 			RoiHandler.ColumnRoi colRoi = roi.prepareDesiredRoi(mFC, jIO.openTiff3DSomeSlices(mFC, colSlices), mRSO, "255", "");
+																				// is here the problem with the size??
 			
 			System.gc();System.gc();
 			IJ.showStatus("Trying to clean up memory ... ");
@@ -111,7 +111,7 @@ public class ExtractBioPores_ extends ImagePlus implements PlugIn  {
 			//ImagePlus outTiff = jIM.extractBioPores2(mFC, colRoi.nowTiff, mBEO);
 						
 			//save result
-			jIO.tiffSaver(mFC, outTiff);
+			jIO.tiffSaver(mFC, outTiff);										// save image
 			
 			//also save non-bio pores
 			//jIO.tiffSaver2(mFC, jIM.extractNonBioPores(mFC, colRoi.nowTiff, outTiff, mBEO));	
@@ -128,8 +128,7 @@ public class ExtractBioPores_ extends ImagePlus implements PlugIn  {
 			IJ.freeMemory();IJ.freeMemory();
 			System.gc();System.gc();
 			
-			IJ.showStatus("Biopores have been extracted.");
-			
-		}		
-	}
-}
+			IJ.showStatus("Biopores have been extracted.");	
+		}	// loop through all images		
+	} // run
+}	// class

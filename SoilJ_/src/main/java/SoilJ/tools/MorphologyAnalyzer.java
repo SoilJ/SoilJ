@@ -3599,8 +3599,6 @@ public class MorphologyAnalyzer implements PlugIn {
 		private double[][] outDistance;
 		private int[][] outPrede;
 		
-		private int myIndex;
-		
 		private int getIndex(int i, int j){
 			return i*numNodes+j;
 	  	}

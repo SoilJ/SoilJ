@@ -1173,8 +1173,13 @@ public class ImageManipulator implements PlugIn {
 		
 	}
 	
-	
-	public ImagePlus extractBioPores(InputOutput.MyFileCollection mFC, ImagePlus nowTiff, MenuWaiter.BioPoreExtractionOptions mBEO) {
+		/**
+	 * @param mFC			[InputOutplut.MyFileCollection]
+	 * @param nowTiff		[ImagePlus]
+	 * @param mBEO			[MenuWaiter.BioPoreExtractionOptions]
+	 * @return	iC.run("OR create stack", roundOneTiff, miniTiff0);
+	 */
+  public ImagePlus extractBioPores(InputOutput.MyFileCollection mFC, ImagePlus nowTiff, MenuWaiter.BioPoreExtractionOptions mBEO) {
 		
 		ImageCalculator iC = new ImageCalculator();
 		Dilate_ dil = new Dilate_();
@@ -1182,18 +1187,19 @@ public class ImageManipulator implements PlugIn {
 		int dyn = 2;
 		double thresholdVesselness = mBEO.thresholdVesselness; 
 		double smallesAllowedElongation = mBEO.smallesAllowedElongation;
-		double[] sigmas = {1,2,3,4};
+		double[] sigmas = {2,3,4};
 		
-		//check how large the image is and scale down in case it is too large.. because tubeness crashes if they are too large (comment out if you have 1000^3 voxels or less) 
+		//check how large the image is and scale down in case it is too large.. because tubeness 
+		// crashes if they are too large (comment out if you have 1000^3 voxels or less) 
 		int w = nowTiff.getWidth(), h = nowTiff.getHeight(), d = nowTiff.getNSlices(); 
-		double bulkVol = (double)w * (double)h * (double)d;
+		double bulkVol = (double) w * (double) h * (double) d;
 		int wnew = w;
 		int hnew = h;
 		int dnew = d;
 		if (bulkVol > 1200000000) {
 			IJ.showStatus("Reducing image size..");
 			nowTiff = binaryScale2HalfSize(nowTiff);
-			wnew = nowTiff.getWidth();
+			wnew = nowTiff.getWidth();					// why not overwrite w, h, d?
 			hnew = nowTiff.getHeight();
 			dnew = nowTiff.getNSlices();
 		}
@@ -1248,9 +1254,9 @@ public class ImageManipulator implements PlugIn {
 		}
 				
 		//*************************initTubenessOndownscaledImage************************************		
-		IJ.showStatus("Reducing image size..");
-		nowTiff = binaryScale2HalfSize(nowTiff);
-		double[] newSigmas = {1,2,3,4,5,6,7,8,9,10,11};
+		IJ.showStatus("Reducing image size.."); 					// >> do the same again, but on the image that has a reduced size!
+		nowTiff = binaryScale2HalfSize(nowTiff);					// reduce image size (even if not reduced before)
+		double[] newSigmas = {1,2,3,4,5,6,7,8};
 				
 		for (int j = 0 ; j < newSigmas.length ; j++) {
 			
@@ -1277,7 +1283,6 @@ public class ImageManipulator implements PlugIn {
 		//*************************Rescale, merge with initial round************************************
 		
 		ImagePlus mediumBiopores = scaleWithoutMenu(oldOne, wnew, hnew, dnew, ImageProcessor.BILINEAR);
-		
 		mediumBiopores = binarize3DFloatImage(mediumBiopores,128);
 		
 		//filterout blobs
@@ -1289,7 +1294,7 @@ public class ImageManipulator implements PlugIn {
 		//mediumBiopores.show();
 		
 		//*************************TubenessOn2TimesdownscaledImage************************************		
-		IJ.showStatus("Reducing image size once more ..");
+		IJ.showStatus("Reducing image size ince more ..");
 		nowTiff = binaryScale2HalfSize(nowTiff);
 		
 		double[] lastSigmas = new double[12];
@@ -1507,10 +1512,8 @@ public class ImageManipulator implements PlugIn {
 		veryLargeCracks = removeSmallPlanes(veryLargeCracks, 2, 60, 40);
 		
 		veryLargeCracks.show();	
-		return veryLargeCracks;
-		
+		return veryLargeCracks;		
 	}
-	
 	
 	public ImagePlus extractGravel(InputOutput.MyFileCollection mFC, ImagePlus nowTiff, MenuWaiter.GravelExtractionOptions mGEO) {
 		
@@ -3805,6 +3808,13 @@ public class ImageManipulator implements PlugIn {
 		
 	}
 
+	
+	/** 
+	 * Puts each pixel in each slice to 0 if below threshold, otherwise to 255
+	 * @param nowTiff
+	 * @param threshold
+	 * @return ImagePlus outTiff
+	 */
 	public ImagePlus binarize3DFloatImage(ImagePlus nowTiff, double threshold) {
 		
 		ImageStack outStack = new ImageStack(nowTiff.getWidth(), nowTiff.getHeight());
@@ -4459,7 +4469,6 @@ public class ImageManipulator implements PlugIn {
 				pRoi = roi.makeMeAPolygonRoiStack("inner", "manual", jCO, 4);		
 				oRoi = roi.makeMeAPolygonRoiStack("outer", "manual", jCO, 4);
 				ooRoi = roi.makeMeAPolygonRoiStack("outerFromInner", "manual", jCO, -wallThickness-6);
-				
 			}
 			
 			else {
