@@ -34,8 +34,6 @@
 			<attribute name="test" value="true"/>
 			<attribute name="maven.pomderived" value="true"/>
 		</attributes>
-	</classpathentry>
-	<classpathentry kind="lib" path="D:/Eclipse/NewMaven/SoilJ/SoilJ_/jars/mcib3d_plugins-4.0.93f.jar"/>
-	<classpathentry kind="lib" path="D:/Eclipse/NewMaven/SoilJ/SoilJ_/jars/mcib3d-core-4.0.93f.jar"/>
+	</classpathentry>	
 	<classpathentry kind="output" path="target/classes"/>
 </classpath>
