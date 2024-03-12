@@ -1910,6 +1910,74 @@ public class MenuWaiter implements PlugIn {
 		
 	}
 	
+	public PoreSpaceAnalyzerOptions showLoopDiameterDistMenu() {
+		
+		PoreSpaceAnalyzerOptions mLDD = new PoreSpaceAnalyzerOptions(); 
+		mLDD.mRSO = regionOfInterestSelection();  //select Region of interest
+
+		GenericDialog gd2 = new GenericDialog("Please tell me what you want to get analysed!");
+		
+		gd2.addStringField("Image phase that is analyzed", "255", 5);
+		gd2.addStringField("Name of the image phase that is analyzed", "Pores", 40);
+		gd2.addCheckbox("Do you want to fill holes in the analyzed image phase?", true);
+		
+		String myReference = "If you are using this plugin please cite the following references: \n\n";
+		gd2.setInsets(50, 0, 0);gd2.addMessage(myReference);
+		myReference = "Legland, D.; Arganda-Carreras, I. & Andrey, P. 2016. MorphoLibJ: integrated library and plugins for mathematical morphology with ImageJ.\n, ";
+		myReference += "Bioinformatics (Oxford Univ Press) 32(22): 3532-3534, PMID 27412086, doi:10.1093/bioinformatics/btw413\n\n";
+		gd2.setInsets(0, 0, 0);gd2.addMessage(myReference);
+		myReference = "Koestel, J. 2018. SoilJ: An ImageJ plugin for the semiautomatic processing of three-dimensional X-ray images of soils.\n ";
+		myReference += "Vadose Zone Journal, doi:10.2136/vzj2017.03.0062.";
+		gd2.setInsets(0, 0, 0);gd2.addMessage(myReference);
+
+		//show dialog
+		gd2.showDialog();
+	    if (gd2.wasCanceled()) return null;	    
+	    else {
+
+	    	mLDD.calcCriticalPoreDiameter = false;
+	    
+	    	//image phase 2 be analyzed
+	    	mLDD.imagePhase2BeAnalyzed = gd2.getNextString();
+	    	mLDD.nameOfAnalyzedPhase = gd2.getNextString();
+	    	mLDD.removeHoles = gd2.getNextBoolean();
+	    	
+	    	//global measures
+	    	mLDD.calcAnisotropy = false;
+	    	mLDD.calcFractal = false;
+	    	mLDD.calcThickness = false;
+	    	mLDD.calcAverageDistance = false;
+	    	mLDD.calcKT87Volume = false;  //has been kicked out of SoilJ
+	    	mLDD.calcCriticalPoreDiameter = false;
+			
+			//local measures
+	    	// maybe re-include later..
+
+			//plotting options
+			mLDD.plotLabels = false;			
+			mLDD.plotThickness = false;
+			mLDD.plotPercolation =  false;
+			mLDD.plotDistanceMap =  false;
+			mLDD.plotKTVolume =  false;
+			mLDD.plotPoresConnected2Top =  false;
+			
+			mLDD.performParticleAnalyses = true;
+			
+			//and the area of the horizontal cross section
+			if (mLDD.mRSO.choiceOfRoi.equalsIgnoreCase("Everything!") | mLDD.mRSO.choiceOfRoi.equalsIgnoreCase("TopOfEveryThing") | mLDD.mRSO.choiceOfRoi.equalsIgnoreCase("BottomOfEveryThing")) {
+				  
+				mLDD.mRSO.areaOfInterest = gd2.getNextNumber();				
+				
+			}
+			
+			mLDD.mRSO.saveROI = false;
+
+	    }
+
+	    return mLDD;
+		
+	}
+	
 	public PoreSpaceAnalyzerOptions showPoreSpaceAnalyzerMenu() {
 
 		PoreSpaceAnalyzerOptions mPSAO = new PoreSpaceAnalyzerOptions(); 

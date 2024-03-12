@@ -2468,6 +2468,44 @@ public class MorphologyAnalyzer implements PlugIn {
 		
 	}
 	
+	public void getLoopDiameterDistribution(int imageNumber, InputOutput.MyFileCollection mFC, RoiHandler.ColumnRoi colRoi, MenuWaiter.PoreSpaceAnalyzerOptions mPSA) {
+		
+		//try to free up some memory			
+		IJ.freeMemory();IJ.freeMemory();
+		
+		//check whether this is a windows OS
+		String pathSep = "/";
+		String checkname = mFC.myPreOutFolder;
+		String testString = checkname.substring(2, 3);
+		if (testString.equalsIgnoreCase("\\")) pathSep = "\\";
+		
+		InputOutput jIO = new InputOutput();
+		ROIMorphoProps myP = new ROIMorphoProps();
+		PoreClusterProps mPCP = new PoreClusterProps();		
+		ImageManipulator jIM = new ImageManipulator();
+		
+		//remove holes from pore system;
+		if (mPSA.removeHoles) {
+			colRoi.nowTiff = jIM.removeHoles(colRoi.nowTiff);
+			colRoi.nowTiff.updateAndDraw();
+			//colRoi.nowTiff.show();
+		}
+		
+		//init some very basic variables..		
+		String nowImageName = mFC.colName;
+		
+		//create output folders and save statistics		
+		IJ.showStatus("Creating directories for the pore-cluster properties ...");
+		String myOutFolder = "Stats";
+		String myOutPath = mFC.myPreOutFolder + pathSep + myOutFolder;
+		new File(myOutPath).mkdir();
+		new File(myOutPath + pathSep + "LoopDiameters").mkdir();
+		String outLoopPath = mFC.myPreOutFolder + pathSep + "Stats" + pathSep + "LoopDiameters" + pathSep + nowImageName + ".ldd";
+
+		IJ.showStatus("Calculating loop diameters ...");
+		
+	}
+	
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2487,7 +2525,6 @@ public class MorphologyAnalyzer implements PlugIn {
 		ROIMorphoProps myP = new ROIMorphoProps();
 		PoreClusterProps mPCP = new PoreClusterProps();		
 		ImageManipulator jIM = new ImageManipulator();
-		RollerCaster rC = new RollerCaster();
 		
 		//colRoi.nowTiff.updateAndDraw();
 		//colRoi.nowTiff.show();
