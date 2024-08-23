@@ -1294,7 +1294,7 @@ public class ImageManipulator implements PlugIn {
 		//mediumBiopores.show();
 		
 		//*************************TubenessOn2TimesdownscaledImage************************************		
-		IJ.showStatus("Reducing image size ince more ..");
+ 		IJ.showStatus("Reducing image size ince more ..");
 		nowTiff = binaryScale2HalfSize(nowTiff);
 		
 		double[] lastSigmas = new double[12];
@@ -1317,8 +1317,7 @@ public class ImageManipulator implements PlugIn {
 			
 			if (j == 0) oldOne = newOne;
 			else oldOne = iC.run("OR create stack", oldOne, newOne);		
-			
-			//miniTiff0.updateAndDraw();miniTiff0.show();
+					
 		}
 		
 		//*************************Rescale final round, merge with previous round************************************
@@ -1332,6 +1331,8 @@ public class ImageManipulator implements PlugIn {
 		
 		//merge with medium
 		largeBiopores = iC.run("OR create stack", largeBiopores, mediumBiopores);
+		
+		//largeBiopores.updateAndDraw();largeBiopores.show();
 		
 		//*************************TubenessOn2TimesdownscaledImage************************************		
 		IJ.showStatus("Reducing image size ince more ..");
