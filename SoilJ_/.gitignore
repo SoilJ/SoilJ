@@ -6,3 +6,4 @@
 /target/s*
 /target/*sources*
 .temp*
+/target/

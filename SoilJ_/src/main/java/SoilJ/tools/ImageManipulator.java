@@ -247,7 +247,7 @@ public class ImageManipulator implements PlugIn {
 		return outTiff;		
 	}
 	
-	public ImagePlus calibrateGrayValuesFromList(ImagePlus nowTiff, InputOutput.CaliRoiLocations myCRL) {
+	public ImagePlus calibrateGrayValuesLarsboStyle(ImagePlus nowTiff, InputOutput.CaliRoiLocations myCRL) {
 		
 		HistogramStuff myHS = new HistogramStuff();
 		
@@ -284,6 +284,45 @@ public class ImageManipulator implements PlugIn {
 
 			double lower = (l1 + l2) / 2;
 						
+			for (int x = 0 ; x < nowTiff.getWidth() ; x++) {
+				for (int y = 0 ; y < nowTiff.getHeight() ; y++) {
+					
+					double nowPix = myIP.getPixel(x, y);					
+					double newPix = (nowPix - lower) / (upper - lower) * (uTarget - lTarget) + lTarget;
+					
+					myIP.putPixel(x, y, (int)Math.round(newPix));
+					
+				}
+			}
+			
+			newStack.addSlice(myIP);
+		}
+		
+		outTiff.setStack(newStack);
+		return outTiff;
+		
+	}
+	
+	public ImagePlus calibrateGrayValuesFromList(ImagePlus nowTiff, double[] grayVals) {
+		
+		HistogramStuff myHS = new HistogramStuff();
+		
+		ImageStack newStack = new ImageStack(nowTiff.getWidth(), nowTiff.getHeight());
+		ImagePlus outTiff = new ImagePlus();
+		
+		double lTarget = 5000;
+		double uTarget = 12000;
+		double upper = StatUtils.percentile(grayVals, 50);
+		double lower = 5000;
+		
+		for (int z = 0 ; z < nowTiff.getNSlices() ; z++) {
+			
+			nowTiff.setSlice(z + 1);
+			ImageProcessor myIP = nowTiff.getProcessor();
+			
+			IJ.showStatus("Correction gray value in slice " + (z + 1) + "/" + nowTiff.getNSlices() + " ...");
+			
+									
 			for (int x = 0 ; x < nowTiff.getWidth() ; x++) {
 				for (int y = 0 ; y < nowTiff.getHeight() ; y++) {
 					

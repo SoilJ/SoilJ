@@ -167,6 +167,14 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		int height;
 	}
 	
+	public class ManuallyGaugedGrayValues {
+		
+		public String[] sampleName;
+		public double[][] Coordinates; 
+		
+	}
+		
+	
 	public MyFileCollection addCurrentFileInfo8Bit(MyFileCollection mFC) {
 		
 		String pathSep = "\\";
@@ -4889,5 +4897,96 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		for (int i = 0 ; i < myDoubles.length ; i++) myDoubles[i] = myList.get(i);
 		
 		return myDoubles;
+	}
+	
+	public int[] getNumberOfLinesAndColumnsInAsciiFile(String myFile) {
+		
+		int[] lnc = new int[2];
+		
+		//check out file
+		try{
+            
+			//open file	
+            BufferedReader br = new BufferedReader(new FileReader(myFile));            
+            String line = "nix";            
+            int ln = 0;
+            int col = 0;
+            
+            //read data
+        	line = br.readLine(); //init and skip header
+        	line = br.readLine();
+        	while (line != null) {
+        		
+        		if (ln == 0) {
+        			String[] wordsArray = line.split("\t");
+        			col = wordsArray.length;
+        		}
+        		
+        		ln++;
+        		line = br.readLine();
+        		
+        	};
+        	
+        	lnc[0] = ln;
+        	lnc[1] = col;
+        	
+        	br.close();
+        	
+        }
+		
+		catch(Exception e) {  
+			
+        	return null;        	
+        }
+		
+		return lnc;
+	}
+	
+	public ManuallyGaugedGrayValues readASCIIFile(String myFile) {
+		
+		//open file
+		int[] lnc = getNumberOfLinesAndColumnsInAsciiFile(myFile);		
+		ManuallyGaugedGrayValues myMGGV = new ManuallyGaugedGrayValues();
+				
+		String[] wordsArray;
+		String[] fileNames = new String[lnc[0]]; 
+		double[][] grayVals = new double[lnc[0]][lnc[1] - 1];
+						
+		try{
+            //open file	
+            BufferedReader br = new BufferedReader(new FileReader(myFile));            
+            String line = "nix";            
+            
+            //read data    
+            br.readLine(); // skip header
+            
+            for (int i = 0 ; i < lnc[0] ; i++) {
+            	
+            	line = br.readLine();        	
+            	
+            	//parse line
+            	wordsArray = line.split("\t");
+            	fileNames[i] = wordsArray[0];
+            	
+            	for (int j = 1 ; j < lnc[1] ; j++) {
+            		
+            		grayVals[i][j - 1] = (double)Integer.parseInt(wordsArray[j]);
+            		
+            	}
+            	
+            }
+        	            
+            br.close();
+            
+        }
+		catch(Exception e) {        	
+        	return null;        	
+        }
+		
+		myMGGV.sampleName = fileNames;
+		myMGGV.Coordinates = grayVals;
+		
+		return myMGGV;
+		
 	}
 }

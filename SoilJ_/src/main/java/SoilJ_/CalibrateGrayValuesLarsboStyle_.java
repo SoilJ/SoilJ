@@ -35,7 +35,7 @@ import ij.plugin.PlugIn;
  *
  */
 
-public class CalibrateGrayValuesManually_ extends ImagePlus implements PlugIn  {
+public class CalibrateGrayValuesLarsboStyle_ extends ImagePlus implements PlugIn  {
 
 	public void run(String arg) {
 		
@@ -80,7 +80,7 @@ public class CalibrateGrayValuesManually_ extends ImagePlus implements PlugIn  {
 						
 			ImagePlus nowTiff = jIO.openTiff3D(mFC.nowTiffPath);
 			
-			ImagePlus outTiff = jIM.calibrateGrayValuesFromList(nowTiff, myCRL);
+			ImagePlus outTiff = jIM.calibrateGrayValuesLarsboStyle(nowTiff, myCRL);
 		
 			jIO.tiffSaver(myOutPath, mFC.fileName, outTiff);
 	
