@@ -1526,8 +1526,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
             myString += "surface fractal dimension:         "	+ String.format("%1.3f",rMP.surfaceFractalDimension) + "\n";
             
             myString += "anisotropy:                        "	+ String.format("%1.3f",rMP.anisotropy) + "\n";      
-            if (rMP.mainAlignment != null) myString += "main alignment:                    "	+ rMP.mainAlignment[0] + " " + rMP.mainAlignment[1] + " " + rMP.mainAlignment[2] + "\n";
-            else myString += "main alignment:                    null" + "\n";
+            myString += "main alignment:                    "	+ rMP.mainAlignment + "\n";
             
             myString += "gamma (connection probability):    "	+ String.format("%1.3f",rMP.gamma) + "\n";
             myString += "Euler number:                      "	+ String.format("%1.6e",rMP.eulerNumber) + "\n";

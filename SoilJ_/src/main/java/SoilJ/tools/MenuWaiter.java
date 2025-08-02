@@ -270,9 +270,8 @@ public class MenuWaiter implements PlugIn {
 		public boolean calcChi;
 		public boolean calcFractal;
 		public boolean globAnisotropy;
-		public boolean calcAverageDistance;
+		public boolean calcDistance;
 		public boolean calcPercolatingVolume;
-		public boolean calcKT87Volume;
 		public boolean calcVolCon2Top;
 
 		public boolean performParticleAnalyses;
@@ -293,7 +292,6 @@ public class MenuWaiter implements PlugIn {
 		public boolean plotThickness;
 		public boolean plotPercolation;		
 		public boolean plotDistanceMap;
-		public boolean plotKTVolume;
 		public boolean plotPoresConnected2Top;
 		
 		//skeletonization
@@ -1946,8 +1944,7 @@ public class MenuWaiter implements PlugIn {
 	    	mLDD.calcAnisotropy = false;
 	    	mLDD.calcFractal = false;
 	    	mLDD.calcThickness = false;
-	    	mLDD.calcAverageDistance = false;
-	    	mLDD.calcKT87Volume = false;  //has been kicked out of SoilJ
+	    	mLDD.calcDistance = false;
 	    	mLDD.calcCriticalPoreDiameter = false;
 			
 			//local measures
@@ -1958,7 +1955,6 @@ public class MenuWaiter implements PlugIn {
 			mLDD.plotThickness = false;
 			mLDD.plotPercolation =  false;
 			mLDD.plotDistanceMap =  false;
-			mLDD.plotKTVolume =  false;
 			mLDD.plotPoresConnected2Top =  false;
 			
 			mLDD.performParticleAnalyses = true;
@@ -1990,17 +1986,12 @@ public class MenuWaiter implements PlugIn {
 		gd2.addCheckbox("Do you want to fill holes in the analyzed image phase?", true);
 
 		String[] whatIntegralMeasuresShallIInvestigate = new String[]{"Anisotropy","Fractal Dimension","Thickness","Distance","Critical Diameter"};
-		boolean[] myIntChoices = new boolean[]{true,true,true,false,true};
+		boolean[] myIntChoices = new boolean[]{true,true,true,true,true};
 		gd2.setInsets(20, 100, 0);gd2.addMessage("\nWhich global morphological measures should I calculate in addition to the Minkowski functionals (volume, surface area, curvature, Euler number)?");
 		gd2.setInsets(0, 100, 0);gd2.addCheckboxGroup(2, 3, whatIntegralMeasuresShallIInvestigate, myIntChoices);
 
-		//String[] whatShallIInvestigate = new String[]{"Thickness"};
-		//boolean[] myChoices = new boolean[]{true};
-		//gd2.setInsets(20, 100, 0);gd2.addMessage("\nWhich morphological measures should I calculate for each cluster?");
-		//gd2.setInsets(0, 100, 0);gd2.addCheckboxGroup(1, 1, whatShallIInvestigate, myChoices);
-
-		String[] whichImagesShallIPlot = new String[]{"Cluster Label","Thickness","Percolating Clusters","Distance Map","KT87Volume","VolCon2Top"};
-		boolean[] myPlotChoices = new boolean[]{false,true,false,false,false,false};
+		String[] whichImagesShallIPlot = new String[]{"Cluster Label","Thickness","Percolating Clusters","Distance Map","VolCon2Top"};
+		boolean[] myPlotChoices = new boolean[]{false,false,false,false, true};
 		gd2.setInsets(20, 200, 0);gd2.addMessage("\nWhich images shall I save?");
 		gd2.setInsets(0, 200, 0);gd2.addCheckboxGroup(3, 3, whichImagesShallIPlot, myPlotChoices);
 		
@@ -2039,8 +2030,7 @@ public class MenuWaiter implements PlugIn {
 	    	mPSAO.calcAnisotropy = gd2.getNextBoolean();
 	    	mPSAO.calcFractal = gd2.getNextBoolean();
 	    	mPSAO.calcThickness = gd2.getNextBoolean();
-	    	mPSAO.calcAverageDistance = gd2.getNextBoolean();
-	    	mPSAO.calcKT87Volume = false;  //has been kicked out of SoilJ
+	    	mPSAO.calcDistance = gd2.getNextBoolean();
 	    	mPSAO.calcCriticalPoreDiameter = gd2.getNextBoolean();
 			
 			//local measures
@@ -2051,7 +2041,6 @@ public class MenuWaiter implements PlugIn {
 			mPSAO.plotThickness = gd2.getNextBoolean();
 			mPSAO.plotPercolation = gd2.getNextBoolean();
 			mPSAO.plotDistanceMap = gd2.getNextBoolean();
-			mPSAO.plotKTVolume = gd2.getNextBoolean();
 			mPSAO.plotPoresConnected2Top = gd2.getNextBoolean();
 			
 			mPSAO.performParticleAnalyses = true;

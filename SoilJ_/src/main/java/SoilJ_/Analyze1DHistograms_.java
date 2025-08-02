@@ -33,7 +33,7 @@ import ij.measure.ResultsTable;
 import ij.plugin.PlugIn;
 
 /** 
- * ExtractPoresizeDistributio is a SoilJ plugin that extracts the pore size distribution from an
+ * Analyze1DHistograms is a SoilJ plugin that extracts the pore size distribution from an
  * image depicting pore diameters (thicknesses) and writes it into an ASCII file.
  * 
  * @author John Koestel

@@ -300,6 +300,43 @@ public class MorphologyAnalyzer implements PlugIn {
 		jIO.writePoreSizeDistribution(savePath, psd, classBounds);
 	}	
 	
+
+	public void extractDistanceDistro(String savePath, ImagePlus nowTiff, double[] classBounds) {
+		
+		
+		InputOutput jIO = new InputOutput();
+		
+		int[] dcd = new int[classBounds.length];
+		
+		//get histogram
+		for (int j = 0 ; j < nowTiff.getNSlices() ; j++) { 
+		
+			IJ.showStatus("Adding to histogram in layer " + (j + 1));
+			
+			nowTiff.setPosition(j+1);
+			ImageProcessor nowIP = nowTiff.getProcessor();
+						 
+			for (int x = 0 ; x < nowTiff.getWidth() ; x++) {
+				for (int y = 0 ; y < nowTiff.getHeight() ; y++) {
+					double nowPix = nowIP.getPixelValue(x, y);
+					
+					//collect according for class boundaries	
+					if (nowPix > 0) {						
+						if (nowPix >= 0) {							
+							//catch columns with very large pores
+							int enterHere = (int)Math.floor(nowPix*2);
+							if (enterHere > classBounds.length - 1) enterHere = classBounds.length - 1;
+							dcd[enterHere]++;
+						}
+					}
+				}
+			}				
+		}		
+		
+		//save histogram
+		jIO.writePoreSizeDistribution(savePath, dcd, classBounds);
+	}	
+	
 	public void extract32BitHisto(String savePath, ImagePlus nowTiff, double[] classBounds) {
 		
 		
@@ -1087,33 +1124,38 @@ public class MorphologyAnalyzer implements PlugIn {
 		aRe.uyxz = maths.compileStatistics(interCountUYXZ, xl, yl, Math.sqrt(3));
 		
 		//calculate intermediate statistics..
-		double[] aniSums = {aRe.x[0], aRe.y[0], aRe.z[0], aRe.xy[0], aRe.yx[0], aRe.dxz[0] ,aRe.dyz[0],aRe.dxyz[0],aRe.dyxz[0],aRe.uxz[0],aRe.uyz[0],aRe.uxyz[0],aRe.uyxz[0]};
+		double aniHor = (aRe.x[0] + aRe.y[0]) / 2;
+		double aniVert = aRe.z[0];
+		double[] aniSums = {aniHor, aniVert};
 				
 		double aniMin = StatUtils.min(aniSums);
 		double aniMax = StatUtils.max(aniSums);
 
 		//calc anisotropy
-		aRe.anisotropy = (aniMax - aniMin) / (aniMax + aniMin);
+		aRe.anisotropy = (aniMax - aniMin) / ((aniMax + aniMin) / 2);
 			
 		//get direction of main alignment
-		int[] mainAli = {0, 0, 0};		
-		for (int i = 0 ; i < aniSums.length ; i++) {
-			
-			if (aRe.x[0] == aniMin) {mainAli[0] = 1;mainAli[1] = 0;mainAli[2] = 0;}
-			if (aRe.y[0] == aniMin) {mainAli[0] = 0;mainAli[1] = 1;mainAli[2] = 0;}
-			if (aRe.z[0] == aniMin) {mainAli[0] = 0;mainAli[1] = 0;mainAli[2] = 1;}
-			if (aRe.xy[0] == aniMin) {mainAli[0] = 1;mainAli[1] = 1;mainAli[2] = 0;}
-			if (aRe.yx[0] == aniMin) {mainAli[0] = 1;mainAli[1] = -1;mainAli[2] = 0;}
-			if (aRe.dxz[0] == aniMin) {mainAli[0] = 1;mainAli[1] = 0;mainAli[2] = -1;}
-			if (aRe.dyz[0] == aniMin) {mainAli[0] = 0;mainAli[1] = 1;mainAli[2] = -1;}
-			if (aRe.dxyz[0] == aniMin) {mainAli[0] = 1;mainAli[1] = 1;mainAli[2] = -1;}
-			if (aRe.dyxz[0] == aniMin) {mainAli[0] = 1;mainAli[1] = -1;mainAli[2] = -1;}
-			if (aRe.uxz[0] == aniMin) {mainAli[0] = 1;mainAli[1] = 0;mainAli[2] = 1;}
-			if (aRe.uyz[0] == aniMin) {mainAli[0] = 0;mainAli[1] = 1;mainAli[2] = 1;}
-			if (aRe.uxyz[0] == aniMin) {mainAli[0] = 1;mainAli[1] = 1;mainAli[2] = 1;}
-			if (aRe.uyxz[0] == aniMin) {mainAli[0] = 1;mainAli[1] = -1;mainAli[2] = 1;}
-			
-		}		
+//		int[] mainAli = {0, 0, 0};		
+//		for (int i = 0 ; i < aniSums.length ; i++) {
+//			
+//			if (aRe.x[0] == aniMin) {mainAli[0] = 1;mainAli[1] = 0;mainAli[2] = 0;}
+//			if (aRe.y[0] == aniMin) {mainAli[0] = 0;mainAli[1] = 1;mainAli[2] = 0;}
+//			if (aRe.z[0] == aniMin) {mainAli[0] = 0;mainAli[1] = 0;mainAli[2] = 1;}
+//			if (aRe.xy[0] == aniMin) {mainAli[0] = 1;mainAli[1] = 1;mainAli[2] = 0;}
+//			if (aRe.yx[0] == aniMin) {mainAli[0] = 1;mainAli[1] = -1;mainAli[2] = 0;}
+//			if (aRe.dxz[0] == aniMin) {mainAli[0] = 1;mainAli[1] = 0;mainAli[2] = -1;}
+//			if (aRe.dyz[0] == aniMin) {mainAli[0] = 0;mainAli[1] = 1;mainAli[2] = -1;}
+//			if (aRe.dxyz[0] == aniMin) {mainAli[0] = 1;mainAli[1] = 1;mainAli[2] = -1;}
+//			if (aRe.dyxz[0] == aniMin) {mainAli[0] = 1;mainAli[1] = -1;mainAli[2] = -1;}
+//			if (aRe.uxz[0] == aniMin) {mainAli[0] = 1;mainAli[1] = 0;mainAli[2] = 1;}
+//			if (aRe.uyz[0] == aniMin) {mainAli[0] = 0;mainAli[1] = 1;mainAli[2] = 1;}
+//			if (aRe.uxyz[0] == aniMin) {mainAli[0] = 1;mainAli[1] = 1;mainAli[2] = 1;}
+//			if (aRe.uyxz[0] == aniMin) {mainAli[0] = 1;mainAli[1] = -1;mainAli[2] = 1;}
+//			
+//		}		
+		
+		String mainAli = "horizontal";
+		if (aniHor > aniVert) mainAli = "vertical";
 		
 		aRe.mainAlignment = mainAli;
 		
@@ -2547,11 +2589,13 @@ public class MorphologyAnalyzer implements PlugIn {
 		if (mPSA.performParticleAnalyses == true) new File(myOutPath + pathSep + "Clusters").mkdir();
 		if (mPSA.calcAnisotropy == true) new File(myOutPath + pathSep + "Anisotropy").mkdir();
 		if (mPSA.calcThickness == true) new File(myOutPath + pathSep + "Thickness").mkdir();		
+		if (mPSA.calcDistance == true) new File(myOutPath + pathSep + "Distance").mkdir();	
 		String outROIPath = mFC.myPreOutFolder + pathSep + "Stats" + pathSep + nowImageName + ".roi";
 		String outClustPath = mFC.myPreOutFolder + pathSep + "Stats" + pathSep + "Clusters" + pathSep + nowImageName + ".clust";		
 		String outAnisotPath = mFC.myPreOutFolder + pathSep + "Stats" + pathSep + "Anisotropy" + pathSep + nowImageName + ".aniso";
 		String outThickPath = mFC.myPreOutFolder + pathSep + "Stats" + pathSep + "Thickness" + pathSep + nowImageName + ".psd";
-		
+		String outDistPath = mFC.myPreOutFolder + pathSep + "Stats" + pathSep + "Distance" + pathSep + nowImageName + ".dcd";
+
 		/////////////////////////////////////////////////////////////////
 		//calculate fractal dimension
 		/////////////////////////////////////////////////////////////////
@@ -2923,7 +2967,7 @@ public class MorphologyAnalyzer implements PlugIn {
 				ImagePlus distTiff = colRoi.nowTiff.duplicate();
 				
 				//create a distance map
-				if ((mPSA.calcCriticalPoreDiameter & !percolatingClusters.isEmpty()) | mPSA.plotDistanceMap | mPSA.calcAverageDistance) {
+				if ((mPSA.calcCriticalPoreDiameter & !percolatingClusters.isEmpty()) | mPSA.plotDistanceMap | mPSA.calcDistance) {
 					
 					IJ.showStatus("Performing Euklidean distance transform ...");
 					
@@ -2934,6 +2978,12 @@ public class MorphologyAnalyzer implements PlugIn {
 					
 					distTiff = new ImagePlus("dist",result);
 					
+					//extract distance classes 
+					double[] classBounds = new double[200];
+					for (int i = 0 ; i < classBounds.length ; i++) classBounds[i] = 0.5 * i;
+					extractDistanceDistro(outDistPath, distTiff, classBounds);
+					
+					//save average distance
 					myP.averageDistance2PhaseBoundary = calculateAverageValue(distTiff);
 
 				}
@@ -2973,41 +3023,40 @@ public class MorphologyAnalyzer implements PlugIn {
 					}
 				}
 				
-				//calculate KT87 volume
-				if (mPSA.calcKT87Volume) {
-					
-					ImagePlus kt87Volume = new ImagePlus();
-					
-					if (myP.criticalPhaseDiameter > 6) {
-					
-						double myThreshold = myP.criticalPhaseDiameter / 2 / 3; // divided by 2 because the distanceTiff shows the radii, not the diameters
-						
-						kt87Volume = extractKT87volume(distTiff, myThreshold, surfTiff, mFC);
-						
-						//calculate KT87 porosity
-						//myP.KT87VolumeFraction = calcVolume(kt87Volume) / myP.roiBulkVolume;				
-					
-						//plot KT87volume
-						if (mPSA.plotKTVolume) {
-							myOutFolder = "KT87Volume";
-							myOutPath = mFC.myPreOutFolder + pathSep + myOutFolder;
-							new File(myOutPath).mkdir();	
-							String nowDir = mFC.myPreOutFolder + pathSep + "KT87Volume";	
-							String KT87ImageName = nowImageName + "_KT87Volume.tif";
-							jIO.tiffSaver(nowDir, KT87ImageName, kt87Volume);									
-						}						
-					}
-					else {						
-						
-						//myP.KT87VolumeFraction = myP.percolatingVolumeFraction;
-						
-					}			
-					
-					kt87Volume.unlock();kt87Volume.flush();
-					
-				}
-				
-				distTiff.unlock();distTiff.flush();
+//				if (mPSA.calcKT87Volume) {
+//					
+//					ImagePlus kt87Volume = new ImagePlus();
+//					
+//					if (myP.criticalPhaseDiameter > 6) {
+//					
+//						double myThreshold = myP.criticalPhaseDiameter / 2 / 3; // divided by 2 because the distanceTiff shows the radii, not the diameters
+//						
+//						kt87Volume = extractKT87volume(distTiff, myThreshold, surfTiff, mFC);
+//						
+//						//calculate KT87 porosity
+//						//myP.KT87VolumeFraction = calcVolume(kt87Volume) / myP.roiBulkVolume;				
+//					
+//						//plot KT87volume
+//						if (mPSA.plotKTVolume) {
+//							myOutFolder = "KT87Volume";
+//							myOutPath = mFC.myPreOutFolder + pathSep + myOutFolder;
+//							new File(myOutPath).mkdir();	
+//							String nowDir = mFC.myPreOutFolder + pathSep + "KT87Volume";	
+//							String KT87ImageName = nowImageName + "_KT87Volume.tif";
+//							jIO.tiffSaver(nowDir, KT87ImageName, kt87Volume);									
+//						}						
+//					}
+//					else {						
+//						
+//						//myP.KT87VolumeFraction = myP.percolatingVolumeFraction;
+//						
+//					}			
+//					
+//					kt87Volume.unlock();kt87Volume.flush();
+//					
+//				}
+//				
+//				distTiff.unlock();distTiff.flush();
 				
 			}
 		}		//closes if-tag checking whether the particle analyses tag
@@ -3460,7 +3509,7 @@ public class MorphologyAnalyzer implements PlugIn {
 		public double[] uyxz;
 		
 		public double anisotropy;
-		public int[] mainAlignment;			
+		public String mainAlignment;			
 		
 	}
 	
@@ -3559,7 +3608,7 @@ public class MorphologyAnalyzer implements PlugIn {
 		public double surfaceFractalDimension;					
 		
 		public double anisotropy;		
-		public int[] mainAlignment;
+		public String mainAlignment;
 			
 		public int phasePercolates;	
 		public double criticalPhaseDiameter;		
