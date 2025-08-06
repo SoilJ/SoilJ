@@ -74,7 +74,7 @@ public class ExtractCracks_ extends ImagePlus implements PlugIn  {
 		MenuWaiter.CrackExtractionOptions mCEO = menu.showCrackExtractionMenu();
 		
 		//create Folder structure
-		InputOutput.MyFileCollection mFC = jIO.createFolders4SubROIData(mRSO);
+		InputOutput.MyFileCollection mFC = jIO.createFolders4SubROIData(mRSO, false);
 		
 		String myOutFolder = mFC.myOutFolder;
 		mFC.myOutFolder = myOutFolder + pathSep + "Cracks_P" + (int)(100*mCEO.thresholdPlanarity) + "L" + (int)mCEO.smallesAllowedElongation + "M" + mCEO.maximumBlurring; 	 	

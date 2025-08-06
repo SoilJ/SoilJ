@@ -41,7 +41,7 @@ import ij.plugin.PlugIn;
  *
  */
 
-public class ExtractBioPores_ extends ImagePlus implements PlugIn  {
+public class ExtractBioPoresFromBinaryImage_ extends ImagePlus implements PlugIn  {
 
 	public void run(String arg) {
 
@@ -72,14 +72,11 @@ public class ExtractBioPores_ extends ImagePlus implements PlugIn  {
 		MenuWaiter.BioPoreExtractionOptions mBEO = menu.showBioPoreExtractionMenu();	// 
 		
 		//create Folder structure
-		InputOutput.MyFileCollection mFC = jIO.createFolders4SubROIData(mRSO);
+		InputOutput.MyFileCollection mFC = jIO.createFolders4SubROIData(mRSO, false);
 		
-		String myOutFolder = mFC.myOutFolder;
+		String myOutFolder = mFC.myBaseFolder;
 		mFC.myOutFolder = myOutFolder + pathSep + "BioPores_V" + (int)(100*mBEO.thresholdVesselness) + "L" + (int)mBEO.smallesAllowedElongation + "M" + mBEO.maximumBlurring; 	 	
-
 		new File(mFC.myOutFolder).mkdir();
-		mFC.myOutFolder2 = myOutFolder + pathSep + "NonBioPores_V" + (int)(100*mBEO.thresholdVesselness) + "L" + (int)mBEO.smallesAllowedElongation + "M" + mBEO.maximumBlurring; 	 	 	 	 	
-		new File(mFC.myOutFolder2).mkdir();
 					
 		//loop over 3D images
 		for (int i = 0 ; i < mFC.myTiffs.length ; i++) {
@@ -97,7 +94,7 @@ public class ExtractBioPores_ extends ImagePlus implements PlugIn  {
 			mFC.startSlice = startStopSlices[0];								// add top and bottom to mFC
 			mFC.stopSlice = startStopSlices[1];
 			RoiHandler.ColumnRoi colRoi = roi.prepareDesiredRoi(mFC, jIO.openTiff3DSomeSlices(mFC, colSlices), mRSO, "255", "");
-																				// is here the problem with the size??
+																			// is here the problem with the size??
 			
 			System.gc();System.gc();
 			IJ.showStatus("Trying to clean up memory ... ");
@@ -107,7 +104,7 @@ public class ExtractBioPores_ extends ImagePlus implements PlugIn  {
 			System.gc();System.gc();			
 			
 			//apply analyzes			
-			ImagePlus outTiff = jIM.extractBioPores(mFC, colRoi.nowTiff, mBEO);		
+			ImagePlus outTiff = jIM.extractBioPoresfromBinaryImage(mFC, colRoi.nowTiff, mBEO);		
 			//ImagePlus outTiff = jIM.extractBioPores2(mFC, colRoi.nowTiff, mBEO);
 						
 			//save result

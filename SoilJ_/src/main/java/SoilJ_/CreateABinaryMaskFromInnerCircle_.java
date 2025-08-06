@@ -71,7 +71,7 @@ public class CreateABinaryMaskFromInnerCircle_ extends ImagePlus implements Plug
 		if (mRSO == null) return;
 		
 		//create Folder structure
-		InputOutput.MyFileCollection mFC = jIO.createFolders4SubROIData(mRSO);		
+		InputOutput.MyFileCollection mFC = jIO.createFolders4SubROIData(mRSO, true);		
 					
 		//loop over 3D images
 		for (i = 0 ; i < mFC.myTiffs.length ; i++) {  //myTiffs.length

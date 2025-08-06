@@ -98,6 +98,15 @@ public class MenuWaiter implements PlugIn {
 		
 	}
 	
+	public class RootExtractionOptions {
+		
+		public boolean doNotProcessOriginalResolution = false;
+		public double thresholdVesselness; 
+		public double smallesAllowedElongation;
+		public int maximumBlurring;
+		
+	}
+	
 	public class CrackExtractionOptions {
 		
 		public boolean doNotProcessOriginalResolution = false;
@@ -351,6 +360,20 @@ public class MenuWaiter implements PlugIn {
 		public boolean save3DImage;
 		public boolean save4Evaluation;
 		public boolean save4GeoDict;
+
+	}
+	
+	public class POMThresholderMenuReturn {
+
+		public int minThreshold = 0;
+		public int maxThreshold = 0;
+		public int minPOMVoxelNumber;
+		
+		public double windowSize;
+		public double overlap;
+
+		public boolean save3DImage;
+		public boolean save4Evaluation;
 
 	}
 
@@ -887,7 +910,7 @@ public class MenuWaiter implements PlugIn {
 		//construct objects
 		GenericDialog gd = new GenericDialog("Thank you for choosing a user defined (constant) threshold for all images!");
 
-		gd.addMessage("Make sure that you have run 'NormalizeTheseImages' when you apply this option!!!");
+		gd.addMessage("Make sure that you have run 'CalibrateGrayValues' when you apply this option!!!");
 
 		gd.addNumericField("Enter the lower threshold for segmenting the image ", 0, 0, 5, "");
 
@@ -3449,12 +3472,12 @@ public class MenuWaiter implements PlugIn {
 		//add threshold method choices
 		gd.addMessage("Segmentation Options");
 
-		gd.addCheckbox("Do you want to use the column outlines defined in 'inner circle' as a ROI?", true);
+		gd.addCheckbox("Do you want to use the column outlines defined in 'inner circle' as a ROI?", false);
 
 		//gd.addMessage("Search-string for only segmenting some of the files in this folder. Leave blank for segmenting them all.");
 		//gd.addStringField("", "", 25);
 
-		gd.addCheckbox("Do you want to cut away all gray values brighter than the wall?", true);
+		gd.addCheckbox("Do you want to cut away all gray values brighter than the wall?", false);
 
 		gd.addMessage("Please choose a primary thresholding algorithm!");
 		gd.addRadioButtonGroup("", myChoices, 5, 2, myChoices[11]);
@@ -3543,6 +3566,64 @@ public class MenuWaiter implements PlugIn {
 	    }
 	}
 	
+	public POMThresholderMenuReturn showPOMThresholdingDialog() {
+
+		//construct objects
+		GenericDialog gd = new GenericDialog("Thresholding dialog");
+
+		POMThresholderMenuReturn mTMR = new POMThresholderMenuReturn();
+		
+		//add threshold method choices
+		gd.addMessage("Organic Material Segmentation Options");
+	
+		gd.addMessage("");
+		gd.addMessage("Make sure that you have run 'CalibrateGrayValues' when you apply this option!!!");
+
+		gd.addNumericField("Enter the lower threshold for segmenting the image ", 9000, 0, 5, "");
+
+		gd.addNumericField("Enter the upper threshold for segmenting the image ", 16000, 0, 5, "");
+		
+		gd.addNumericField("Enter gray-value range of search window", 3800, 0, 5, "");
+
+		gd.addNumericField("Enter search window overlap in percent", 90, 0, 2, "");
+		
+		gd.addNumericField("Filter away all POM or root clusters with less than ", 25, 0, 5, " voxels (0 will skip this step)");
+
+		//saving options
+		gd.addMessage("");
+		gd.addMessage("Saving options");
+
+		gd.addCheckbox("Save the segmented, 3-D binary images", true);
+
+		gd.addCheckbox("Save segmentation results as overlays in some sample slices", true);		
+		
+		String myReference = "If you are using this plugin please cite the following references: \n\n";
+		gd.setInsets(40, 0, 0);gd.addMessage(myReference);
+		myReference = "Koestel, J. 2018. SoilJ: An ImageJ plugin for the semiautomatic processing of three-dimensional X-ray images of soils.\n ";
+		myReference += "Vadose Zone Journal, doi:10.2136/vzj2017.03.0062.";
+		gd.setInsets(0, 0, 0);gd.addMessage(myReference);
+
+		//show dialog
+		gd.showDialog();
+	    if (gd.wasCanceled()) return null;
+	    else {
+
+	    	mTMR.minThreshold = (int)Math.round(gd.getNextNumber());
+	    	mTMR.maxThreshold = (int)Math.round(gd.getNextNumber());
+
+	    	mTMR.windowSize = gd.getNextNumber();
+	    	mTMR.overlap = gd.getNextNumber();
+
+	    	mTMR.minPOMVoxelNumber = (int)Math.round(gd.getNextNumber());
+	    	
+	    	//get saving options
+	    	mTMR.save3DImage = gd.getNextBoolean();
+	    	mTMR.save4Evaluation = gd.getNextBoolean();	
+
+	      	return mTMR;
+	    }
+	}
+	
 	public BioPoreExtractionOptions showBioPoreExtractionMenu() {
 		
 		BioPoreExtractionOptions mBEO = new BioPoreExtractionOptions();
@@ -3552,7 +3633,7 @@ public class MenuWaiter implements PlugIn {
 		//prepare radio box with the choices
 		gd.addCheckbox("Do you want to skip calculating on the original image resoluttion (check if your image sizes are large)", false);
 		gd.addNumericField("Please enter the minimum vesselness a biopore must have", 0.6, 1);
-		gd.addNumericField("Please enter the minimum length in voxels a biopore must have", 20, 1);
+		gd.addNumericField("Please enter the minimum length in voxels a biopore must have", 5, 1);
 		//gd.addNumericField("Please enter maximum footprint of the Gaussian Blur", 100, 0);
 		
 		//show dialog
@@ -3567,6 +3648,32 @@ public class MenuWaiter implements PlugIn {
 	    }
 		
 		return mBEO;
+	}
+	
+	public RootExtractionOptions showRootsExtractionMenu() {
+		
+		RootExtractionOptions mREO = new RootExtractionOptions();
+		
+		GenericDialog gd = new GenericDialog("Give me some root extraction parameters, please.");
+
+		//prepare radio box with the choices
+		gd.addCheckbox("Do you want to skip calculating on the original image resoluttion (check if your image sizes are large)", false);
+		gd.addNumericField("Please enter the minimum vesselness a root must have", 0.3, 1);
+		gd.addNumericField("Please enter the minimum length in voxels a root must have", 5, 1);
+		//gd.addNumericField("Please enter maximum footprint of the Gaussian Blur", 100, 0);
+		
+		//show dialog
+		gd.showDialog();
+	    if (gd.wasCanceled()) return null;
+	    else {
+	    	//get ROI typ
+	    	mREO.doNotProcessOriginalResolution = gd.getNextBoolean();
+	    	mREO.thresholdVesselness = gd.getNextNumber();
+	    	mREO.smallesAllowedElongation = gd.getNextNumber();
+	    	//mBEO.maximumBlurring = (int)gd.getNextNumber();
+	    }
+		
+		return mREO;
 	}
 	
 	public CrackExtractionOptions showCrackExtractionMenu() {

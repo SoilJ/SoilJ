@@ -77,7 +77,7 @@ public class CompileJoint1DHistogram_ extends ImagePlus implements PlugIn  {
 		if (mRSO == null) return;
 		
 		//create Folder structure
-		InputOutput.MyFileCollection mFC = jIO.createFolders4SubROIData(mRSO);
+		InputOutput.MyFileCollection mFC = jIO.createFolders4SubROIData(mRSO, true);
 		
 		//also create a folder for the cut surfaces
 		if (mRSO.includeSurfaceTopography) {

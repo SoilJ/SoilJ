@@ -61,8 +61,7 @@ public class SimpleThresholding_ extends ImagePlus implements PlugIn  {
 
 		//ask for threshold choice
 		MenuWaiter.ThresholderMenuReturn mTMR = menu.showThresholdingDialog();
-		if (mTMR == null) return;
-		
+		if (mTMR == null) return;		
 	
 		
 		String myOutFolder;
@@ -130,7 +129,7 @@ public class SimpleThresholding_ extends ImagePlus implements PlugIn  {
 			else nowTiff = jIO.openTiff3DSomeSlices(mFC, myZ);
 			
 			//apply segmentation			
-			outTiff = jIM.applyAChosenThresholdingMethod(nowTiff, mFC, mTMR, myZ);			 
+			outTiff = jIM.applyAChosenThresholdingMethod(nowTiff, mFC, mTMR);			 
 		
 			//save result
 			if (mTMR.save3DImage == true) jIO.tiffSaver(myOutPath, mFC.myTiffs[i], outTiff[0]);

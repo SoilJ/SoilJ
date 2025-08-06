@@ -3828,7 +3828,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		
 	}
 	
-	public void writeSnapshots4ThresholdComparison(MyFileCollection mFC, ImagePlus nowTiff, ImagePlus binTiff, PolygonRoi[] pRoi, int[] myZ) {
+	public void writeSnapshots4ThresholdComparison(MyFileCollection mFC, ImagePlus nowTiff, ImagePlus binTiff, int[] myZ) {
 		
 		String pathSep = "\\";
 		
@@ -4046,7 +4046,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		}
     }
 	
-	public MyFileCollection createFolders4SubROIData(MenuWaiter.ROISelectionOptions mRSO) {
+	public MyFileCollection createFolders4SubROIData(MenuWaiter.ROISelectionOptions mRSO, boolean createAlready) {
 		
 		String pathSep = "\\";
 		
@@ -4059,39 +4059,42 @@ public class InputOutput extends ImagePlus implements PlugIn {
 					
 		//create output paths
 		String myPreOutFolder = "";		
+		String myOutFolder = "";	
 		if (mRSO.choiceOfRoi.equals("RealSample")) {			
 			
-			if (mRSO.heightOfRoi > 0) myPreOutFolder = "Top" + mRSO.cutAwayFromTop + "Height" + mRSO.heightOfRoi + "Wall" + mRSO.cutAwayFromWall;
+			if (mRSO.heightOfRoi > 0) myOutFolder = "Top" + mRSO.cutAwayFromTop + "Height" + mRSO.heightOfRoi + "Wall" + mRSO.cutAwayFromWall;
 			boolean isCut = false;
 			if (mRSO.cutAwayFromBottom > 0 | mRSO.cutAwayFromTop > 0 | mRSO.cutAwayFromWall > 0 | mRSO.cutAwayFromCenter > 0) isCut = true; 
-			if (isCut & mRSO.heightOfRoi > 0) myPreOutFolder = "Tv" + mRSO.cutAwayFromTop + "Height" + mRSO.heightOfRoi + "Wall" + mRSO.cutAwayFromWall;
-			if (isCut & mRSO.cutZPercent & mRSO.cutXYPercent & mRSO.heightOfRoi == 0) myPreOutFolder = 
+			if (isCut & mRSO.heightOfRoi > 0) myOutFolder = "Tv" + mRSO.cutAwayFromTop + "Height" + mRSO.heightOfRoi + "Wall" + mRSO.cutAwayFromWall;
+			if (isCut & mRSO.cutZPercent & mRSO.cutXYPercent & mRSO.heightOfRoi == 0) myOutFolder = 
 					"Tp" + mRSO.cutAwayFromTop + "Bp" + mRSO.cutAwayFromBottom +	"Wp" + mRSO.cutAwayFromWall + "Cp" + mRSO.cutAwayFromCenter;
-			if (isCut & !mRSO.cutZPercent & mRSO.cutXYPercent & mRSO.heightOfRoi == 0) myPreOutFolder = 
+			if (isCut & !mRSO.cutZPercent & mRSO.cutXYPercent & mRSO.heightOfRoi == 0) myOutFolder = 
 					"Tv" + mRSO.cutAwayFromTop + "Bv" + mRSO.cutAwayFromBottom +	"Wp" + mRSO.cutAwayFromWall + "Cp" + mRSO.cutAwayFromCenter;
-			if (isCut & mRSO.cutZPercent & !mRSO.cutXYPercent & mRSO.heightOfRoi == 0) myPreOutFolder = 
+			if (isCut & mRSO.cutZPercent & !mRSO.cutXYPercent & mRSO.heightOfRoi == 0) myOutFolder = 
 					"Tp" + mRSO.cutAwayFromTop + "Bp" + mRSO.cutAwayFromBottom +	"Wv" + mRSO.cutAwayFromWall + "Cv" + mRSO.cutAwayFromCenter;
-			if (isCut & !mRSO.cutZPercent & !mRSO.cutXYPercent & mRSO.heightOfRoi == 0) myPreOutFolder = 
+			if (isCut & !mRSO.cutZPercent & !mRSO.cutXYPercent & mRSO.heightOfRoi == 0) myOutFolder = 
 					"Tv" + mRSO.cutAwayFromTop + "Bv" + mRSO.cutAwayFromBottom +	"Wv" + mRSO.cutAwayFromWall + "Cv" + mRSO.cutAwayFromCenter;
-			if (!isCut) myPreOutFolder = "InnerCircleColumn";	
+			if (!isCut) myOutFolder = "InnerCircleColumn";	
 
-			if (mRSO.includeSurfaceTopography) myPreOutFolder = "S_"+ myPreOutFolder;
-			else myPreOutFolder = "C_"+ myPreOutFolder;
+			if (mRSO.includeSurfaceTopography) myOutFolder = "S_"+ myOutFolder;
+			else myOutFolder = "C_"+ myOutFolder;
 			mFC = getAllMyNeededFolders(mFC.myBaseFolder, mFC.myTiffs, "", mRSO.useInnerCircleFiles, mRSO.includeSurfaceTopography);   //"" put because no possibility for a filterTag implemented yet
 			
 		} else {
 						
-			if (mRSO.choiceOfRoi.equals("Cuboid")) myPreOutFolder = "Cuboid_XL" + mRSO.cubeX1 + "XR" + mRSO.cubeX2 + "YL" + mRSO.cubeY1 + "YR" + mRSO.cubeY2 + "ZT" + mRSO.cubeZ1 + "ZB" + mRSO.cubeZ2;
-			if (mRSO.choiceOfRoi.equals("Cylinder")) myPreOutFolder = "Cyl_X" + mRSO.cylX + "Y" + mRSO.cylY+ "ZT" + mRSO.cylZ1 + "ZB" + mRSO.cylZ2 + "R" + mRSO.cylRadius;
-			if (mRSO.choiceOfRoi.equals("Everything!")) myPreOutFolder = "EntireImage";
-			if (mRSO.choiceOfRoi.equals("TopOfEveryThing")) myPreOutFolder = "TopOfEntireImage";
-			if (mRSO.choiceOfRoi.equals("BottomOfEveryThing")) myPreOutFolder = "BottomOfEntireImage";
+			if (mRSO.choiceOfRoi.equals("Cuboid")) myOutFolder = "Cuboid_XL" + mRSO.cubeX1 + "XR" + mRSO.cubeX2 + "YL" + mRSO.cubeY1 + "YR" + mRSO.cubeY2 + "ZT" + mRSO.cubeZ1 + "ZB" + mRSO.cubeZ2;
+			if (mRSO.choiceOfRoi.equals("Cylinder")) myOutFolder = "Cyl_X" + mRSO.cylX + "Y" + mRSO.cylY+ "ZT" + mRSO.cylZ1 + "ZB" + mRSO.cylZ2 + "R" + mRSO.cylRadius;
+			if (mRSO.choiceOfRoi.equals("Everything!")) myOutFolder = "EntireImage";
+			if (mRSO.choiceOfRoi.equals("TopOfEveryThing")) myOutFolder = "TopOfEntireImage";
+			if (mRSO.choiceOfRoi.equals("BottomOfEveryThing")) myOutFolder = "BottomOfEntireImage";
 			
 		}
 		
-		String myPreOutPath = mFC.myBaseFolder + pathSep + myPreOutFolder;
-		new File(myPreOutPath).mkdir();		
-		mFC.myOutFolder = myPreOutPath; 	//also add it to the folder collection
+		if (createAlready) {
+			String myOutPath = mFC.myBaseFolder + pathSep + myOutFolder;
+			new File(myOutPath).mkdir();		
+			mFC.myOutFolder = myOutPath; 	//also add it to the folder collection
+		}
 		
 		//save pathSep
 		mFC.pathSep = pathSep;

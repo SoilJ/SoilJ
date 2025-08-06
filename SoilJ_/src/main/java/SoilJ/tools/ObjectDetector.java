@@ -27,7 +27,6 @@ import org.apache.commons.math3.stat.StatUtils;
 import org.apache.commons.math3.stat.descriptive.rank.Median;
 
 import SoilJ.tools.HistogramStuff.IlluminationInfo;
-import Utilities.Counter3D;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.ImageStack;
@@ -39,7 +38,6 @@ import ij.gui.Roi;
 import ij.measure.CurveFitter;
 import ij.measure.SplineFitter;
 import ij.plugin.ContrastEnhancer;
-import ij.plugin.ImageCalculator;
 import ij.plugin.PlugIn;
 import ij.plugin.Selection;
 import ij.plugin.filter.GaussianBlur;
@@ -2812,158 +2810,7 @@ public class ObjectDetector implements PlugIn {
 		
 	}	
 	
-	public ImagePlus extractFreshOM(ImagePlus nowTiff, MenuWaiter.OMFinderSettingsDEPRECATED oMF) {
-		
-		ImageCalculator myIC =  new ImageCalculator();
-		
-		ImagePlus purgedTiff = new ImagePlus();
-		ImageStack purgedStack = new ImageStack(nowTiff.getWidth(), nowTiff.getHeight());
-		
-		ImagePlus outTiff = new ImagePlus();	
 
-		double mingray = 1;
-		double effectiveSearchRegion = 255;
-		double trueRegion2Search = oMF.maxgrayValue - oMF.mingrayValue;
-		double windowSize = oMF.windowSize * effectiveSearchRegion;   
-		double overlap = oMF.overlap * windowSize;
-		int numberOfWindows = (int)Math.round(1 / (oMF.windowSize * oMF.overlap));
-		double[] lowerWindowBound = new double[numberOfWindows]; 
-		lowerWindowBound[0] = mingray;
-		for (int i = 1 ; i < numberOfWindows ; i++) lowerWindowBound[i] = mingray + i * (windowSize - overlap);
-		
-		//remove all gray values outside the min and max values
-		for (int z = 1 ; z < nowTiff.getNSlices() + 1 ; z++) {
-			
-			IJ.showStatus("Removing all gray values outside the search range in slice " + z + "/" + nowTiff.getNSlices());
-			
-			nowTiff.setPosition(z);
-			ImageProcessor nowIP = nowTiff.getProcessor();
-			ImageProcessor purgedIP = new ByteProcessor(nowTiff.getWidth(), nowTiff.getHeight());
-			
-			for (int x = 0 ; x < nowTiff.getWidth() ; x++) {		
-				for (int y = 0 ; y < nowTiff.getHeight() ; y++) {					
-					double nowgray = (double)nowIP.getPixelValue(x, y);
-					double modgray = (nowgray - (double)oMF.mingrayValue) / trueRegion2Search * (double)256;
-					if (modgray > 255) modgray = 0;
-					purgedIP.putPixel(x, y, (int)Math.round(modgray));					
-				}
-			}
-			purgedStack.addSlice(purgedIP);
-		}
-		purgedTiff.setStack("", purgedStack);
-		
-		//purgedTiff.updateAndDraw();
-		//purgedTiff.show();
-		
-		//init sub-images to merge
-		ImagePlus[] mTiff = new ImagePlus[numberOfWindows];
-		
-		for (int j = 0 ; j < numberOfWindows ; j++) {
-			
-			ImageStack outStack1 = new ImageStack(nowTiff.getWidth(), nowTiff.getHeight());
-			ImageStack outStack2 = new ImageStack(nowTiff.getWidth(), nowTiff.getHeight());
-			
-			for (int i = 0 ; i < purgedTiff.getNSlices() ; i++) {			
-					
-				IJ.showStatus("Searching for fresh organic material, stage " + (j + 1) + "/" + numberOfWindows + " in slice " + (i + 1) + "/" + purgedTiff.getNSlices());
-		
-				//set tiff to the correct position and get Processor etc..
-				purgedTiff.setPosition(i+1);
-				ImageProcessor myIP = purgedTiff.getProcessor();
-				ByteProcessor modIP1 = myIP.duplicate().convertToByteProcessor(false);
-				ByteProcessor modIP2 = myIP.duplicate().convertToByteProcessor(false);
-											
-				//apply threshold		
-				modIP1.threshold((int)Math.floor(lowerWindowBound[j]));
-				modIP2.threshold((int)Math.ceil(lowerWindowBound[j] + windowSize));
-		
-				
-				outStack1.addSlice(modIP1);
-				outStack2.addSlice(modIP2);
-			}
-					
-			ImagePlus zTiff1 = new ImagePlus();
-			zTiff1.setStack(outStack1);
-			ImagePlus zTiff2 = new ImagePlus();
-			zTiff2.setStack(outStack2);
-			
-			//zTiff1.updateAndDraw();zTiff1.show();
-			//zTiff2.updateAndDraw();zTiff2.show();
-			
-			//merge the two images			
-			outTiff = myIC.run("xor create stack", zTiff1, zTiff2);
-			zTiff1.killStack();
-			zTiff2.killStack();
-			System.gc();
-			
-			//if (j == numberOfWindows) {
-			//	outTiff.updateAndDraw();
-			//	outTiff.show();
-			//}
-			
-			//erode 3D
-			Erode_ jE = new Erode_();
-			IJ.showStatus("Removing partial volume voxels, stage " + (j + 1) + "/" + (numberOfWindows));			
-			ImagePlus outTiff2 = jE.erode(outTiff, 255, true);
-			outTiff.killStack();
-			System.gc();
-			
-			//kick out clusters smaller than 1000	
-			int slicesPerChunk = 2; //input parameter 4 particle analyzer
-			int imgSize = (int)Math.round(Math.sqrt((double)nowTiff.getWidth() * (double)nowTiff.getHeight()));
-			int minVol = imgSize; //
-			int maxVol = imgSize * nowTiff.getNSlices(); 
-			boolean doExclude = false;
-		
-			Counter3D myOC = new Counter3D(outTiff2, 128, minVol, maxVol, doExclude, false);
-			myOC.getObjects();
-			outTiff = myOC.getObjMap();			
-			
-			//re-convert to binary image
-			ImageStack outStack = new ImageStack(nowTiff.getWidth(), nowTiff.getHeight());
-			for (int i = 0 ; i < nowTiff.getNSlices() ; i++) {			
-				
-				//set tiff to the correct position and get Processor etc..			
-				outTiff.setPosition(i+1);
-				ImageProcessor myIP = outTiff.getProcessor().convertToByteProcessor(false);
-				ImageProcessor modIP = myIP.duplicate();
-				modIP.threshold(0);
-				
-				outStack.addSlice(modIP);
-			}
-			
-			outTiff2.setStack(outStack);				
-			outTiff.killStack();
-			System.gc();
-						
-			//dilate 3D
-			Dilate_ jD = new Dilate_();
-			IJ.showStatus("Dilating remaining image features, stage " + (j + 1) + "/" + (numberOfWindows));
-			mTiff[j] = jD.dilate(outTiff2, 255, true);
-			outTiff2.killStack();
-			System.gc();
-			
-			//mTiff[j].updateAndDraw();
-			//mTiff[j].show();
-			
-		}
-		
-		//merge the sub-images
-		ImagePlus zwischi = new ImagePlus();		
-		IJ.showStatus("Plugging everything together, step " + 1 + "/" + (numberOfWindows - 1));
-		if (numberOfWindows > 1) zwischi = myIC.run("or create stack",mTiff[0], mTiff[1]);		
-		else outTiff = mTiff[0];
-		if (numberOfWindows > 2) {
-			for (int i = 2 ; i < mTiff.length ; i++) {
-				IJ.showStatus("Plugging everything together, step " + i + "/" + (numberOfWindows - 1));
-				zwischi = myIC.run("or create stack",zwischi, mTiff[i]);
-			}
-		}
-		
-		outTiff = zwischi;
-		
-		return outTiff;
-	}
 	
 	
 	

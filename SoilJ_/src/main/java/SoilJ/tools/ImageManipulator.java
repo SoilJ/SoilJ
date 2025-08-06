@@ -66,6 +66,9 @@ import inra.ijpb.binary.distmap.DistanceTransform3DFloat;
 import inra.ijpb.data.image.Images3D;
 import inra.ijpb.geometry.Ellipsoid;
 import inra.ijpb.label.LabelImages;
+import inra.ijpb.label.select.LabelSizeFiltering;
+import inra.ijpb.label.select.RelationalOperator;
+import inra.ijpb.measure.region3d.EquivalentEllipsoid;
 import inra.ijpb.measure.region3d.InertiaEllipsoid;
 import inra.ijpb.plugins.MarkerControlledWatershed3DPlugin;
 import inra.ijpb.watershed.ExtendedMinimaWatershed;
@@ -1098,9 +1101,77 @@ public class ImageManipulator implements PlugIn {
 		
 	}
 	
-	public ImagePlus removeBlobs(ImagePlus nowTiff, int dyn, double thresholdVesselness, double smallesAllowedElongation) {
+	public ImagePlus removeBlobs(ImagePlus nowTiff, double thresholdVesselness, double smallesAllowedElongation) {
+	
+		TailoredMaths jTM = new TailoredMaths();
 		
+		IJ.showStatus("Identifying connected pore-clusters ...");
+		
+		FloodFillComponentsLabeling3D myFCCL = new FloodFillComponentsLabeling3D(26, 32);
+		ImageStack myLabelStack = myFCCL.computeLabels(nowTiff.getStack());		
+		ImagePlus labelTiff = new ImagePlus("labelTiff", myLabelStack);
+		
+		labelTiff.updateAndDraw();//labelTiff.show();
+		
+		Ellipsoid[] ellipsoids = null;
+		EquivalentEllipsoid algo = new EquivalentEllipsoid();
+		int[] labels = LabelImages.findAllLabels(myLabelStack);
+		ellipsoids = algo.analyzeRegions(myLabelStack, labels, null);
+		
+        //flag labels as too spherical or small
+        double[] flag = new double[ellipsoids.length];
+        for (int i = 0 ; i < ellipsoids.length ; i++) {
+        	
+        	double vesselness = jTM.calculateVesselness(ellipsoids[i]); 
+        	double[] radii = jTM.calculateEllipsoidRadii(ellipsoids[i]);
+        	double r1 = radii[0];
+        	
+        	if (vesselness > thresholdVesselness & r1 > smallesAllowedElongation) flag[i] = 255;
+        	else flag[i] = 0;
+        	
+        }
+		
+        //remove 0 flagged clusters		I
+        ImagePlus outTiff = new ImagePlus();
+		ImageStack outStack = new ImageStack(nowTiff.getWidth(), nowTiff.getHeight());
+		
+		for (int z = 0 ; z < nowTiff.getNSlices() ; z++) {
+					
+			labelTiff.setSlice(z + 1);			
+			ImageProcessor nowIP = labelTiff.getProcessor().duplicate();			
+			
+			IJ.showStatus("Binarizing air phase in layer " + (z + 1));
+						
+			ImageProcessor outIP = new ByteProcessor(nowIP.getWidth(), nowIP.getHeight());
 				
+			for (int x = 0 ; x < outIP.getWidth() ; x++) {
+				for (int y = 0 ; y < outIP.getHeight() ; y++) {
+					
+					int nowPix = (int)nowIP.getPixelValue(x, y);
+					if (nowPix > 0) {
+						int myInput = (int)flag[nowPix - 1];
+						outIP.putPixel(x, y, myInput);	
+					}
+					else outIP.putPixel(x, y, 0);
+				}					
+			}
+		
+			outStack.addSlice(outIP);
+			
+		}
+		
+		outTiff = new ImagePlus("filteredTiff", outStack); 
+		
+		//outTiff.updateAndDraw();outTiff.show();
+			
+		return outTiff;
+		
+	}
+	
+	public ImagePlus removeBlobsMaiksMethod(ImagePlus nowTiff, int dyn, double thresholdVesselness, double smallesAllowedElongation) {
+						
+		TailoredMaths jTM = new TailoredMaths();
+		
 		//get watershed segmentation from binary image
 		String weightLabel = ChamferWeights3D.BORGEFORS.toString();
 		boolean normalize = true;
@@ -1109,25 +1180,24 @@ public class ImageManipulator implements PlugIn {
 		Images3D.invert( dist );
 		ImageStack result = ExtendedMinimaWatershed.extendedMinimaWatershed(dist, nowTiff.getImageStack(), dyn, connectivity, 32, false );
 		ImagePlus waterShedImage = new ImagePlus("wsi", result);
+		
+		//waterShedImage.updateAndDraw();
+		//waterShedImage.show();
 			
 		//get ellipsoids
 		Ellipsoid[] ellipsoids = null;
-		InertiaEllipsoid algo = new InertiaEllipsoid();
+		EquivalentEllipsoid algo = new EquivalentEllipsoid();
 		int[] labels = LabelImages.findAllLabels(waterShedImage);
 		Calibration calib = waterShedImage.getCalibration();
         ellipsoids = algo.analyzeRegions(waterShedImage.getImageStack(), labels, calib);
 		
-        //calculate vesselness
+        //flag labels as too spherical or small
         double[] flag = new double[ellipsoids.length];
         for (int i = 0 ; i < ellipsoids.length ; i++) {
-        	double r1 = ellipsoids[i].radius1();
-        	double r2 = ellipsoids[i].radius2();
-        	double r3 = ellipsoids[i].radius3();
         	
-        	double Rb = r3 / Math.sqrt(r1*r2);
-        	double Ra = r2 / r1;
-        	
-        	double vesselness = Math.abs(Math.exp(-Rb*Rb)*Math.exp(-Ra*Ra)); 
+        	double vesselness = jTM.calculateVesselness(ellipsoids[i]); 
+        	double[] radii = jTM.calculateEllipsoidRadii(ellipsoids[i]);
+        	double r1 = radii[0];
         	
         	if (vesselness > thresholdVesselness & r1 > smallesAllowedElongation) flag[i] = 255;
         	else flag[i] = 0;
@@ -1218,14 +1288,14 @@ public class ImageManipulator implements PlugIn {
 	 * @param mBEO			[MenuWaiter.BioPoreExtractionOptions]
 	 * @return	iC.run("OR create stack", roundOneTiff, miniTiff0);
 	 */
-  public ImagePlus extractBioPores(InputOutput.MyFileCollection mFC, ImagePlus nowTiff, MenuWaiter.BioPoreExtractionOptions mBEO) {
+  public ImagePlus extractBioPoresfromBinaryImage(InputOutput.MyFileCollection mFC, ImagePlus nowTiff, MenuWaiter.BioPoreExtractionOptions mBEO) {
 		
 		ImageCalculator iC = new ImageCalculator();
 		Dilate_ dil = new Dilate_();
 		
 		int dyn = 2;
 		double thresholdVesselness = mBEO.thresholdVesselness; 
-		double smallesAllowedElongation = mBEO.smallesAllowedElongation;
+		double smallestAllowedElongation = mBEO.smallesAllowedElongation;
 		double[] sigmas = {2,3,4};
 		
 		//check how large the image is and scale down in case it is too large.. because tubeness 
@@ -1250,8 +1320,7 @@ public class ImageManipulator implements PlugIn {
 		ImageHandler hystThresh = null;
 		ImagePlus oldOne = new ImagePlus();
 		ImagePlus smallBiopores = new ImagePlus();
-	
-			
+				
 		int n_dilations = 1;	
 		
 		if (!mBEO.doNotProcessOriginalResolution) {
@@ -1287,7 +1356,7 @@ public class ImageManipulator implements PlugIn {
 			//oldOne.show();
 		
 			//remove blobs
-			smallBiopores = removeBlobs(oldOne, dyn, thresholdVesselness, smallesAllowedElongation);
+			smallBiopores = removeBlobsMaiksMethod(oldOne, dyn, thresholdVesselness, smallestAllowedElongation);
 	
 			//smallBiopores.updateAndDraw();smallBiopores.show();
 		}
@@ -1325,9 +1394,9 @@ public class ImageManipulator implements PlugIn {
 		mediumBiopores = binarize3DFloatImage(mediumBiopores,128);
 		
 		//filterout blobs
-		mediumBiopores = removeBlobs(mediumBiopores, dyn, thresholdVesselness, smallesAllowedElongation);
+		mediumBiopores = removeBlobsMaiksMethod(mediumBiopores, dyn, thresholdVesselness, smallestAllowedElongation);
 		
-		//merge with pore network at smallest scale if it was calculateed
+		//merge with pore network at smallest scale if it was calculated
 		if (!mBEO.doNotProcessOriginalResolution) mediumBiopores = iC.run("OR create stack", mediumBiopores, smallBiopores);
 		
 		//mediumBiopores.show();
@@ -1366,7 +1435,7 @@ public class ImageManipulator implements PlugIn {
 		largeBiopores = binarize3DFloatImage(largeBiopores,128);
 		
 		//filterout blobs
-		largeBiopores = removeBlobs(largeBiopores, dyn, thresholdVesselness, smallesAllowedElongation);
+		largeBiopores = removeBlobsMaiksMethod(largeBiopores, dyn, thresholdVesselness, smallestAllowedElongation);
 		
 		//merge with medium
 		largeBiopores = iC.run("OR create stack", largeBiopores, mediumBiopores);
@@ -1408,9 +1477,193 @@ public class ImageManipulator implements PlugIn {
 		veryLargeBiopores = binarize3DFloatImage(veryLargeBiopores,128);
 		
 		//filterout blobs
-		veryLargeBiopores = removeBlobs(veryLargeBiopores, dyn, thresholdVesselness, smallesAllowedElongation);
+		veryLargeBiopores = removeBlobsMaiksMethod(veryLargeBiopores, dyn, thresholdVesselness, smallestAllowedElongation);
 		
 		return iC.run("OR create stack", largeBiopores, veryLargeBiopores);
+		
+	}
+  
+  	public ImagePlus extractRootsFromBinaryImage(InputOutput.MyFileCollection mFC, ImagePlus nowTiff, MenuWaiter.RootExtractionOptions mREO) {
+		
+		ImageCalculator iC = new ImageCalculator();
+				
+		double thresholdVesselness = mREO.thresholdVesselness; 
+		double smallestAllowedElongation = mREO.smallesAllowedElongation;
+		double[] sigmas = {2,3,4};
+		
+		//check how large the image is and scale down in case it is too large.. because tubeness 
+		// crashes if they are too large (comment out if you have 1000^3 voxels or less) 
+		int w = nowTiff.getWidth(), h = nowTiff.getHeight(), d = nowTiff.getNSlices(); 
+		double bulkVol = (double) w * (double) h * (double) d;
+		int wnew = w;
+		int hnew = h;
+		int dnew = d;
+		if (bulkVol > 1200000000) {
+			IJ.showStatus("Reducing image size..");
+			nowTiff = binaryScale2HalfSize(nowTiff);
+			wnew = nowTiff.getWidth();					// why not overwrite w, h, d?
+			hnew = nowTiff.getHeight();
+			dnew = nowTiff.getNSlices();
+		}
+		
+		//*************************CalcTubenessOnLargeImage************************************
+		// GB step 1
+		HysteresisSegment myHS = new HysteresisSegment(55, 65);
+		TubenessProcessor tp = new TubenessProcessor(1, false);
+		ImageHandler hystThresh = null;
+		ImagePlus oldOne = new ImagePlus();
+		ImagePlus smallRoots = new ImagePlus();
+			
+		if (!mREO.doNotProcessOriginalResolution) {
+		
+			ImagePlus original = tp.generateImage(nowTiff.duplicate());
+		
+			//original.show();
+			
+			//hysteresis Threshold
+			hystThresh = myHS.hysteresis(ImageHandler.wrap(original), true);
+			oldOne = hystThresh.getImagePlus();			
+			oldOne = binarize3DImage(oldOne,0);
+			
+			//oldOne.show();
+					
+			for (int j = 0 ; j < sigmas.length ; j++) {
+			
+				double sigma=sigmas[j];	
+			
+				tp = new TubenessProcessor(sigma, false);
+				ImagePlus newOne = tp.generateImage(nowTiff);
+			
+				hystThresh = myHS.hysteresis(ImageHandler.wrap(newOne), true);
+				newOne = hystThresh.getImagePlus();
+				newOne = binarize3DImage(newOne,0);
+				//newOne = binarize3DFloatImage(original, 60);
+
+				oldOne = iC.run("OR create stack", oldOne, newOne);		
+			
+			}
+		
+			//oldOne.show();
+		
+			//remove blobs
+			smallRoots = removeBlobs(oldOne, thresholdVesselness, smallestAllowedElongation);
+				
+			//smallRoots.updateAndDraw();smallRoots.show();
+		}
+				
+		//*************************initTubenessOndownscaledImage************************************		
+		IJ.showStatus("Reducing image size.."); 					// >> do the same again, but on the image that has a reduced size!
+		nowTiff = binaryScale2HalfSize(nowTiff);					// reduce image size (even if not reduced before)
+		double[] newSigmas = {1,2,3,4,5,6,7,8};
+				
+		for (int j = 0 ; j < newSigmas.length ; j++) {
+			
+			double sigma=newSigmas[j];	
+
+			tp = new TubenessProcessor(sigma, false);
+			ImagePlus newOne = tp.generateImage(nowTiff);
+			
+			hystThresh = myHS.hysteresis(ImageHandler.wrap(newOne), true);
+			newOne = hystThresh.getImagePlus();
+			newOne = binarize3DImage(newOne,0);
+			//newOne = binarize3DFloatImage(oldOne, 55);
+					
+			if (j == 0) oldOne = newOne;
+			else oldOne = iC.run("OR create stack", oldOne, newOne);		
+			
+		}
+		
+		//oldOne.show();
+		
+		//*************************Rescale, merge with initial round************************************
+		
+		ImagePlus mediumRoots = scaleWithoutMenu(oldOne, wnew, hnew, dnew, ImageProcessor.BILINEAR);
+		mediumRoots = binarize3DFloatImage(mediumRoots,128);
+		
+		//mediumRoots.show();
+		
+		//filterout blobs
+		mediumRoots = removeBlobs(mediumRoots, thresholdVesselness, smallestAllowedElongation);
+		
+		//merge with pore network at smallest scale if it was calculated
+		if (!mREO.doNotProcessOriginalResolution) mediumRoots = iC.run("OR create stack", mediumRoots, smallRoots);
+		
+		//mediumRoots.updateAndDraw();mediumRoots.show();
+		
+		//*************************TubenessOn2TimesdownscaledImage************************************		
+		IJ.showStatus("Reducing image size ince more ..");
+		nowTiff = binaryScale2HalfSize(nowTiff);
+		
+		//nowTiff.updateAndDraw();nowTiff.show();
+		
+		double[] lastSigmas = new double[12];
+		for (int i = 0 ; i < lastSigmas.length ; i++) lastSigmas[i] = 4+i;
+		
+		for (int j = 0 ; j < lastSigmas.length ; j++) {
+			
+			double sigma=lastSigmas[j];				
+					
+			tp = new TubenessProcessor(sigma, false);
+			ImagePlus newOne = tp.generateImage(nowTiff);
+						
+			hystThresh = myHS.hysteresis(ImageHandler.wrap(newOne), true);
+			newOne = hystThresh.getImagePlus();
+			newOne = binarize3DImage(newOne,0);
+						
+			if (j == 0) oldOne = newOne;
+			else oldOne = iC.run("OR create stack", oldOne, newOne);		
+					
+		}
+		
+		//*************************Rescale final round, merge with previous round************************************
+		
+		ImagePlus largeRoots = scaleWithoutMenu(oldOne, wnew, hnew, dnew, ImageProcessor.BILINEAR);
+		
+		largeRoots = binarize3DFloatImage(largeRoots,128);
+		
+		//filterout blobs
+		largeRoots = removeBlobs(largeRoots, thresholdVesselness, smallestAllowedElongation);
+		
+		//merge with medium
+		largeRoots = iC.run("OR create stack", largeRoots, mediumRoots);
+		
+		//largeRoots.updateAndDraw();largeRoots.show();
+		
+		//*************************TubenessOn2TimesdownscaledImage************************************		
+		IJ.showStatus("Reducing image size ince more ..");
+		nowTiff = binaryScale2HalfSize(nowTiff);
+		
+		double[] veryLastSigmas = new double[12];
+		for (int i = 0 ; i < lastSigmas.length ; i++) lastSigmas[i] = 4+i;
+		
+		for (int j = 0 ; j < lastSigmas.length ; j++) {
+			
+			double sigma=veryLastSigmas[j];
+		
+			tp = new TubenessProcessor(sigma, false);
+			ImagePlus newOne = tp.generateImage(nowTiff);
+						
+			hystThresh = myHS.hysteresis(ImageHandler.wrap(newOne), true);
+			newOne = hystThresh.getImagePlus();
+			newOne = binarize3DImage(newOne,0);
+			//newOne = binarize3DFloatImage(oldOne, 55);
+
+			if (j == 0) oldOne = newOne;
+			else oldOne = iC.run("OR create stack", oldOne, newOne);		
+			
+			//miniTiff0.updateAndDraw();miniTiff0.show();
+		}
+		
+		//*************************Rescale final round, merge with previous round************************************
+		
+		ImagePlus veryLargeRoots = scaleWithoutMenu(oldOne, wnew, hnew, dnew, ImageProcessor.BILINEAR);
+		
+		veryLargeRoots = binarize3DFloatImage(veryLargeRoots,128);
+		
+		//filterout blobs
+		veryLargeRoots = removeBlobs(veryLargeRoots, thresholdVesselness, smallestAllowedElongation);
+		
+		return iC.run("OR create stack", largeRoots, veryLargeRoots);
 		
 	}
 	
@@ -3495,8 +3748,146 @@ public class ImageManipulator implements PlugIn {
 		
 	}
 	
+	public ImagePlus extractPOMandRoots(ImagePlus nowTiff, InputOutput.MyFileCollection mFC, MenuWaiter.POMThresholderMenuReturn mTMR) {
 		
-	public ImagePlus[] applyAChosenThresholdingMethod(ImagePlus nowTiff, InputOutput.MyFileCollection mFC, MenuWaiter.ThresholderMenuReturn mTMR, int[] myZ) {
+		//init
+		ImageCalculator myIC =  new ImageCalculator();		
+		ImagePlus outTiff = new ImagePlus();
+		Erode_ jE = new Erode_();
+		Dilate_ jD = new Dilate_();
+		
+		//assign segmentation parameters
+		int mingray = mTMR.minThreshold;
+		double trueRegion2Search = mTMR.maxThreshold - mTMR.minThreshold;
+		int windowSize = (int)Math.round(mTMR.windowSize);   
+		double overlap = mTMR.overlap / 100;
+		double underlap = 1 - mTMR.overlap / 100;
+		
+		//implement search window with overlap
+		int numberOfWindows = (int)Math.ceil((trueRegion2Search - windowSize * overlap) / (windowSize * underlap));		
+
+		int[] lowerWindowBound = new int[numberOfWindows]; 
+		lowerWindowBound[0] = mingray;
+		for (int i = 1 ; i < numberOfWindows ; i++) lowerWindowBound[i] = (int)Math.round(lowerWindowBound[i - 1] + windowSize * (1 - overlap / 100));
+		
+		//loop over search windows  
+		for (int j = 0 ; j < numberOfWindows ; j++) {
+			
+			//init new Image part
+			ImagePlus purgedTiff = new ImagePlus();
+			ImageStack purgedStack = new ImageStack(nowTiff.getWidth(), nowTiff.getHeight());	
+			
+			//set new cutoff variables
+			int lowerCutoff = lowerWindowBound[j];
+			int upperCutoff = lowerWindowBound[j] + windowSize;
+			if (upperCutoff > mTMR.maxThreshold) upperCutoff = mTMR.maxThreshold;
+			
+			//cut out selected gray value range
+			for (int z = 1 ; z < nowTiff.getNSlices() + 1 ; z++) {
+				
+				IJ.showStatus("Searching for organic material, stage " + (j + 1) + "/" + numberOfWindows + " in slice " + z + "/" + nowTiff.getNSlices());
+				
+				nowTiff.setPosition(z);
+				ImageProcessor nowIP = nowTiff.getProcessor();
+				ImageProcessor purgedIP = new ByteProcessor(nowTiff.getWidth(), nowTiff.getHeight());
+				
+				for (int x = 0 ; x < nowTiff.getWidth() ; x++) {		
+					for (int y = 0 ; y < nowTiff.getHeight() ; y++) {					
+						double nowgray = (double)nowIP.getPixelValue(x, y);
+						int modgray = 255;
+						if (nowgray < lowerCutoff) modgray = 0;
+						if (nowgray > upperCutoff) modgray = 0;
+						purgedIP.putPixel(x, y, modgray);					
+					}
+				}
+				purgedStack.addSlice(purgedIP);
+			}
+			purgedTiff.setStack(lowerCutoff + "_" + upperCutoff, purgedStack);
+
+			//run an erosion operation on the extracted gray range 
+			purgedTiff = jE.erode(purgedTiff, 255, true);
+			
+			//run a dilation operation on the extracted gray range 
+			purgedTiff = jD.dilate(purgedTiff, 255, true);
+			
+			//carry out a closing again to fill holes
+			purgedTiff = jD.dilate(purgedTiff, 255, true);
+			purgedTiff = jE.erode(purgedTiff, 255, true);
+			
+			//merge new purgedTiff to outTiff
+			if (j == 0) outTiff = purgedTiff;
+			else outTiff = myIC.run("or create stack", outTiff, purgedTiff);
+			
+			//outTiff.updateAndDraw();
+			//outTiff.show();
+			
+		}
+		
+		//carry out a final closing again
+		outTiff = jD.dilate(outTiff, 255, true);
+		outTiff = jE.erode(outTiff, 255, true);
+				
+		if (mTMR.minPOMVoxelNumber > 0) {
+			
+			IJ.showStatus("Filtering out smaller fragments...");			
+			outTiff = filterOutSmallClusters(outTiff, mTMR.minPOMVoxelNumber);
+			
+		}
+		
+		//outTiff.updateAndDraw();
+		//outTiff.show();
+		
+		return outTiff;
+	}
+	
+	public ImagePlus filterOutSmallClusters(ImagePlus nowTiff, int minVoxNumber) {
+
+		IJ.showStatus("Identifying connected pore-clusters ...");
+		
+		FloodFillComponentsLabeling3D myFCCL = new FloodFillComponentsLabeling3D(26, 32);
+		ImageStack myLabelStack = myFCCL.computeLabels(nowTiff.getStack());
+		
+		IJ.freeMemory();IJ.freeMemory();
+		
+		//filter away small clusters
+		LabelSizeFiltering myLSF = new LabelSizeFiltering(RelationalOperator.GE, minVoxNumber);
+		ImageStack filterStack = myLSF.process(myLabelStack);
+		
+		//Convert to binary again..
+		ImagePlus labelTiff = new ImagePlus();
+		labelTiff.setStack(filterStack);	
+		ImagePlus outTiff = binarize3DImage(labelTiff,0);
+		
+		//outTiff.updateAndDraw();
+		//outTiff.show();
+		
+		return outTiff;
+		
+	}
+	
+	
+	
+	public ImagePlus prepareSnapshots4ThresholdComparison(ImagePlus nowTiff, int[] myZ) {
+		
+		ImageStack snapStack = new ImageStack(nowTiff.getWidth(), nowTiff.getHeight());	
+		
+		//cut out selected gray value range
+		for (int z = 0 ; z < myZ.length ; z++) {
+					
+			nowTiff.setPosition(myZ[z]);
+			ImageProcessor nowIP = nowTiff.getProcessor();			
+			snapStack.addSlice(nowIP);
+		}
+		
+		ImagePlus outTiff = new ImagePlus();
+		outTiff.setStack("", snapStack);
+		
+		return outTiff;
+				
+	}
+	
+		
+	public ImagePlus[] applyAChosenThresholdingMethod(ImagePlus nowTiff, InputOutput.MyFileCollection mFC, MenuWaiter.ThresholderMenuReturn mTMR) {
 		
 		String pathSep = "/";
 		
@@ -3504,6 +3895,7 @@ public class ImageManipulator implements PlugIn {
 		HistogramStuff hist = new HistogramStuff();
 		RoiHandler rH = new RoiHandler();
 		ObjectDetector jOD = new ObjectDetector();
+		TailoredMaths jTM = new TailoredMaths();
 		
 		ImagePlus[] outImg = {null, null, null};
 		ImageStack myStack = new ImageStack(nowTiff.getWidth(), nowTiff.getHeight());
@@ -3698,10 +4090,9 @@ public class ImageManipulator implements PlugIn {
 			jIO.writeThreshold(thresholdSaverPath, nowTiff.getShortTitle(), myThresh);	
 			
 			//also save threshold comparison images	
-			if ((mTMR.save3DImage | mTMR.save4GeoDict) & mTMR.save4Evaluation) jIO.writeSnapshots4ThresholdComparison(mFC, nowTiff, outImg[0], oRoi, myZ);
-			if (mTMR.save4Evaluation & !(mTMR.save3DImage | mTMR.save4GeoDict)) {
-				for (int i = 0 ; i < myZ.length ; i++) myZ[i] = i + 1;
-				jIO.writeSnapshots4ThresholdComparison(mFC,  nowTiff, outImg[0], oRoi, myZ);
+			if (mTMR.save3DImage) {
+				int[] myZ = jTM.makeStandardSnapshotSequence(mFC.nOfSlices);	
+				jIO.writeSnapshots4ThresholdComparison(mFC, nowTiff, outImg[0],myZ);
 			}
 		}
 		
@@ -3759,7 +4150,10 @@ public class ImageManipulator implements PlugIn {
 			}
 			
 			//also save threshold comparison images			
-			if (mTMR.save4Evaluation) jIO.writeSnapshots4ThresholdComparison(mFC, nowTiff, outImg[0], oRoi, myZ);			
+			if (mTMR.save4Evaluation) {
+				int[] myZ = jTM.makeStandardSnapshotSequence(mFC.nOfSlices);	
+				jIO.writeSnapshots4ThresholdComparison(mFC, nowTiff, outImg[0], myZ);			
+			}
 
 		}
 					
@@ -3767,7 +4161,7 @@ public class ImageManipulator implements PlugIn {
 	}
 	
 	public ImagePlus binarize3DImage(ImagePlus nowTiff, int threshold) {
-		
+	
 		ImagePlus outTiff = new ImagePlus();
 		ImageStack outStack = new ImageStack(nowTiff.getWidth(), nowTiff.getHeight());
 		
@@ -3777,12 +4171,12 @@ public class ImageManipulator implements PlugIn {
 			ImageProcessor nowIP = nowTiff.getProcessor().duplicate();			
 			
 			ImageProcessor outIP = new ByteProcessor(nowIP.getWidth(), nowIP.getHeight());
-			if (nowTiff.getBytesPerPixel() == 2) {
+			if (nowTiff.getBytesPerPixel() == 2 || nowTiff.getBytesPerPixel() == 4) {
 				
 				for (int x = 0 ; x < outIP.getWidth() ; x++) {
 					for (int y = 0 ; y < outIP.getHeight() ; y++) {
 						
-						int nowPix = nowIP.getPixel(x, y);
+						int nowPix = (int)Math.round(nowIP.getPixelValue(x, y));
 						
 						if (nowPix > threshold) outIP.putPixel(x, y, 255);
 						else outIP.putPixel(x, y, 0);					

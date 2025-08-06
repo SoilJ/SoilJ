@@ -22,6 +22,7 @@ package SoilJ.tools;
 import org.apache.commons.math3.stat.StatUtils;
 
 import ij.plugin.PlugIn;
+import inra.ijpb.geometry.Ellipsoid;
 
 /** 
  * TailoredMaths is a SoilJ class collecting mathematical subroutines.
@@ -58,6 +59,60 @@ public class TailoredMaths implements PlugIn {
 		for (j = lastEntry + 1 ; j < grayValue.length ; j++) mGreyAtThisAngle[j] = mGreyAtThisAngle[lastEntry];
 		
 		return mGreyAtThisAngle;
+	}
+	
+	public double calculateVesselness(Ellipsoid ellipsoid) {
+		
+        //calculate vesselness
+    	double r1 = ellipsoid.radius1();
+    	double r2 = ellipsoid.radius2();
+    	double r3 = ellipsoid.radius3();
+    	
+    	double Rb = r3 / Math.sqrt(r1*r2);
+    	double Ra = r2 / r1;
+    	
+    	double vesselness = Math.abs(Math.exp(-Rb*Rb)*Math.exp(-Ra*Ra)); 
+
+		return vesselness;
+	}
+	
+	public double[] calculateEllipsoidRadii(Ellipsoid ellipsoid) {
+		
+        //calculate vesselness
+    	double r1 = ellipsoid.radius1();
+    	double r2 = ellipsoid.radius2();
+    	double r3 = ellipsoid.radius3();
+    	
+    	double[] radii = {r1, r2, r3};
+    	
+		return radii;
+	}
+	
+	public int[] convert2Array(int nOfSlices) {
+		
+		int[] myZ = new int[nOfSlices];
+		for (int j = 0 ; j < nOfSlices ; j++) {	
+			myZ[j] = j + 1;
+		}
+		
+		return myZ;		
+	}
+	
+	public int[] makeStandardSnapshotSequence(int nOfSlices) {
+			
+		//create folder for each horizontal cross-section for checking
+		int[] eDC = {0, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 100};  //eDC stands for evaluation depth choices 
+		
+		//define evaluation depths
+		int[] myZ = new int[eDC.length];
+		for (int j = 0 ; j < eDC.length ; j++) {
+			double checkZ = (double)eDC[j] * (double)nOfSlices / 100d;
+			myZ[j] = (int)Math.round(checkZ);
+		}
+		if (myZ[0] == 0) myZ[0] = 1;
+		if (myZ[eDC.length - 1] != nOfSlices) myZ[eDC.length - 1] = nOfSlices;
+		
+		return myZ;
 	}
 	
 	public int[][] applyCorrFactor(int[][] interCount, int xl, int yl, double correctionFactor) {

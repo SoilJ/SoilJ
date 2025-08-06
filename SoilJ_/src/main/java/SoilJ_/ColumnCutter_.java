@@ -71,7 +71,7 @@ public class ColumnCutter_ extends ImagePlus implements PlugIn  {
 		if (mRSO == null) return;
 		
 		//create Folder structure
-		InputOutput.MyFileCollection mFC = jIO.createFolders4SubROIData(mRSO);				
+		InputOutput.MyFileCollection mFC = jIO.createFolders4SubROIData(mRSO, true);				
 		String myInnerCircleFolder =  mFC.myOutFolder + pathSep + "InnerCircle";
 		new File(myInnerCircleFolder).mkdir();			
 		

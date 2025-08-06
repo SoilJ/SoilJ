@@ -2,10 +2,10 @@ package SoilJ_;
 
 import java.io.File;
 
+import SoilJ.tools.ImageManipulator;
 import SoilJ.tools.InputOutput;
 import SoilJ.tools.MenuWaiter;
-import SoilJ.tools.ObjectDetector;
-import ij.IJ;
+import SoilJ.tools.TailoredMaths;
 
 /**
  *SoilJ is a collection of ImageJ plugins for the semi-automatized processing of 3-D X-ray images of soil columns
@@ -53,50 +53,63 @@ public class ExtractPOMAndRoots_ extends ImagePlus implements PlugIn  {
 		
 		//construct biggish objects
 		InputOutput jIO = new InputOutput();		
-		ObjectDetector jOD = new ObjectDetector();
+		ImageManipulator jIM = new ImageManipulator();
 		MenuWaiter menu = new MenuWaiter();
+		TailoredMaths jTM = new TailoredMaths();
+
+		//init images
+		ImagePlus nowTiff = new ImagePlus();		
+		ImagePlus outTiff = new ImagePlus();
 		
-		// init variables
-		int i;
-		MenuWaiter.OMFinderSettingsDEPRECATED oMF = menu.new OMFinderSettingsDEPRECATED();
-		oMF = menu.showOMFinderMenuDEPRECATED();
-		if (oMF == null) return;
+		//ask for threshold choice
+		String myOutFolder;
+		String myOutPath = null;		
+		MenuWaiter.POMThresholderMenuReturn mTMR = menu.showPOMThresholdingDialog();
+		if (mTMR == null) return;
+		String thresholds = "";
+		if (mTMR.minThreshold > 0) thresholds = "" + mTMR.minThreshold / 100 + "h";
+		if (mTMR.maxThreshold > 0) thresholds = thresholds + "_" + mTMR.maxThreshold / 100 + "h";
 		
-		//construct image related objects
-		ImagePlus nowTiff;  //input
-		ImagePlus outTiff;  //output
+		myOutFolder = "POM" + thresholds + "_W" + (int)Math.round(mTMR.windowSize / 100) + "h_Over" + (int)Math.round(mTMR.overlap) + "p";
+	
+		//select file or files
+	  	InputOutput.MyFileCollection mFC = jIO.fileSelector("Please choose a file or folder with your image data");
 		
-		//read base folder and number of 3D images
-	    String[] myTiffs = null;String myBaseFolder = null;
-	    while (myTiffs == null) {
-	    	myBaseFolder = jIO.chooseAFolder("Please choose the folder with your image data");
-			if (myBaseFolder == null) return;
-			myTiffs = jIO.listTiffsInFolder(new File(myBaseFolder));
-			if (myTiffs == null) {
-				IJ.error("Please choose a folder with TIFF images or cancel. Thank you.");	
-			}
-		}
-		String myTiffName;
-		String myOutFolder = "FreshOrganicMaterial";
-						
-		//create output folder
-		String mySubBaseFolder = jIO.getTheFolderAbove(myBaseFolder, pathSep);
-		String myOutPath = mySubBaseFolder + pathSep + myOutFolder;
+		myOutPath = mFC.myBaseFolder + pathSep + myOutFolder;						
 		new File(myOutPath).mkdir();
+		
+		mFC.myOutFolder = myOutPath;
+
 				
 		//loop over 3D images
-		for (i = 0 ; i < myTiffs.length ; i++) {  
+		for (int i = 0 ; i < mFC.myTiffs.length ; i++) {  //myTiffs.length
 
-			//assign current TIFF
-			myTiffName = myTiffs[i];
-			nowTiff = jIO.openTiff3D(myBaseFolder + pathSep + myTiffName);
+			//try to free up some memory
+			System.gc();
+			
+			//assign tiff file
+			mFC.fileName = mFC.myTiffs[i];
+			mFC = jIO.addCurrentFileInfo(mFC);					
+				
+			//load image
+			nowTiff = jIO.openTiff3D(mFC.nowTiffPath);			
 			
 			//do the cutting
-			outTiff = jOD.extractFreshOM(nowTiff, oMF);
+			outTiff = jIM.extractPOMandRoots(nowTiff, mFC, mTMR);	
 			
 			//save the results
-			jIO.tiffSaver(myOutPath, myTiffName, outTiff);			
+			if (mTMR.save3DImage == true) jIO.tiffSaver(myOutPath, mFC.myTiffs[i], outTiff);
 			
+			//also save threshold comparison images			
+			if (mTMR.save4Evaluation) {
+				int[] myZ = jTM.convert2Array(mFC.nOfSlices);
+				ImagePlus graySnapTiff = jIM.prepareSnapshots4ThresholdComparison(nowTiff, myZ);
+				ImagePlus binSnapTiff = jIM.prepareSnapshots4ThresholdComparison(outTiff, myZ);
+				jIO.writeSnapshots4ThresholdComparison(mFC, graySnapTiff, binSnapTiff, myZ);	
+			}
+						
+			if (i == 0) jIO.writeStringIntoAsciiFile(myOutPath + pathSep + "Path2Gauge.txt", mFC.myInnerCircleFolder + "\n"); 	//also save the gauge path..
+					
 		}
 	}
 }
