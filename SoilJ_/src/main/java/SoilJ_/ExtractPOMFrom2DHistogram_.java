@@ -34,7 +34,7 @@ import ij.plugin.PlugIn;
  * @author John Koestel
  */
 
-public class TernarySegmentation_ extends ImagePlus implements PlugIn  {
+public class ExtractPOMFrom2DHistogram_ extends ImagePlus implements PlugIn  {
 
 	public void run(String arg) {
 
@@ -59,42 +59,25 @@ public class TernarySegmentation_ extends ImagePlus implements PlugIn  {
 		int i;
 		
 		//init folder collection
-		InputOutput.MyFileCollection mFC = jIO.new MyFileCollection();
-		
-		//read base folder and number of 3D images
-	    String[] myTiffs = null;String myBaseFolder = null;
-	    while (myTiffs == null) {
-	    	myBaseFolder = jIO.chooseAFolder("Please choose the folder with your image data");
-			if (myBaseFolder == null) return;
-			myTiffs = jIO.listTiffsInFolder(new File(myBaseFolder));
-			if (myTiffs == null) {
-				IJ.error("Please choose a folder with TIFF images or cancel. Thank you.");	
-			}
-		}
-	    if (myBaseFolder.substring(myBaseFolder.length() - 1).equalsIgnoreCase(pathSep)) {
-	    	myBaseFolder = myBaseFolder.substring(0, myBaseFolder.length() - 1);
-	    }
+		InputOutput.MyFileCollection mFC = jIO.fileSelector("Please choose a file or folder with your image data");
 	    
 	    String myGradFolder = "";
-    	if (jIO.testIfFolderIsPresent(new File(myBaseFolder), "Gradients")) {
-    		myGradFolder = myBaseFolder + pathSep + "Gradients";
+    	if (jIO.testIfFolderIsPresent(new File(mFC.myBaseFolder), "Gradients")) {
+    		myGradFolder = mFC.myBaseFolder + pathSep + "Gradients";
     	}
     	else {	    	
-    		myTiffs = null;
-			while (myTiffs == null) {
+    		mFC.myTiffs = null;
+			while (mFC.myTiffs == null) {
 				myGradFolder = jIO.chooseAFolder("Please choose the folder with your gradient images");
 				if (myGradFolder == null) return;
-				myTiffs = jIO.listTiffsInFolder(new File(myGradFolder));
-				if (myTiffs == null) {				
+				mFC.myTiffs = jIO.listTiffsInFolder(new File(myGradFolder));
+				if (mFC.myTiffs == null) {				
 					IJ.error("Please choose a folder with TIFF images or cancel. Thank you.");
 				}
 			}		
     	}
     	    			    
-	    //create output paths	
-  		mFC.myBaseFolder = myBaseFolder;
-  		
-  		String myOutPath =  myBaseFolder + pathSep + "TernarySegmentation";
+    	String myOutPath = mFC.myBaseFolder + pathSep + "POMFrom2DHistogram";
   		new File(myOutPath).mkdir();		
   		mFC.myOutFolder = myOutPath; 	//also add it to the folder collection
   		  		  		
@@ -111,10 +94,10 @@ public class TernarySegmentation_ extends ImagePlus implements PlugIn  {
 		pomRegion = jIO.openTiff3D(mFC);
 		
 		//loop over 3D images
-		for (i = 0 ; i < myTiffs.length ; i++) {  
+		for (i = 0 ; i < mFC.myTiffs.length ; i++) {  
 
 			//assign current TIFF
-			mFC.fileName = myTiffs[i];
+			mFC.fileName = mFC.myTiffs[i];
 			mFC = jIO.addCurrentFileInfo(mFC);
 			mFC.nowTiffPath = mFC.myBaseFolder + pathSep + mFC.fileName;
 			ImagePlus nowTiff = jIO.openTiff3D(mFC.nowTiffPath);
@@ -124,16 +107,17 @@ public class TernarySegmentation_ extends ImagePlus implements PlugIn  {
 			ImagePlus gradTiff = jIO.openTiff3D(mFC.nowTiffPath);	
 			
 			//segment ternary and save
-			jIM.segmentTernaryAndSave(mFC, nowTiff, gradTiff, pomRegion);
+			ImagePlus outTiff = jIM.extractPOMFrom2DHistogram(mFC, nowTiff, gradTiff, pomRegion);
+			
+			//save image
+			jIO.tiffSaver(myOutPath, mFC.myTiffs[i], outTiff);
 		
 		}
 		
-		IJ.showStatus("Done! Flushing memory.. ");
+		IJ.showStatus("POM extraction done! Flushing memory.. ");
 		
 		//try to clear memory
 		IJ.freeMemory();IJ.freeMemory();
-		
-		IJ.showStatus("Memory should be free again!");
 		
 	}
 }

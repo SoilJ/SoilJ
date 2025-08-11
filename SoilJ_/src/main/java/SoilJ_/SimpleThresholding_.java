@@ -71,7 +71,7 @@ public class SimpleThresholding_ extends ImagePlus implements PlugIn  {
 			mTMR = menu.showManualThresholdingDialog(mTMR);
 			String thresholds = "";
 			if (mTMR.minThreshold > 0) thresholds = "" + mTMR.minThreshold;
-			if (mTMR.maxThreshold > 0 & thresholds.equalsIgnoreCase("")) thresholds = "" + mTMR.maxThreshold;
+			if (mTMR.maxThreshold > 0 & thresholds.equalsIgnoreCase("")) thresholds = mTMR.minThreshold + "_" + mTMR.maxThreshold;
 			
 			myOutFolder = "ConstantThreshold" + thresholds;
 			

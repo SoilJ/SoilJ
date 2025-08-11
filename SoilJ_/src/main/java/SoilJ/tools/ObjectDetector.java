@@ -51,9 +51,11 @@ import ij.process.ShortProcessor;
 import inra.ijpb.binary.BinaryImages;
 import inra.ijpb.binary.conncomp.FloodFillComponentsLabeling3D;
 import inra.ijpb.label.LabelImages;
+import inra.ijpb.morphology.Morphology;
+import inra.ijpb.morphology.Strel3D;
+import inra.ijpb.morphology.strel.CubeStrel;
 import process3d.Dilate_;
 import process3d.Erode_;
-import process3d.Gradient;
 
 /** 
  * ObjectDetector is one of the two main SoilJ classes (the other being ImageManipulator). 
@@ -493,8 +495,12 @@ public class ObjectDetector implements PlugIn {
 		
 		InputOutput jIO = new InputOutput();
 		
-		ImagePlus gradTiff = Gradient.calculateGrad(myTiff, false);
-
+		ImageStack nowStack = myTiff.getStack();
+		Strel3D se = CubeStrel.fromDiameter(2);
+		ImageStack grad = Morphology.gradient(nowStack, se);
+		
+		ImagePlus gradTiff = new ImagePlus("Gradient3D", grad);
+	
 		jIO.tiffSaver(mFC.myGradientFolder, mFC.fileName, gradTiff);
 		
 		return gradTiff;		

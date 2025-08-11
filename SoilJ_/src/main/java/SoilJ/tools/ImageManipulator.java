@@ -70,7 +70,6 @@ import inra.ijpb.label.select.LabelSizeFiltering;
 import inra.ijpb.label.select.RelationalOperator;
 import inra.ijpb.measure.region3d.EquivalentEllipsoid;
 import inra.ijpb.measure.region3d.InertiaEllipsoid;
-import inra.ijpb.plugins.MarkerControlledWatershed3DPlugin;
 import inra.ijpb.watershed.ExtendedMinimaWatershed;
 import mcib3d.image3d.ImageByte;
 import mcib3d.image3d.ImageHandler;
@@ -4345,8 +4344,8 @@ public class ImageManipulator implements PlugIn {
 					
 					//do segmentation
 					markerIP.putPixel(x, y, 0);
-					if (mPix < myMin + 0.33 * deltaPOM) markerIP.putPixel(x, y, 1);  
-					if (mPix > myMax) markerIP.putPixel(x, y, 3);
+					if (mPix < myMin + 0.5 * deltaPOM) markerIP.putPixel(x, y, 1);  
+					if (mPix >= myMin + 0.5 * deltaPOM) markerIP.putPixel(x, y, 3);
 					
 					//do extra IP for pomRegion Seeds
 					if (pomRegIP.getPixel(mPix/10, gPix) > 0) pomSeedsIP.putPixel(x, y, 255);
@@ -4358,7 +4357,8 @@ public class ImageManipulator implements PlugIn {
 			//test.show();
 			
 			//filter out thin POM seed regions
-			pomSeedsIP.dilate();
+			//pomSeedsIP.dilate();
+			//pomSeedsIP.erode();
 			
 			for (int x = 0 ; x < mP.getWidth(); x++) {
 				
@@ -4384,14 +4384,86 @@ public class ImageManipulator implements PlugIn {
 		//markerTiff.show();
 		
 		//use watershed algorithm
-		int connectivity = 26;		
-		MarkerControlledWatershed3DPlugin mcWS = new MarkerControlledWatershed3DPlugin();
-		MarkerControlledWatershed3DPlugin.binaryMarkers = false;
-		MarkerControlledWatershed3DPlugin.getDams = false;		
-		outTiff = mcWS.process(gradTiff, markerTiff, null, connectivity);		
+		/*
+		 * int connectivity = 26; MarkerControlledWatershed3DPlugin mcWS = new
+		 * MarkerControlledWatershed3DPlugin();
+		 * MarkerControlledWatershed3DPlugin.binaryMarkers = false;
+		 * MarkerControlledWatershed3DPlugin.getDams = false; outTiff =
+		 * mcWS.process(nowTiff, markerTiff, null, connectivity);
+		 */	
 		
 		//save images		
-		jIO.tiffSaver(mFC.myOutFolder, mFC.fileName, outTiff);
+		jIO.tiffSaver(mFC.myOutFolder, mFC.fileName, markerTiff);
+		
+	}
+	
+	public ImagePlus extractPOMFrom2DHistogram(InputOutput.MyFileCollection mFC, ImagePlus nowTiff, ImagePlus gradTiff, ImagePlus pomRegion) {
+		
+ 		ImageManipulator jIM = new ImageManipulator();
+		Erode_ jE = new Erode_();
+		Dilate_ jD = new Dilate_();
+		
+		int w = nowTiff.getWidth();
+		int h = nowTiff.getHeight();
+			
+		ImagePlus pomTiff = new ImagePlus();	
+		
+		ImageStack pomStack = new ImageStack(w, h);
+			
+		//scale again to original height.. because the joint histogram had been scaled by 0.5 in y direction
+		pomRegion = jIM.scaleWithoutMenu(pomRegion, pomRegion.getWidth(), pomRegion.getHeight() * 2, 1, ImageProcessor.BILINEAR);
+		
+		//assign POM mask process
+		ImageProcessor pomRegIP = pomRegion.getProcessor();
+		
+		//flip back upright again		
+		pomRegIP.flipVertical();
+					
+		//do the segmentation
+		for (int z = 0 ; z < nowTiff.getNSlices() ; z++) {
+			
+			IJ.showStatus("Segmenting slice " + (z+1) + "/" + nowTiff.getNSlices());
+			
+			nowTiff.setSlice(z + 1);
+			ImageProcessor mP = nowTiff.getProcessor();
+			
+			gradTiff.setSlice(z + 1);
+			ImageProcessor gP = gradTiff.getProcessor().convertToShort(false);
+			
+			ImageProcessor pomIP = new ByteProcessor(w, h);
+			
+			for (int x = 0 ; x < mP.getWidth(); x++) {
+				
+				for (int y = 0 ; y < mP.getHeight(); y++) {
+					
+					int mPix = mP.getPixel(x, y);
+					int gPix = gP.getPixel(x, y);	
+					
+					//segment POM
+					if (pomRegIP.getPixel(mPix/10, gPix) > 0) {
+						pomIP.putPixel(x, y, 255);
+					}
+					
+				}
+			}			
+			
+			//add new markerSlice
+			pomStack.addSlice(pomIP);
+		
+		}	
+		
+		pomTiff.setStack(pomStack);
+		
+		//pomTiff.updateAndDraw();
+		//pomTiff.show();
+					
+		IJ.freeMemory();IJ.freeMemory();
+		
+		//run morphological opening on pomTiff to remove small fragments
+		pomTiff = jE.erode(pomTiff, 255, true);
+		pomTiff = jD.dilate(pomTiff, 255, true);		
+		
+		return pomTiff;
 		
 	}
 	

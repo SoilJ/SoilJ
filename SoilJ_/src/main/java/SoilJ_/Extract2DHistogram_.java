@@ -223,7 +223,7 @@ public class Extract2DHistogram_ extends ImagePlus implements PlugIn  {
 			double[][] indieHist = new double[256][256];
 			for (int x = 0 ; x < 256 ; x++) {
 				for (int y = 0 ; y < 256 ; y++) {
-					out2DHist[x][y] += (double)hist2D[x][y] / (2 * sumEntries);
+					//out2DHist[x][y] += (double)hist2D[x][y] / (2 * sumEntries);
 					indieHist[x][y] = (double)hist2D[x][y] / (2 * sumEntries);
 				}
 			}		
