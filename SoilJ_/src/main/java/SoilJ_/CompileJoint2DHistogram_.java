@@ -34,7 +34,7 @@ import ij.plugin.PlugIn;
  * @author John Koestel
  */
 
-public class Analyze2DHistograms_ extends ImagePlus implements PlugIn  {
+public class CompileJoint2DHistogram_ extends ImagePlus implements PlugIn  {
 
 	public void run(String arg) {
 
