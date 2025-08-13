@@ -4091,7 +4091,7 @@ public class ImageManipulator implements PlugIn {
 			//also save threshold comparison images	
 			if (mTMR.save3DImage) {
 				int[] myZ = jTM.makeStandardSnapshotSequence(mFC.nOfSlices);	
-				jIO.writeSnapshots4ThresholdComparison(mFC, nowTiff, outImg[0],myZ);
+				jIO.writeSnapshots4ThresholdComparison(mFC, nowTiff, outImg[0], myZ);
 			}
 		}
 		
