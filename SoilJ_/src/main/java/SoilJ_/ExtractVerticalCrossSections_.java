@@ -90,6 +90,7 @@ String pathSep = "\\";
 
 			//outTiff.updateAndDraw();
 			//outTiff.show();
+			//and add this comment that Git notices
 			
 			//wait a bit..
 			IJ.wait(1000);
