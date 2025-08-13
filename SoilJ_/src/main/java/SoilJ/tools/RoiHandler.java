@@ -253,10 +253,10 @@ public class RoiHandler implements PlugIn {
 	 * @param innerOrOuter			[String]	cut away from inner or from outer wall?
 	 * @param wideTightOrExact		[String]	
 	 * @param preciseCC				[ObjectDetector.ColCoords3D]	The column outlines as in innerCircle files
-	 * @param cutAwayFromWalls		[int]		voxels to cut away
+	 * @param toBeCutOrPreserved		[int]		voxels to cut away
 	 * @return PolygonRoi[heigthOfColumn] 
 	 */
-	public PolygonRoi[] makeMeAPolygonRoiStack(String innerOrOuter, String wideTightOrExact, ObjectDetector.ColCoords3D preciseCC, int cutAwayFromWalls) {
+	public PolygonRoi[] makeMeAPolygonRoiStack(String innerOrOuter, String wideTightOrExact, ObjectDetector.ColCoords3D preciseCC, int toBeCutOrPreserved) {
 
 		TailoredMaths math = new TailoredMaths();
 		
@@ -280,10 +280,15 @@ public class RoiHandler implements PlugIn {
 		if (wideTightOrExact.contentEquals("wide")) clipper0 = 1;
 		if (wideTightOrExact.contentEquals("tight")) clipper0 = -1;
 		if (wideTightOrExact.contentEquals("exact")) clipper0 = 0;
-		if (wideTightOrExact.contentEquals("manual")) clipper0 = cutAwayFromWalls;
+		if (wideTightOrExact.contentEquals("manual")) clipper0 = toBeCutOrPreserved;
 		
 		for (int i = 0 ; i < preciseCC.heightOfColumn ; i++) { // loop through column
 			
+			if (innerOrOuter.contentEquals("innerRadius")) {
+				majRad = toBeCutOrPreserved;
+				minRad = toBeCutOrPreserved;
+				clipper = 0;
+			}
 			if (innerOrOuter.contentEquals("inner")) {
 				majRad = preciseCC.innerMajorRadius[i];
 				minRad = preciseCC.innerMinorRadius[i];
@@ -513,8 +518,7 @@ public class RoiHandler implements PlugIn {
 		String imgName = mFC.colName;
 		double area = 0;
 		boolean hasSurface = mRSO.includeSurfaceTopography;
-		
-		
+				
 		//check if mFC and mRSO values match
 		if (mRSO.cutAwayFromTop != mFC.startSlice) mFC.startSlice = mRSO.cutAwayFromTop;
 		if (mRSO.cutAwayFromBottom > 0 & mRSO.cutAwayFromBottom != nowTiff.getNSlices() - mFC.stopSlice) mFC.stopSlice = nowTiff.getNSlices() - mRSO.cutAwayFromBottom;
@@ -546,19 +550,32 @@ public class RoiHandler implements PlugIn {
 					double myRadius = (StatUtils.mean(jCO.innerMajorRadius) + StatUtils.mean(jCO.innerMinorRadius)) / 2; // mean radius of major and minor inner circle
 					cutAwayFromXY = (int) Math.floor(mRSO.cutAwayFromWall * myRadius / 100); // caluculate voxels to cut away >> why not inner & outer je zB 10% wegschneiden?
 				}
+				
+				//also transfer radius around central axis to new variable
+				int keepRadiusAroundCentralAxis = mRSO.keepRadiusFromCenter;
 
 				//calculate average area
 				double[] avgRadius = new double[jCO.innerMajorRadius.length];				// array for storing avg radius in each slice
 				for (int radiusFinder = 0 ; radiusFinder < jCO.innerMajorRadius.length ; radiusFinder++) {
 					avgRadius[radiusFinder] = (jCO.innerMajorRadius[radiusFinder] + jCO.innerMinorRadius[radiusFinder]) / 2; // avg of major and minor inner radius
 				}
-				double myRadius = StatUtils.mean(avgRadius) - cutAwayFromXY;				// mean of the slice-averages
+				
+				double myOldRadius = StatUtils.mean(avgRadius) - cutAwayFromXY;				// mean of the slice-averages
+				double myRadius = 0;
+				if (cutAwayFromXY > 0) myRadius = myOldRadius - cutAwayFromXY;	
+				if (keepRadiusAroundCentralAxis > 0) myRadius = keepRadiusAroundCentralAxis;				
 				area = myRadius * myRadius * Math.PI;										// > area
 				
 				int averageRadius = (int)Math.round(myRadius);								// int
 				PolygonRoi[] pRoi = roi.makeMeAPolygonRoiStack("inner", "manual", jCO, -cutAwayFromXY);	// returns coordinates from all (chosen) angles for each slice
 				PolygonRoi[] iRoi = null;
 				if (cutAwayFromXY == 0) iRoi = roi.makeMeAPolygonRoiStack("inner", "manual", jCO, 10);	// if cutAwayFromY is 0 then add 10???
+				
+				//in case a central column should be kept, overwrite pRoi
+				if (keepRadiusAroundCentralAxis > 0) {
+					pRoi = roi.makeMeAPolygonRoiStack("innerRadius", "manual", jCO, keepRadiusAroundCentralAxis);
+				}
+				
 				if (mRSO.cutAwayFromCenter > 0) {											// cutAwayFromCenter: number of voxels or percent
 					int cutAwayFromCenter = mRSO.cutAwayFromCenter;
 					if (mRSO.cutXYPercent) {
@@ -600,6 +617,7 @@ public class RoiHandler implements PlugIn {
 			
 	// + + + + + + + + + + if the ROI is defined by the choice of layer below the surface
 	// + + + + + + + + + + and the height of the ROI
+			
 			if ((mRSO.cutAwayFromTop > 0 & mRSO.cutAwayFromBottom == 0 ) & 
 					mRSO.includeSurfaceTopography & mRSO.heightOfRoi > 0 & mRSO.heightOfRoi < 4000) {  // ROI below top and height of column
 				
@@ -730,7 +748,7 @@ public class RoiHandler implements PlugIn {
 			int minY = nowTiff.getHeight();
 			for (int i = 0 ; i < colRoi.pRoi.length ; i++) {
 				int[] nowX = colRoi.pRoi[i].getXCoordinates();
-				int[] nowY = colRoi.pRoi[i].getXCoordinates();
+				int[] nowY = colRoi.pRoi[i].getYCoordinates();
 				
 				double nmiX = StatUtils.min(rC.castInt2Double(nowX)) + colRoi.pRoi[i].getXBase();
 				double nmiY = StatUtils.min(rC.castInt2Double(nowY)) + colRoi.pRoi[i].getYBase();
@@ -802,7 +820,8 @@ public class RoiHandler implements PlugIn {
 				offsetX[i] = colRoi.pRoi[i].getXBase() - cutRoi.getXBase();		
 				offsetY[i] = colRoi.pRoi[i].getYBase() - cutRoi.getYBase();		
 
-				if (GandS[0].contains("Gauge")) {
+				//cut away from wall or cut out column with defined radius				
+				if (GandS[0].contains("Gauge")) {					
 					ixmid[i] = colRoi.jCO.xmid[i + mFC.startSlice] - cutRoi.getXBase();						
 					iymid[i] = colRoi.jCO.ymid[i + mFC.startSlice] - cutRoi.getYBase();
 					innerMajorRadius[i] = colRoi.jCO.innerMajorRadius[i + mFC.startSlice] - mRSO.cutAwayFromWall;

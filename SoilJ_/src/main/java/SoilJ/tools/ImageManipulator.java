@@ -1125,7 +1125,7 @@ public class ImageManipulator implements PlugIn {
         	double[] radii = jTM.calculateEllipsoidRadii(ellipsoids[i]);
         	double r1 = radii[0];
         	
-        	if (vesselness > thresholdVesselness & r1 > smallesAllowedElongation) flag[i] = 255;
+        	if (vesselness < thresholdVesselness & r1 > smallesAllowedElongation) flag[i] = 255;
         	else flag[i] = 0;
         	
         }

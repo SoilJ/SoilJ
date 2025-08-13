@@ -4056,24 +4056,30 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		
 		//select file or files
 	  	MyFileCollection mFC = fileSelector("Please choose a file or folder with your image data");	
-					
+		
+		String wallOrRadius = "Wall";				
+		int cutOrKeep = mRSO.cutAwayFromWall;
+		if (mRSO.keepRadiusFromCenter > 0) {
+			wallOrRadius = "Radius";
+			cutOrKeep = mRSO.keepRadiusFromCenter;			
+		}
+	  	
 		//create output paths
-		String myPreOutFolder = "";		
 		String myOutFolder = "";	
 		if (mRSO.choiceOfRoi.equals("RealSample")) {			
 			
-			if (mRSO.heightOfRoi > 0) myOutFolder = "Top" + mRSO.cutAwayFromTop + "Height" + mRSO.heightOfRoi + "Wall" + mRSO.cutAwayFromWall;
+			if (mRSO.heightOfRoi > 0) myOutFolder = "Top" + mRSO.cutAwayFromTop + "Height" + mRSO.heightOfRoi + wallOrRadius + cutOrKeep;
 			boolean isCut = false;
-			if (mRSO.cutAwayFromBottom > 0 | mRSO.cutAwayFromTop > 0 | mRSO.cutAwayFromWall > 0 | mRSO.cutAwayFromCenter > 0) isCut = true; 
-			if (isCut & mRSO.heightOfRoi > 0) myOutFolder = "Tv" + mRSO.cutAwayFromTop + "Height" + mRSO.heightOfRoi + "Wall" + mRSO.cutAwayFromWall;
+			if (mRSO.cutAwayFromBottom > 0 | mRSO.cutAwayFromTop > 0 | cutOrKeep > 0 | mRSO.cutAwayFromCenter > 0) isCut = true; 
+			if (isCut & mRSO.heightOfRoi > 0) myOutFolder = "Tv" + mRSO.cutAwayFromTop + "Height" + mRSO.heightOfRoi + wallOrRadius + cutOrKeep;
 			if (isCut & mRSO.cutZPercent & mRSO.cutXYPercent & mRSO.heightOfRoi == 0) myOutFolder = 
-					"Tp" + mRSO.cutAwayFromTop + "Bp" + mRSO.cutAwayFromBottom +	"Wp" + mRSO.cutAwayFromWall + "Cp" + mRSO.cutAwayFromCenter;
+					"Tp" + mRSO.cutAwayFromTop + "Bp" + mRSO.cutAwayFromBottom +	"Wp" + cutOrKeep + "Cp" + mRSO.cutAwayFromCenter;
 			if (isCut & !mRSO.cutZPercent & mRSO.cutXYPercent & mRSO.heightOfRoi == 0) myOutFolder = 
-					"Tv" + mRSO.cutAwayFromTop + "Bv" + mRSO.cutAwayFromBottom +	"Wp" + mRSO.cutAwayFromWall + "Cp" + mRSO.cutAwayFromCenter;
+					"Tv" + mRSO.cutAwayFromTop + "Bv" + mRSO.cutAwayFromBottom +	"Wp" + cutOrKeep + "Cp" + mRSO.cutAwayFromCenter;
 			if (isCut & mRSO.cutZPercent & !mRSO.cutXYPercent & mRSO.heightOfRoi == 0) myOutFolder = 
-					"Tp" + mRSO.cutAwayFromTop + "Bp" + mRSO.cutAwayFromBottom +	"Wv" + mRSO.cutAwayFromWall + "Cv" + mRSO.cutAwayFromCenter;
+					"Tp" + mRSO.cutAwayFromTop + "Bp" + mRSO.cutAwayFromBottom +	"Wv" + cutOrKeep + "Cv" + mRSO.cutAwayFromCenter;
 			if (isCut & !mRSO.cutZPercent & !mRSO.cutXYPercent & mRSO.heightOfRoi == 0) myOutFolder = 
-					"Tv" + mRSO.cutAwayFromTop + "Bv" + mRSO.cutAwayFromBottom +	"Wv" + mRSO.cutAwayFromWall + "Cv" + mRSO.cutAwayFromCenter;
+					"Tv" + mRSO.cutAwayFromTop + "Bv" + mRSO.cutAwayFromBottom +	"Wv" + cutOrKeep + "Cv" + mRSO.cutAwayFromCenter;
 			if (!isCut) myOutFolder = "InnerCircleColumn";	
 
 			if (mRSO.includeSurfaceTopography) myOutFolder = "S_"+ myOutFolder;
@@ -4117,22 +4123,29 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		
 		PhaseOfInterestInfo mPII = jIM.parsePhaseOfInterestInfo(mPSA.imagePhase2BeAnalyzed);		
 					
+		String wallOrRadius = "Wall";				
+		int cutOrKeep = mPSA.mRSO.cutAwayFromWall;
+		if (mPSA.mRSO.keepRadiusFromCenter > 0) {
+			wallOrRadius = "Radius";
+			cutOrKeep = mPSA.mRSO.keepRadiusFromCenter;			
+		}
+		
 		//create output paths
 		String myPreOutFolder = "";		
 		if (mPSA.mRSO.choiceOfRoi.equals("RealSample")) {			
 			
-			if (mPSA.mRSO.heightOfRoi > 0) myPreOutFolder = "Top" + mPSA.mRSO.cutAwayFromTop + "Height" + mPSA.mRSO.heightOfRoi + "Wall" + mPSA.mRSO.cutAwayFromWall;
+			if (mPSA.mRSO.heightOfRoi > 0) myPreOutFolder = "Top" + mPSA.mRSO.cutAwayFromTop + "Height" + mPSA.mRSO.heightOfRoi + wallOrRadius + cutOrKeep;
 			boolean isCut = false;
-			if (mPSA.mRSO.cutAwayFromBottom > 0 | mPSA.mRSO.cutAwayFromTop > 0 | mPSA.mRSO.cutAwayFromWall > 0 | mPSA.mRSO.cutAwayFromCenter > 0) isCut = true; 
-			if (isCut & mPSA.mRSO.heightOfRoi > 0) myPreOutFolder = "Tv" + mPSA.mRSO.cutAwayFromTop + "Height" + mPSA.mRSO.heightOfRoi + "Wall" + mPSA.mRSO.cutAwayFromWall;
+			if (mPSA.mRSO.cutAwayFromBottom > 0 | mPSA.mRSO.cutAwayFromTop > 0 | cutOrKeep > 0 | mPSA.mRSO.cutAwayFromCenter > 0) isCut = true; 
+			if (isCut & mPSA.mRSO.heightOfRoi > 0) myPreOutFolder = "Tv" + mPSA.mRSO.cutAwayFromTop + "Height" + mPSA.mRSO.heightOfRoi + wallOrRadius + cutOrKeep;
 			if (isCut & mPSA.mRSO.cutZPercent & mPSA.mRSO.cutXYPercent & mPSA.mRSO.heightOfRoi == 0) myPreOutFolder = 
-					"Tp" + mPSA.mRSO.cutAwayFromTop + "Bp" + mPSA.mRSO.cutAwayFromBottom +	"Wp" + mPSA.mRSO.cutAwayFromWall + "Cp" + mPSA.mRSO.cutAwayFromCenter;
+					"Tp" + mPSA.mRSO.cutAwayFromTop + "Bp" + mPSA.mRSO.cutAwayFromBottom +	"Wp" + cutOrKeep + "Cp" + mPSA.mRSO.cutAwayFromCenter;
 			if (isCut & !mPSA.mRSO.cutZPercent & mPSA.mRSO.cutXYPercent & mPSA.mRSO.heightOfRoi == 0) myPreOutFolder = 
-					"Tv" + mPSA.mRSO.cutAwayFromTop + "Bv" + mPSA.mRSO.cutAwayFromBottom +	"Wp" + mPSA.mRSO.cutAwayFromWall + "Cp" + mPSA.mRSO.cutAwayFromCenter;
+					"Tv" + mPSA.mRSO.cutAwayFromTop + "Bv" + mPSA.mRSO.cutAwayFromBottom +	"Wp" + cutOrKeep + "Cp" + mPSA.mRSO.cutAwayFromCenter;
 			if (isCut & mPSA.mRSO.cutZPercent & !mPSA.mRSO.cutXYPercent & mPSA.mRSO.heightOfRoi == 0) myPreOutFolder = 
-					"Tp" + mPSA.mRSO.cutAwayFromTop + "Bp" + mPSA.mRSO.cutAwayFromBottom +	"Wv" + mPSA.mRSO.cutAwayFromWall + "Cv" + mPSA.mRSO.cutAwayFromCenter;
+					"Tp" + mPSA.mRSO.cutAwayFromTop + "Bp" + mPSA.mRSO.cutAwayFromBottom +	"Wv" + cutOrKeep + "Cv" + mPSA.mRSO.cutAwayFromCenter;
 			if (isCut & !mPSA.mRSO.cutZPercent & !mPSA.mRSO.cutXYPercent & mPSA.mRSO.heightOfRoi == 0) myPreOutFolder = 
-					"Tv" + mPSA.mRSO.cutAwayFromTop + "Bv" + mPSA.mRSO.cutAwayFromBottom +	"Wv" + mPSA.mRSO.cutAwayFromWall + "Cv" + mPSA.mRSO.cutAwayFromCenter;
+					"Tv" + mPSA.mRSO.cutAwayFromTop + "Bv" + mPSA.mRSO.cutAwayFromBottom +	"Wv" + cutOrKeep + "Cv" + mPSA.mRSO.cutAwayFromCenter;
 			if (!isCut) myPreOutFolder = "InnerCircleColumn";	
 						
 			if (mPSA.mRSO.includeSurfaceTopography) myPreOutFolder = "S_"+ myPreOutFolder;

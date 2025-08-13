@@ -233,6 +233,7 @@ public class MenuWaiter implements PlugIn {
 		
 		public int cutAwayFromWall;
 		public int cutAwayFromCenter;		
+		public int keepRadiusFromCenter;	
 		
 		public boolean includeSurfaceTopography;
 		public boolean useInnerCircleFiles;
@@ -1486,13 +1487,14 @@ public class MenuWaiter implements PlugIn {
 			choiceOfSubRoi[4] = "The top or bottom half of the soil column";
 			gdR.addRadioButtonGroup("Please choose a region of interest along the Z-axis", choiceOfSubRoi, 5, 1, "The entire soil column");
 
-			String[] choiceOfSubRoi2 = new String[5];
+			String[] choiceOfSubRoi2 = new String[6];
 			choiceOfSubRoi2[0] = "The entire soil column";
-			choiceOfSubRoi2[1] = "The central part of the soil column (define number of voxels to be cut away from the wall)";
-			choiceOfSubRoi2[2] = "The central part of the soil column (define percentage to be cut away from the wall)";
-			choiceOfSubRoi2[3] = "A hollow cylinder cut out from the soil column (define number of voxels to be cut away from the center and/or the wall)";
-			choiceOfSubRoi2[4] = "A hollow cylinder cut out from the soil column (define percentage to be cut away from the center and/or the wall)";
-			gdR.addRadioButtonGroup("Please choose a region of interest in the XY-plane", choiceOfSubRoi2, 5, 1, "The entire soil column");
+			choiceOfSubRoi2[1] = "The central part of the soil column (define radius around central axis in voxels)";
+			choiceOfSubRoi2[2] = "The central part of the soil column (define number of voxels to be cut away from the wall)";
+			choiceOfSubRoi2[3] = "The central part of the soil column (define percentage to be cut away from the wall)";
+			choiceOfSubRoi2[4] = "A hollow cylinder cut out from the soil column (define number of voxels to be cut away from the center and/or the wall)";
+			choiceOfSubRoi2[5] = "A hollow cylinder cut out from the soil column (define percentage to be cut away from the center and/or the wall)";
+			gdR.addRadioButtonGroup("Please choose a region of interest in the XY-plane", choiceOfSubRoi2, 6, 1, "The entire soil column");
 			
 			String[] referencePoint = new String[2];
 			referencePoint[0] = "The top and bottom soil surfaces as found by the SoilJ SoilSurfaceFinder";
@@ -1637,10 +1639,24 @@ public class MenuWaiter implements PlugIn {
 		    			mRSO.choiceOfXYRoi = "everything"; break;
 		    		}
 		    		case 1: {
+		    			mRSO.choiceOfXYRoi = "centralRadiusVoxels"; 
+		    			
+		    			GenericDialog gd3 = new GenericDialog("Please tell me more!");
+		    			gd3.addNumericField("Radius around the central axis", 0, 0, 5, "voxels");
+		    			
+		    			gd3.showDialog();
+		    		    if (gd3.wasCanceled()) return null;
+		    		    else {
+		    		    	mRSO.keepRadiusFromCenter = (int) Math.round(gd3.getNextNumber());		    		    
+		    		    }
+		    			
+		    			break;
+		    		}
+		    		case 2: {
 		    			mRSO.choiceOfXYRoi = "centralVoxels"; 
 		    			
 		    			GenericDialog gd3 = new GenericDialog("Please tell me more!");
-		    			gd3.addNumericField("Cut away from wall", 0, 0, 5, "voxel");
+		    			gd3.addNumericField("Cut away from wall", 0, 0, 5, "voxels");
 		    			
 		    			gd3.showDialog();
 		    		    if (gd3.wasCanceled()) return null;
@@ -1650,7 +1666,7 @@ public class MenuWaiter implements PlugIn {
 		    			
 		    			break;
 		    		}
-		    		case 2: {		    			
+		    		case 3: {		    			
 		    			
 		    			mRSO.choiceOfXYRoi= "centralPercent";	
 		    			mRSO.cutXYPercent = true;
@@ -1667,12 +1683,12 @@ public class MenuWaiter implements PlugIn {
 		    			
 		    			break;
 		    		}
-		    		case 3: {
+		    		case 4: {
 		    			mRSO.choiceOfXYRoi = "donutVoxels"; 
 		    			
 		    			GenericDialog gd3 = new GenericDialog("Please tell me more!");
-		    			gd3.addNumericField("Cut away from wall", 0, 0, 5, "voxel");
-		    			gd3.addNumericField("Cut away from center", 0, 0, 5, "voxel");	
+		    			gd3.addNumericField("Cut away from wall", 0, 0, 5, "voxels");
+		    			gd3.addNumericField("Cut away from center", 0, 0, 5, "voxels");	
 		    			
 		    			gd3.showDialog();
 		    		    if (gd3.wasCanceled()) return null;
@@ -1683,7 +1699,7 @@ public class MenuWaiter implements PlugIn {
 		    			
 		    			break;
 		    		}
-		    		case 4: {
+		    		case 5: {
 		    			mRSO.choiceOfXYRoi = "donutPercent"; 
 		    			
 		    			mRSO.cutXYPercent = true;
