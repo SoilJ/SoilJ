@@ -38,6 +38,7 @@ import SoilJ.tools.RoiHandler.ColumnRoi;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.ImageStack;
+import ij.gui.OvalRoi;
 import ij.gui.PolygonRoi;
 import ij.gui.Roi;
 import ij.measure.Calibration;
@@ -264,9 +265,1639 @@ public class MorphologyAnalyzer implements PlugIn {
 		
 	}
 	
+	
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////
+	
+	public void aTailoredPoreSpaceAnalyzer(int imageNumber, InputOutput.MyFileCollection mFC, RoiHandler.ColumnRoi colRoi, MenuWaiter.PoreSpaceAnalyzerOptions mPSA) {
+				
+		//try to free up some memory			
+		IJ.freeMemory();IJ.freeMemory();
+		
+		//check whether this is a windows OS
+		String pathSep = "/";
+		String checkname = mFC.myPreOutFolder;
+		String testString = checkname.substring(2, 3);
+		if (testString.equalsIgnoreCase("\\")) pathSep = "\\";
+		
+		InputOutput jIO = new InputOutput();
+		ROIMorphoProps myP = new ROIMorphoProps();
+		PoreClusterProps mPCP = new PoreClusterProps();		
+		ImageManipulator jIM = new ImageManipulator();
+		
+		//colRoi.nowTiff.updateAndDraw();
+		//colRoi.nowTiff.show();
+		
+		//remove holes from pore system;
+		if (mPSA.removeHoles) {
+			colRoi.nowTiff = jIM.removeHoles(colRoi.nowTiff);
+			colRoi.nowTiff.updateAndDraw();
+			//colRoi.nowTiff.show();
+		}
+		
+		//init some very basic variables..		
+		String nowImageName = mFC.colName;
+		
+		//create output folders and save statistics		
+		IJ.showStatus("Creating directories for the pore-cluster properties ...");
+		String myOutFolder = "Stats";
+		String myOutPath = mFC.myPreOutFolder + pathSep + myOutFolder;
+		new File(myOutPath).mkdir();
+		if (mPSA.performParticleAnalyses == true) new File(myOutPath + pathSep + "Clusters").mkdir();
+		if (mPSA.calcAnisotropy == true) new File(myOutPath + pathSep + "Anisotropy").mkdir();
+		if (mPSA.calcThickness == true) new File(myOutPath + pathSep + "Thickness").mkdir();		
+		if (mPSA.calcDistance == true) new File(myOutPath + pathSep + "Distance").mkdir();	
+		String outROIPath = mFC.myPreOutFolder + pathSep + "Stats" + pathSep + nowImageName + ".roi";				
+		String outAnisotPath = mFC.myPreOutFolder + pathSep + "Stats" + pathSep + "Anisotropy" + pathSep + nowImageName + ".aniso";
+
+		//load surface Tiff if desired
+		ImagePlus surfTiff = jIO.loadSurfaceTiff(mFC, mPSA.mRSO);
+		
+		/////////////////////////////////////////////////////////////////
+		//calculate fractal dimension
+		/////////////////////////////////////////////////////////////////
+		
+		IJ.showStatus("Calculating fractal properties ...");
+		
+		if (mPSA.calcFractal == true) {			
+			FractalProperties myFP = calculateFractalProperties(colRoi, mPSA.mRSO);
+			myP.surfaceFractalDimension = myFP.surfaceFractalDim;			
+		}
+		
+		IJ.freeMemory();IJ.freeMemory();
+		
+		//colRoi.nowTiff.show();
+				
+		/////////////////////////////////////////////////////////////////
+		//calculate anisotropy
+		/////////////////////////////////////////////////////////////////
+		
+		IJ.showStatus("Investigating anisotropies ...");		
+		if (mPSA.calcAnisotropy == true) {			
+			myP = calculateAnisotropy(myP, colRoi.nowTiff, mPSA.mRSO, mFC, outAnisotPath);
+		}
+		
+		//colRoi.nowTiff.show();
+				
+		IJ.freeMemory();IJ.freeMemory();
+		
+		/////////////////////////////////////////////////////////////////		
+		//calculate macroporosity
+		/////////////////////////////////////////////////////////////////
+		
+		IJ.showStatus("Calculating macroporosities ...");
+		
+		myP = caclulateMacroporosity(myP, mPSA.mRSO, mFC, colRoi, surfTiff);
+				
+		IJ.freeMemory();IJ.freeMemory();
+
+		/////////////////////////////////////////////////////////////////
+		// do particle analyses
+		/////////////////////////////////////////////////////////////////
+		
+		//check if the clusters need to be identified
+		mPCP.containsAParticleAnalysis = false;
+		if (mPSA.performParticleAnalyses == true) {	
+			myP = calculateParticleAnalyzerStuff(mFC, mPSA, colRoi, myP, surfTiff);
+		}
+		
+		/////////////////////////////////////////////////////////////////
+		// calculate Thickness
+		/////////////////////////////////////////////////////////////////
+		
+		//do thickness calculation 
+		if (mPSA.calcThickness | mPSA.plotThickness) {
+			myP = calculateThickness(mFC, myP, colRoi, mPSA);
+		}
+			
+		/////////////////////////////////////////////////////////////////
+		// calculate Distance
+		/////////////////////////////////////////////////////////////////
+		
+		if (!mPSA.calcDistance | mPSA.plotDistanceMap) {
+			myP = calculateDistanceDistribution(mFC, colRoi, myP, mPSA);
+		}
+					
+		////////////////////////////////////////////////////////
+		// calculate critical pore diameter
+		////////////////////////////////////////////////////////			
+		
+		if (mPSA.calcCriticalPoreDiameter == true) {
+			if (myP.percolatingVolumeFraction < 1) {
+				myP.criticalPhaseDiameter = -1;
+				myP.phasePercolates = 0;
+				myP = calculatePercolationThreshold(colRoi.nowTiff.duplicate(), surfTiff, mFC, myP);
+				myP.percolationThreshold = myP.percolationThreshold / myP.roiBulkVolume;
+			}			
+			else {				
+				myP = calculateCriticalPoreDiameter(mFC, colRoi, myP, surfTiff);
+			}		
+		}
+		
+		////////////////////////////////////////////////////////
+		// clean up and save
+		////////////////////////////////////////////////////////	
+		
+		System.gc();System.gc();
+		IJ.showStatus("Trying to clean up memory ... ");
+		IJ.freeMemory();IJ.freeMemory();
+		System.gc();System.gc();
+		
+		//write Results
+		IJ.showStatus("Writing results ... ");
+		jIO.writeROIMorphoResults(nowImageName, outROIPath, myP);
+		
+	}
+	
+	public ROIMorphoProps caclulateMacroporosity(ROIMorphoProps myP, MenuWaiter.ROISelectionOptions mRSO, InputOutput.MyFileCollection mFC, RoiHandler.ColumnRoi colRoi, ImagePlus surfTiff) {
+		
+		InputOutput jIO = new InputOutput();
+		
+		if (myP.phaseVolume == 0) myP.phaseVolume = macroPoreVolume(colRoi.nowTiff);		
+		
+		double[] bulkSoilVolume = {0, 0, 0, 0};
+		if (mRSO.choiceOfRoi.equalsIgnoreCase("RealSample") & mRSO.includeSurfaceTopography) {
+			String[] myGandS = jIO.getTheCorrectGaugeNSurfaceFiles(mFC);			
+			bulkSoilVolume = calculateTheBulkSoilVolume(myGandS[0], surfTiff, mRSO, mFC);
+			myP.roiBulkVolume = bulkSoilVolume[0];			
+		}
+		else { 
+			bulkSoilVolume[0] = Math.round(mRSO.areaOfInterest) * (double)colRoi.nowTiff.getNSlices();
+			myP.roiBulkVolume = bulkSoilVolume[0];
+			surfTiff = null;
+		}
+		
+		myP.phaseVolumeFraction = myP.phaseVolume / myP.roiBulkVolume;	
+		
+		return myP;
+	}
+	
+	public ROIMorphoProps calculateThickness(InputOutput.MyFileCollection mFC, ROIMorphoProps myP, RoiHandler.ColumnRoi colRoi, MenuWaiter.PoreSpaceAnalyzerOptions mPSA) {
+
+		InputOutput jIO = new InputOutput();
+		
+		String outThickPath = mFC.myPreOutFolder + mFC.pathSep + "Stats" + mFC.pathSep + "Thickness" + mFC.pathSep + mFC.colName + ".psd";
+
+		LocalThicknessWrapper myLTW = new LocalThicknessWrapper();
+		myLTW.calibratePixels = false;
+		myLTW.maskThicknessMap = true;
+		myLTW.threshold = 128;
+		myLTW.setSilence(true);
+		ImagePlus thickTiff = null;
+		
+		if (mPSA.mRSO.includeSurfaceTopography) myLTW.processImage(colRoi.surfaceNotCut);
+		else myLTW.processImage(colRoi.nowTiff);				
+		thickTiff = myLTW.getResultImage();
+		myP.averagePhaseDiameter = calculateAverageValue(thickTiff);
+		
+		//extract pore size distribution				
+		double[] classBounds = new double[200];
+		for (int i = 0 ; i < classBounds.length ; i++) classBounds[i] = 0.5 * i;
+		classBounds[classBounds.length - 1] = 100000;
+		
+		extractPoresizeDistro(outThickPath, thickTiff, classBounds);
+		
+		//delete image from heap in case it is not going to be saved..
+		if (mPSA.plotThickness == false) {
+			thickTiff.unlock();thickTiff.flush();
+		}
+
+		if (mPSA.plotThickness == true) {			
+			String myOutFolder = "Thickness";
+			String myOutPath = mFC.myPreOutFolder + mFC.pathSep + myOutFolder;
+			new File(myOutPath).mkdir();
+			String nowDir = myOutPath;		
+			String thicknessImageName = mFC.colName + "_Thickness.tif";
+			jIO.tiffSaver(nowDir, thicknessImageName, thickTiff);			
+		
+			thickTiff.unlock();thickTiff.flush();
+		}
+		
+		System.gc();System.gc();		
+		IJ.freeMemory();IJ.freeMemory();
+		System.gc();System.gc();
+		
+		return myP;
+		
+	}
+
+	public ROIMorphoProps calculateParticleAnalyzerStuff(InputOutput.MyFileCollection mFC, MenuWaiter.PoreSpaceAnalyzerOptions mPSA, RoiHandler.ColumnRoi colRoi, ROIMorphoProps myP, ImagePlus surfTiff) {
+		
+		PoreClusterProps mPCP = new PoreClusterProps();
+		InputOutput jIO = new InputOutput();		
+		
+		mPCP.containsAParticleAnalysis = true;
+		String outClustPath = mFC.myPreOutFolder + mFC.pathSep + "Stats" + mFC.pathSep + "Clusters" + mFC.pathSep + mFC.colName + ".clust";
+			
+		////////////////////////////////////////////////////////
+		// get clusters	
+		////////////////////////////////////////////////////////
+		
+		IJ.showStatus("Identifying connected pore-clusters ...");
+
+		FloodFillComponentsLabeling3D myFCCL = new FloodFillComponentsLabeling3D(26, 32);
+		ImageStack myLabelStack = myFCCL.computeLabels(colRoi.nowTiff.getStack());
+										
+		IJ.freeMemory();IJ.freeMemory();
+		
+		//calculate surface and Euler number.. using MorphoLibJ
+		ImagePlus labelTiff = new ImagePlus();
+		labelTiff.setStack(myLabelStack);				
+		
+		int[] labels = LabelImages.findAllLabels(myLabelStack);
+		int numOfObjects = labels.length;
+		Calibration calib = labelTiff.getCalibration();
+		
+		//labelTiff.updateAndDraw();
+		//labelTiff.show();
+		
+		//surface and curvature
+		IntrinsicVolumesAnalyzer3D mIRA = new IntrinsicVolumesAnalyzer3D();
+		mIRA.setConnectivity(26);
+		Result[] myMorphos = mIRA.analyzeRegions(myLabelStack, labels, calib);
+		
+		double[] morphoVols = new double[myMorphos.length];
+		double[] morphoSurf = new double[myMorphos.length];
+		double[] morphoCurv = new double[myMorphos.length];
+		double[] morphoEuler = new double[myMorphos.length];
+		for (int i = 0 ; i < myMorphos.length ; i++) {
+			morphoVols[i] = myMorphos[i].volume;
+			morphoSurf[i] = myMorphos[i].surfaceArea;
+			morphoCurv[i] = 2 * Math.PI * myMorphos[i].meanBreadth;
+			morphoEuler[i] = myMorphos[i].eulerNumber;
+		}
+					
+		//myP.phaseVolume = StatUtils.sum(morphoVols);
+		myP.surfaceArea = StatUtils.sum(morphoSurf);
+		myP.meanCurvature = StatUtils.sum(morphoCurv);			
+		myP.eulerNumber = StatUtils.sum(morphoEuler);	
+		
+		//calculate percolating clusters ... needs the other parameters.. and is needed for following parameters	
+		ArrayList<Integer> conTop = new ArrayList<Integer>();
+		ArrayList<Integer> conBot = new ArrayList<Integer>();
+		ArrayList<Integer> isPercolating = new ArrayList<Integer>();
+		if (numOfObjects > 0) {
+			conTop = check4TouchingTheTop(labelTiff, colRoi.nowTiff, surfTiff);
+			conBot = check4TouchingTheBottom(labelTiff, colRoi.nowTiff, surfTiff);
+			isPercolating = checkForPercolatingClusters(numOfObjects, conTop, conBot);				
+		}
+		
+		//free memory	
+		IJ.freeMemory();IJ.freeMemory();
+		
+		//catch in case that numOfObjects < 1
+		boolean hasItObjects = true;
+		if (numOfObjects < 1) {
+			hasItObjects = false;
+			numOfObjects = 1;
+		}
+			
+		// init variables for export of results			
+		int[] id = new int[numOfObjects];	
+		
+		double[] volume = new double[numOfObjects];						//Vol: particle volume
+		double[] surfaceArea = new double[numOfObjects];				//SA: surface area (0 if too small for mesh to be produced; see warning log)
+		
+		double[] xCenter = new double[numOfObjects];					//x Cent: x-coordinate of particle centroid
+		double[] yCenter = new double[numOfObjects];					//y Cent: y-coordinate of particle centroid
+		double[] zCenter = new double[numOfObjects];					//z Cent: z-coordinate of particle centroid
+		int[] xMin = new int[numOfObjects];								//x Min: min x-coordinate of particle 
+		int[] yMin = new int[numOfObjects];								//y Min: min y-coordinate of particle 
+		int[] zMin = new int[numOfObjects];								//z Min: min z-coordinate of particle 
+		int[] xMax = new int[numOfObjects];								//x Max: max x-coordinate of particle 
+		int[] yMax = new int[numOfObjects];								//y Max: max y-coordinate of particle 
+		int[] zMax = new int[numOfObjects];								//z Max: max z-coordinate of particle 
+		
+		boolean[] tTop = new boolean[numOfObjects];						//cluster is touching top..		
+		boolean[] tBot = new boolean[numOfObjects];						//cluster is touching bot..		
+		boolean[] percolating = new boolean[numOfObjects];				//cluster is percolating or not..			
+	
+		double[] euler = new double[numOfObjects];						//Euler (xi): Euler characteristic of the particle
+		double[] meanCurvature = new double[numOfObjects];						//Holes (beta1): number of topological holes (handles) in the particle
+					
+		//sort results 
+		int[] sortedIndices = AndAllTheRest.getIndicesInOrder(morphoVols);
+		
+		//write results into a biiiiig table		
+		if (hasItObjects) {
+			for (int i = 0; i < morphoVols.length; i++) {			
+				if (morphoVols[sortedIndices[i]] > 0) {			
+					
+					IJ.showStatus("Sorting out properties of the individual pore-clusters ...");
+					
+					id[i] = sortedIndices[i] + 1;				
+					volume[i] = morphoVols[sortedIndices[i]];
+	
+					surfaceArea[i] = morphoSurf[sortedIndices[i]];		
+					meanCurvature[i] = morphoCurv[sortedIndices[i]];
+					euler[i] = morphoEuler[sortedIndices[i]];
+
+				}
+			}
+		}
+
+		//also find percolating clusters
+		for (int i = 0 ; i < id.length ; i++) {
+			if (conTop.contains(id[i])) tTop[i] = true;
+			else  tTop[i] = false;
+			
+			if (conBot.contains(id[i])) tBot[i] = true;
+			else  tBot[i] = false;
+			
+			if (isPercolating.contains(id[i])) percolating[i] = true;
+			else  percolating[i] = false;
+		}
+		
+		//assign results to output structure		
+		mPCP.hasItObjects = hasItObjects;
+		mPCP.id = id;
+		
+		mPCP.volume = volume;
+		mPCP.surfaceArea = surfaceArea;
+		mPCP.meanCurvature = meanCurvature;		
+		mPCP.euler = euler;
+		
+		mPCP.xCenter = xCenter;
+		mPCP.yCenter = yCenter;		
+		mPCP.zCenter = zCenter;
+		mPCP.minX = xMin;
+		mPCP.minY = yMin;
+		mPCP.minZ = zMin;
+		mPCP.maxX = xMax;
+		mPCP.maxY = yMax;
+		mPCP.maxZ = zMax;
+
+		mPCP.touchesTop = tTop;
+		mPCP.touchesBot = tBot;
+		mPCP.isPercolating = percolating;	
+						
+		/*//calculate connected correlation length and chi
+		if (mPSA.calcChi == true) {						
+			myP = calculateChiOfPercolation(labelTiff, mFC, myP);
+		}
+		else {
+			double[] dummy = new double[myP.id.length];
+			for (int i = 0 ; i < myP.id.length ; i++) dummy[i] = -1;				
+			myP.connectedCorrelationLength = dummy;
+			myP.chiOfPercolation = dummy;				
+		}*/			
+		
+		//calculate global connection probability (gamma)
+		double sumOfSquaredClusterSizes = 0;
+		double rF = 1000000;
+		for (int i = 0 ; i < mPCP.id.length ; i++) {
+			double squaredClusterSize = mPCP.volume[i] / rF * mPCP.volume[i] / rF;
+			sumOfSquaredClusterSizes += squaredClusterSize;
+		}
+		myP.gamma = sumOfSquaredClusterSizes / (myP.phaseVolume / rF * myP.phaseVolume / rF);			
+					
+		//save desired images
+		if (mPSA.plotLabels == true) {
+			String myOutFolder = "ClusterLabels";
+			String myOutPath = mFC.myPreOutFolder + mFC.pathSep + myOutFolder;
+			new File(myOutPath).mkdir();				
+			String clusterLabelImageName = mFC.colName + "_ClusterLables.tif";
+			jIO.tiffSaver(myOutPath, clusterLabelImageName, labelTiff);
+			
+			if (!mPSA.plotPercolation & !mPSA.plotPoresConnected2Top) {
+				labelTiff.unlock();
+				labelTiff.flush();
+			}
+		}
+		
+		//top-connected porosity calculation..
+		double topConVolume = 0; 
+		ArrayList<Integer> touchesTopList = new ArrayList<Integer>();
+		for (int i = 0 ; i < percolating.length ; i++) if (mPCP.touchesTop[i]) {				
+			touchesTopList.add(id[i]);	
+			topConVolume += volume[i];
+		}
+		myP.volumeConnected2Top = topConVolume;
+		
+		//save image if wanted
+		if (mPSA.plotPoresConnected2Top) {
+			
+			ImagePlus touchesTopImp = extractSpecificPoreLabels(labelTiff, touchesTopList);
+							
+			String myOutFolder = "VolumeConnected2Top";
+			String  myOutPath = mFC.myPreOutFolder + mFC.pathSep + myOutFolder;
+			new File(myOutPath).mkdir();
+			String nowDir = mFC.myPreOutFolder + mFC.pathSep + myOutFolder;		
+			String volumeImageName = mFC.colName + "_VolCon2Top.tif";	
+			jIO.tiffSaver(nowDir, volumeImageName, touchesTopImp);
+			
+			touchesTopImp.unlock();touchesTopImp.flush();				
+		}			
+	
+		//percolating porosity calculation..
+		double percVolume = 0; 
+		ArrayList<Integer> percolatingClusters = new ArrayList<Integer>();
+		for (int i = 0 ; i < percolating.length ; i++) if (percolating[i]) {
+			percolatingClusters.add(id[i]);
+			percVolume += volume[i];
+		}
+		
+		myP.percolatingVolumeFraction = percVolume;
+		if (mPSA.plotPercolation & percVolume > 0) {
+			
+			ImagePlus percPorosityImp = extractSpecificPoreLabels(labelTiff, percolatingClusters);
+			String myOutFolder = "PercolatingVolume";
+			String myOutPath = mFC.myPreOutFolder + mFC.pathSep + myOutFolder;
+			new File(myOutPath).mkdir();
+			String nowDir = mFC.myPreOutFolder + mFC.pathSep + myOutFolder;		
+			String volumeImageName = mFC.colName + "_PercVol.tif";	
+			jIO.tiffSaver(nowDir, volumeImageName, percPorosityImp);
+			
+			percPorosityImp.unlock();percPorosityImp.flush();				
+		}
+		
+		labelTiff.unlock();labelTiff.flush();
+		
+		System.gc();System.gc();		
+		IJ.freeMemory();IJ.freeMemory();
+		System.gc();System.gc();
+		IJ.wait(2000);
+		IJ.freeMemory();
+		
+		/////////////////////////////////////////////////////////////////////////////
+		//save and return results
+		//////////////////////////////////////////////////////////////////////////////////
+		
+		if (mPSA.performParticleAnalyses == true) jIO.writeClusterMorphoResults(mFC.colName, outClustPath, mPCP);
+					
+		return myP;
+	}
+	
+	public ROIMorphoProps calculateCriticalPoreDiameter(InputOutput.MyFileCollection mFC, RoiHandler.ColumnRoi colRoi, ROIMorphoProps myP, ImagePlus surfTiff) {
+		
+		ImagePlus distTiff = colRoi.nowTiff.duplicate();
+		
+		//create a distance map			
+		IJ.showStatus("Performing Euklidean distance transform ...");
+		
+		float[] floatWeights = ChamferWeights3D.BORGEFORS.getFloatWeights();
+		boolean normalize = true;
+		DistanceTransform3D dt = new DistanceTransform3DFloat(floatWeights, normalize);
+		ImageStack result = dt.distanceMap(colRoi.nowTiff.getStack());
+		
+		distTiff = new ImagePlus("dist",result);
+		
+		myP.phasePercolates = 1;
+
+		double[] results = doActuallyCalculateCriticalPoreDiameter(distTiff, surfTiff, mFC);
+		myP.criticalPhaseDiameter = results[0]; 
+		myP.percolationThreshold = results[1] / myP.roiBulkVolume;	
+		
+		return myP;
+
+	}
+	
+	public ROIMorphoProps calculateDistanceDistribution(InputOutput.MyFileCollection mFC, RoiHandler.ColumnRoi colRoi, ROIMorphoProps myP, MenuWaiter.PoreSpaceAnalyzerOptions mPSA) {
+		
+		InputOutput jIO = new InputOutput();
+		String outDistPath = mFC.myPreOutFolder + mFC.pathSep + "Stats" + mFC.pathSep + "Distance" + mFC.pathSep + mFC.colName + ".dcd";
+		
+		//create a distance map
+		IJ.showStatus("Performing Euklidean distance transform ...");
+		
+		float[] floatWeights = ChamferWeights3D.BORGEFORS.getFloatWeights();
+		boolean normalize = true;
+		DistanceTransform3D dt = new DistanceTransform3DFloat(floatWeights, normalize);
+		ImageStack result = dt.distanceMap(colRoi.nowTiff.getStack());
+		
+		ImagePlus distTiff = new ImagePlus("dist",result);
+		
+		//cut away voxels outside ROI
+		if (mPSA.mRSO.choiceOfRoi.equals("RealSample") | mPSA.mRSO.choiceOfXYRoi.equals("Cylinder")) {
+			
+			ImageStack cutStack = new ImageStack(distTiff.getWidth(), distTiff.getHeight());
+			
+			for (int i = 0 ; i < distTiff.getNSlices() ; i++) {
+				
+				distTiff.setPosition(i+1);
+				ImageProcessor nowIP = distTiff.getProcessor();		
+				
+				//select ROI.. cut ROI is not yet implemented to be updated for PoreSpaceAnalyzer
+				/*
+				 * if (mPSA.mRSO.choiceOfRoi.equals("RealSample")) {
+				 * 
+				 * //remove voxels outside ROI nowIP.setRoi(colRoi.pRoi[i]); nowIP.setColor(0);
+				 * nowIP.fillOutside(colRoi.pRoi[i]);
+				 * 
+				 * ImagePlus dodo = new ImagePlus("", nowIP); dodo.updateAndDraw();dodo.show();
+				 * 
+				 * //also remove voxels inside inner Roi, is selected if
+				 * (mPSA.mRSO.cutAwayFromCenter > 0) { nowIP.setRoi(colRoi.iRoi[i]);
+				 * nowIP.setColor(0); nowIP.fill(colRoi.iRoi[i]); } } else {
+				 */
+					
+				OvalRoi cutRoi = new OvalRoi(0,0, distTiff.getWidth(), distTiff.getHeight());
+				
+				//remove voxels outside ROI
+				nowIP.setRoi(cutRoi);
+				nowIP.setColor(0);
+				nowIP.fillOutside(cutRoi);				
+				
+				
+				cutStack.addSlice(nowIP);
+			}
+			
+			distTiff.setStack(cutStack);
+		}
+		
+		//distTiff.updateAndDraw();
+		//distTiff.show();
+		
+		//extract distance classes 
+		double width = colRoi.nowTiff.getWidth();
+		double breadth = colRoi.nowTiff.getHeight();
+		double diagonal =  Math.sqrt(width * width + breadth * breadth);
+		double height = colRoi.nowTiff.getNSlices();
+		double maxDistance = Math.sqrt(height * height + diagonal * diagonal);
+		double[] classBounds = new double[(int)Math.round(maxDistance)];
+		for (int i = 0 ; i < classBounds.length ; i++) classBounds[i] = i;
+		extractDistanceDistro(outDistPath, distTiff, classBounds);
+		
+		//save average distance
+		myP.averageDistance2PhaseBoundary = calculateAverageValue(distTiff);
+		
+		if (mPSA.plotDistanceMap) {
+			String myOutFolder = "DistanceMap";
+			String myOutPath = mFC.myPreOutFolder + mFC.pathSep + myOutFolder;
+			new File(myOutPath).mkdir();
+			String nowDir = mFC.myPreOutFolder + mFC.pathSep + "DistanceMap";		
+			String distImageName = mFC.colName + "_DistanceMap.tif";
+			jIO.tiffSaver(nowDir, distImageName, distTiff);
+		}
+		
+		return myP;
+	}
+	
+	public double calcVolume(ImagePlus nowTiff) {
+		
+		double myVolume = 0;
+		
+		for (int z = 1 ; z <= nowTiff.getNSlices() ; z++) {	
+			
+			nowTiff.setPosition(z);
+			ImageProcessor nowIP = nowTiff.getProcessor();			
+			
+			//loop through all pixel within cross-section
+			for (int x = 0 ; x < nowTiff.getWidth() ; x++) {
+				for (int y = 0 ; y < nowTiff.getHeight() ; y++) {							
+					int nowPixel = nowIP.getPixel(x, y);
+					if (nowPixel > 1) myVolume++;
+				}
+			}				
+		}		
+		
+		return myVolume;
+		
+	}
+	
+	public ImagePlus extractKT87volume(ImagePlus distTiff, double threshold, ImagePlus surfTiff, InputOutput.MyFileCollection mFC) {
+		
+		Dilate_ mD = new Dilate_();
+		
+		//set all values smaller than the threshold to 0
+		ImageStack largerPores = new ImageStack(distTiff.getWidth(), distTiff.getHeight());
+		ImagePlus laPores = new ImagePlus();
+		for (int z = 1 ; z <= distTiff.getNSlices() ; z++) {	
+			
+			distTiff.setPosition(z);
+			ImageProcessor nowIP = distTiff.getProcessor();
+			ImageProcessor laIP = new ByteProcessor(distTiff.getWidth(), distTiff.getHeight());
+			
+			//loop through all pixel within cross-section
+			for (int x = 0 ; x < distTiff.getWidth() ; x++) {
+				for (int y = 0 ; y < distTiff.getHeight() ; y++) {							
+					double nowPixel = nowIP.getPixelValue(x, y);
+					if (nowPixel >= threshold) laIP.putPixel(x, y, 255);
+					else laIP.putPixel(x, y, 0);							
+				}
+			}					
+			largerPores.addSlice(laIP);
+		}		
+		laPores.setStack(largerPores);
+		
+		//laPores.updateAndDraw();
+		//laPores.show();
+						
+		IJ.freeMemory();IJ.freeMemory();
+		
+		//find pore clusters in laPores and check if they form a percolating path		
+		FloodFillComponentsLabeling3D myFCCL = new FloodFillComponentsLabeling3D(26, 32);
+		ImageStack myLabelStack = myFCCL.computeLabels(laPores.getStack());						
+		ImagePlus laParLaTiff = new ImagePlus();
+		laParLaTiff.setStack(myLabelStack);
+		
+		int[] labels = LabelImages.findAllLabels(myLabelStack);
+		int numOfObjects = labels.length;
+		
+		ArrayList<Integer> laConTop = check4TouchingTheTop(laParLaTiff, laPores, surfTiff);	
+		ArrayList<Integer> laConBot = check4TouchingTheBottom(laParLaTiff, laPores, surfTiff);
+		ArrayList<Integer> percolatingClusters = checkForPercolatingClusters(numOfObjects, laConTop, laConBot);
+
+		//remove all isolated clusters
+		ImageStack outStack = new ImageStack(laParLaTiff.getWidth(), laParLaTiff.getHeight());
+		ImagePlus outTiff = new ImagePlus();
+		for(int z = 0 ; z < laParLaTiff.getNSlices() ; z++) {
+			
+			laParLaTiff.setSlice(z + 1);
+			ImageProcessor nowIP = laParLaTiff.getProcessor();
+			ImageProcessor outIP = new ByteProcessor(nowIP.getWidth(), nowIP.getHeight());
+			
+			for (int x = 0 ; x < nowIP.getWidth() ; x++) {
+				for (int y = 0 ; y < nowIP.getHeight() ; y++) {
+					
+					int nowPix = (int)Math.round(nowIP.getPixelValue(x, y));
+					if (percolatingClusters.contains(nowPix)) outIP.putPixel(x, y, 255);
+					else outIP.putPixel(x, y, 0);
+					
+				}
+			}
+			
+			outStack.addSlice(outIP);
+			
+		}
+		
+		outTiff.setStack(outStack);
+		
+		//dilate until resolution is reached again
+		
+		for (int i = 0 ; i < (int)Math.round(threshold) ; i++) outTiff = mD.dilate(outTiff, 255, false);
+		 
+		return outTiff;
+				
+	}
+	
+	public double calculateAverageValue(ImagePlus thickTiff) {
+		
+		ArrayList<Float> listOfThicknesses = new ArrayList<Float>();
+		
+		for (int z = 0 ; z < thickTiff.getNSlices() ; z++) {
+			
+			thickTiff.setSlice(z + 1);
+			ImageProcessor nowIP = thickTiff.getProcessor();
+			
+			for (int x = 0 ; x < thickTiff.getWidth() ; x++) {
+				for (int y = 0 ; y < thickTiff.getHeight() ; y++) {
+					
+					float nowPix = nowIP.getPixelValue(x, y);
+					if (nowPix > 0) listOfThicknesses.add(nowPix);
+					
+				}
+			}
+		}
+		
+		double[] thickArray = new double[listOfThicknesses.size()]; 
+		for (int i = 0 ; i < thickArray.length ; i++) thickArray[i] = listOfThicknesses.get(i);
+		
+		double avgThick = StatUtils.mean(thickArray);
+		
+		return avgThick;
+	}
+	
+	public DistanceProps calculatePhaseDistanceProperties(ImagePlus thickTiff, RoiHandler.ColumnRoi pRoi) {
+		
+		DistanceProps mDP = new DistanceProps();
+		HistogramStuff hist = new HistogramStuff();
+			
+		//calcluate 3 mm cutoff
+		double my3mm = 3f / (pRoi.voxelSizeInMicron / 1000);
+		
+		//extract histogram
+		int[] myHist = hist.extractHistograms16(thickTiff);
+		myHist[0] = 0;
+		
+		//caclulate aerated voxels
+		float ovox = 0;
+		float avox = 0;
+		for (int i = 0 ; i < my3mm ; i++) ovox += myHist[i];
+		for (int i = (int)Math.ceil(my3mm) ; i < myHist.length ; i++) avox += myHist[i];
+		
+		//assign results
+		mDP.averageDistance2PhaseBoundaryInMM = hist.findMeanFromHistogram(myHist);
+		mDP.medianDistance2PhaseBoundaryInMM = hist.findMedianFromHistogram(myHist);
+		mDP.fractionLessThan3MMFromPhaseBoundary = ovox / (pRoi.area * thickTiff.getNSlices());
+		mDP.fractionMoreThan3MMFromPhaseBoundary = avox / (pRoi.area * thickTiff.getNSlices());;
+		
+		return mDP;
+	}
+	
+	public ImagePlus findClusterConnected2Top(ImagePlus nowTiff, double drainingDepthInVx) {
+		
+		BoundingBox3D mBB = new BoundingBox3D();
+		
+		//nowTiff.updateAndDraw();nowTiff.show();
+		
+		//find connected pore clusters
+		IJ.showStatus("Find air phases connected to top..");
+		FloodFillComponentsLabeling3D myFCCL = new FloodFillComponentsLabeling3D(26, 32);
+		ImageStack myLabelStack = myFCCL.computeLabels(nowTiff.getStack());
+		
+		//calculate surface and Euler number.. using MorphoLibJ
+		ImagePlus labelTiff = new ImagePlus();
+		labelTiff.setStack(myLabelStack);				
+		
+		//get Topmost coordinate of each cluster
+		int[] labels = LabelImages.findAllLabels(myLabelStack);
+		int numOfObjects = labels.length;
+		Calibration calib = labelTiff.getCalibration();		
+		Box3D[] myBox = mBB.analyzeRegions(myLabelStack, labels, calib);
+		
+		//labelTiff.updateAndDraw();labelTiff.show();
+			
+		// check if the cluster is draining
+		ArrayList<Integer> isDraining = new ArrayList<Integer>();
+		if (numOfObjects > 0 ) {	
+			for (int i = 0 ; i < myBox.length ; i++) {
+				if (myBox[i].getZMin() <= drainingDepthInVx) isDraining.add(i + 1);
+			}
+		}		
+		
+		//extract Image
+		ImagePlus drainingClusters = extractSpecificPoreLabels(labelTiff, isDraining);
+		
+		//touchesTopImp.updateAndDraw();touchesTopImp.show();
+							
+		return drainingClusters;
+				
+	}
+	
+	public ImagePlus findClusterConnected2Bottom(ImagePlus nowTiff, double wettingHeightInVX) {
+		
+		BoundingBox3D mBB = new BoundingBox3D();
+		
+		//find connected pore clusters
+		FloodFillComponentsLabeling3D myFCCL = new FloodFillComponentsLabeling3D(26, 32);
+		ImageStack myLabelStack = myFCCL.computeLabels(nowTiff.getStack());
+		
+		//calculate surface and Euler number.. using MorphoLibJ
+		ImagePlus labelTiff = new ImagePlus();
+		labelTiff.setStack(myLabelStack);
+		int[] labels = LabelImages.findAllLabels(myLabelStack);
+		int numOfObjects = labels.length;
+		Calibration calib = labelTiff.getCalibration();			
+		Box3D[] myBox = mBB.analyzeRegions(myLabelStack, labels, calib);
+		
+		//calculate percolating clusters ... needs the other parameters.. and is needed for following parameters	
+		ArrayList<Integer> isWetting = new ArrayList<Integer>();
+		if (numOfObjects > 0) {	
+			for (int i = 0 ; i < myBox.length ; i++) {
+				if (myBox[i].getZMin() >= wettingHeightInVX) isWetting.add(i);
+			}
+		}		
+		
+		//extract Image
+		ImagePlus touchesTopImp = extractSpecificPoreLabels(labelTiff, isWetting);
+							
+		return touchesTopImp;
+				
+	}
+
+	public double tMaxLaplace(ImageStack nowStack, ImageStack lapStack, int myMode) {
+		
+		HistogramStuff hist = new HistogramStuff();
+		ImageManipulator jIM = new ImageManipulator();
+		
+		ImagePlus lapTiff = new ImagePlus();
+		lapTiff.setStack(lapStack);
+		
+		ImagePlus origTiff = new ImagePlus();
+		origTiff.setStack(nowStack);
+	
+		//get histogram of the gradient image
+		int[] myHistGradient = hist.sampleHistogram(lapTiff);				
+		myHistGradient[0] = 0;
+		int myCutoffGradient = hist.findTheKnee(myHistGradient);
+		
+		//segment gradient image..
+		ImagePlus myGradientMask = lapTiff.duplicate();
+		myGradientMask = jIM.binarizeGradientMask(myGradientMask, myCutoffGradient);
+		//myGradientMask.show();
+		
+		//sample upper threshold for this segment
+		double weightSum = 0;
+		double weightAndSampleSum = 0;
+		for (int i = 0 ; i < lapStack.getSize() ; i++) {
+			
+			IJ.showStatus("Calculating threshold from Laplace mask slice " + (i+1) + "/" + lapTiff.getNSlices());
+			
+			//set all image to the correct position
+			origTiff.setPosition(i+1); //remember that this image has one slice more on top and bottom, respectively..
+			lapTiff.setPosition(i+1);
+			myGradientMask.setPosition(i+1);
+			
+			//get each images IPs
+			ImageProcessor origIP = origTiff.getProcessor();
+			ImageProcessor gradIP = lapTiff.getProcessor();
+			ImageProcessor maskIP = myGradientMask.getProcessor();
+	
+			//because imageCalculator does not work... do it by hand.. again..
+			for (int x = 0 ; x < origIP.getWidth(); x++) {
+				for (int y = 0 ; y < origIP.getHeight(); y++) {
+					if (maskIP.get(x, y) > 0 && origIP.get(x, y) > 0 && origIP.get(x, y) < myMode) {
+						double nowWeight = gradIP.getPixelValue(x, y);
+						double nowSample = origIP.getPixelValue(x, y);
+						weightSum = weightSum + nowWeight;
+						weightAndSampleSum = weightAndSampleSum + nowWeight * nowSample;
+					}							
+				}
+			}
+		}		
+		
+		double tMax = weightAndSampleSum / weightSum;
+		
+		return tMax;
+	}
+
+	public double tMaxSobel(ImageStack nowStack, ImageStack sobStack, int myMode) {
+	
+		//init units
+		HistogramStuff hist = new HistogramStuff();
+		ImageManipulator jIM = new ImageManipulator();
+		
+		//init variables
+		ImagePlus gradTiff = new ImagePlus();
+		gradTiff.setStack(sobStack);
+		
+		ImagePlus torigTiff = new ImagePlus();
+		torigTiff.setStack(nowStack);
+		
+		//get histogram of the gradient image
+		int[] myHistGradient = hist.sampleHistogram(gradTiff);				
+		myHistGradient[0] = 0;
+		int myCutoffGradient = hist.findTheKnee(myHistGradient);
+		
+		//segment gradient image..
+		ImagePlus myGradientMask = gradTiff.duplicate();
+		myGradientMask = jIM.binarizeGradientMask(myGradientMask, myCutoffGradient);
+		//myGradientMask.show();
+		
+		//sample upper threshold for this segment
+		double weightSum = 0;
+		double weightAndSampleSum = 0;
+		for (int i = 0 ; i < sobStack.getSize() ; i++) {
+			
+			IJ.showStatus("Calculating threshold from Sobel mask slice " + (i+1) + "/" + gradTiff.getNSlices());
+			
+			//set all image to the correct position
+			torigTiff.setPosition(i+1); //remember that this image has one slice more on top and bottom, respectively..
+			gradTiff.setPosition(i+1);
+			myGradientMask.setPosition(i+1);
+			
+			//get each images IPs
+			ImageProcessor origIP = torigTiff.getProcessor();
+			ImageProcessor gradIP = gradTiff.getProcessor();
+			ImageProcessor maskIP = myGradientMask.getProcessor();		
+	
+			//because imageCalculator does not work... do it by hand.. again..
+			for (int x = 0 ; x < origIP.getWidth(); x++) {
+				for (int y = 0 ; y < origIP.getHeight(); y++) {
+					if (maskIP.get(x, y) > 0 && origIP.get(x, y) > 0 && origIP.get(x, y) < myMode) {
+						double nowWeight = gradIP.getPixelValue(x, y);
+						double nowSample = origIP.getPixelValue(x, y);
+						weightSum = weightSum + nowWeight;
+						weightAndSampleSum = weightAndSampleSum + nowWeight * nowSample;
+					}							
+				}
+			}
+		}		
+		
+		double tMax = weightAndSampleSum / weightSum;
+		
+		return tMax;
+	}
+
+	public double macroPoreVolume(ImagePlus nowTiff) {
+		
+		double macroPoreVolume = 0;
+		
+		int nslices = nowTiff.getNSlices();
+		
+		for (int i = 0 ; i < nslices ; i++) {
+			
+			nowTiff.setPosition(i+1);
+			ImageProcessor myIP = nowTiff.getProcessor();
+			int[] nowHist = myIP.getHistogram();
+			
+			macroPoreVolume += nowHist[255];
+						
+		}
+		
+		return macroPoreVolume;
+	}
+
+	public ImagePlus findTheLargestCluster(ImagePlus nowTiff, int indexOfLargestCluster) {
+		
+		int i;
+		ImageStack lStack = new ImageStack(nowTiff.getWidth(), nowTiff.getHeight());
+		ImagePlus lTiff = new ImagePlus();
+		
+		//nowTiff.draw();
+		//nowTiff.show();
+		
+		for (i = 0 ; i < nowTiff.getNSlices() ; i++) {
+			
+			nowTiff.setPosition(i + 1);
+			ImageProcessor nowIP = nowTiff.getProcessor();
+			
+			IJ.showStatus("Isolating largest cluster in slice #" + (i + 1) + "/" + (nowTiff.getNSlices()+1));				
+			
+			ImageProcessor modIP = new ByteProcessor(nowTiff.getWidth(), nowTiff.getHeight());
+			
+			for (int x = 0 ; x < nowIP.getWidth() ; x++) {
+				for (int y = 0 ; y < nowIP.getHeight() ; y++) {
+					int nowPix = Math.round(nowIP.getPixelValue(x, y));					
+					if (nowPix == indexOfLargestCluster) modIP.putPixelValue(x, y, 255);
+					else modIP.putPixelValue(x, y, 0);					
+				}			
+			}								
+			lStack.addSlice(modIP);
+		}
+		lTiff.setStack(lStack);
+		
+		return lTiff;
+	}
+	
+	public class AnisotropyResults {
+		
+		public double[] x;
+		public double[] y;
+		public double[] z;
+		
+		public double[] xy;		
+		public double[] yx;
+		
+		public double[] dxz;
+		public double[] dyz;
+		public double[] dxyz;
+		public double[] dyxz;
+		
+		public double[] uxz;
+		public double[] uyz;
+		public double[] uxyz;
+		public double[] uyxz;
+		
+		public double anisotropy;
+		public String mainAlignment;			
+		
+	}
+	
+	public class PlusVertex extends Vertex {
+		
+		public ArrayList<PlusEdge> plusBranches = null;
+		
+		public PlusVertex() {
+			
+			super();
+			
+			this.plusBranches = new ArrayList<PlusEdge>();			
+			
+		}
+		
+		public ArrayList<PlusEdge> getPlusBranches() {
+			return this.plusBranches;
+		}
+		
+		public void setPlusBranches(ArrayList<PlusEdge> nowBranches) {
+			this.plusBranches = nowBranches;
+		}
+		
+	}
+	
+	public class PlusEdge extends Edge {
+		
+		private RollerCaster rC = new RollerCaster();
+		public double v1Dist;
+		public double v2Dist;
+		public ArrayList<Double> distance = null;
+		
+		public double constrictionFactor; 
+		public double bottleNeck;
+		public double lengthReduction;
+		
+		public PlusVertex plusV1 = null;
+		public PlusVertex plusV2 = null;
+		
+		public PlusEdge(Vertex v1, Vertex v2, ArrayList<Point> slabs, double length) {
+			
+			super(v1, v2, slabs, length);
+			
+			this.distance = new ArrayList<Double>();
+			this.constrictionFactor = 0; 
+			this.v1Dist = 0;
+			this.v2Dist = 0;
+			this.bottleNeck = 0;
+			this.lengthReduction = 0;
+			
+		}
+		
+	}
+	
+	public class PlusGraph extends Graph {
+		
+		public ArrayList<PlusEdge> plusEdge = null;	
+		public ArrayList<PlusVertex> plusVertex = null;
+		public ArrayList<Vertex> topVerts = null;
+		public ArrayList<Vertex> botVerts = null;
+		
+		public PlusGraph() {
+			
+			super();
+			
+			this.plusEdge = new ArrayList <PlusEdge>();
+			this.plusVertex = new ArrayList <PlusVertex>();
+			
+			this.topVerts = new ArrayList<Vertex>();
+			this.botVerts = new ArrayList<Vertex>();			
+			
+		}
+		
+		public ArrayList<PlusVertex> getPlusVertices() {
+			return this.plusVertex;			
+		}
+		
+	}
+	
+	public class ROIMorphoProps {
+		
+		public double roiBulkVolume;		
+		public double phaseVolume;
+		public double phaseVolumeFraction;
+		public double surfaceArea;		
+		public double meanCurvature;
+		public double eulerNumber;
+		
+		public double gamma;
+		
+		public double averagePhaseDiameter;
+		public double averageDistance2PhaseBoundary;
+		public double fractionLessThan3MMFromPhaseBoundary;
+		public double fractionMoreThan3MMFromPhaseBoundary;
+		
+		public double surfaceFractalDimension;					
+		
+		public double anisotropy;		
+		public String mainAlignment;
+			
+		public int phasePercolates;	
+		public double criticalPhaseDiameter;		
+		public double percolatingVolumeFraction;
+		public double percolationThreshold;
+		public double largesPhaseClusterVolumeFraction;
+		
+		public double volumeConnected2Top;
+		public double volumeFractionConnected2Bottom;
+		
+		public double depthOfPhasePenetration;
+
+		public int[] distanceHistogram;		
+		
+	}
+	
+	public class DistanceProps {
+		
+		public double averageDistance2PhaseBoundaryInMM;
+		public double medianDistance2PhaseBoundaryInMM;
+		public double maxDistance2PhaseBoundaryInMM;
+		public double modeDistance2PhaseBoundaryInMM;
+		public double fractionLessThan3MMFromPhaseBoundary;
+		public double fractionMoreThan3MMFromPhaseBoundary;
+		
+	}
+	
+	public class PoreClusterProps {
+			
+		public boolean hasItObjects;
+		public boolean containsAParticleAnalysis;
+		public int[] id;								//ID: unique particle identifier; this number is the label used for the particle in all calculations and output
+		public double[] volume;							//Vol: particle volume
+		public double[] surfaceArea;					//SA: surface area (0 if too small for mesh to be produced; see warning log)
+		public double[] meanCurvature;
+		public double[] euler;	
+
+		public boolean[] isPercolating;
+		public boolean[] touchesTop;
+		public boolean[] touchesBot;
+		
+		public double[] xCenter;						//x Cent: x-coordinate of particle centroid
+		public double[] yCenter;						//y Cent: y-coordinate of particle centroid
+		public double[] zCenter;						//z Cent: z-coordinate of particle centroid
+		
+		public int[] minZ;
+		public int[] maxZ;
+		public int[] minX; 
+		public int[] maxX;
+		public int[] minY;
+		public int[] maxY;
+	}
+
+	public class ParallelFloydWarshall {
+	  
+		//Ross Anderson's parallel Floyd-Warshall algorithm
+		
+		private ExecutorService exec;		  
+		private int numThreads;
+		private double[] current;
+		private double[] next;
+		
+		private double[] currentD;
+		private double[] nextD;
+		
+		private int[] currentP;
+		private int[] nextP;
+		  
+		private int[] maxIndex;
+		private int numNodes;
+		private boolean solved;
+		
+		private double[][] outAdjacency;
+		private double[][] outDistance;
+		private int[][] outPrede;
+		
+		private int getIndex(int i, int j){
+			return i*numNodes+j;
+	  	}
+	  
+	  	private int getI(int index){
+	  		return index / numNodes;
+	  	}
+	  
+	  	private int getJ(int index){
+	  		return index % numNodes;
+	  	}
+	  
+	  	/**
+	   	* @param numNodes the number of nodes in the graph
+	   	* @param distances the matrix of distances between nodes, indexed from 0 to
+	   	*                  numNodes-1.  distances[i][j] cost of a directed edge from
+	   	*                  i to j.  Must be Double.POSITIVE_INFINITY if the edge is
+	   	*                  not present.  distance[i][i] is a self arc (allowed).
+	   	*/
+	  	public ParallelFloydWarshall(int numNodes, double[][] adjacencyMatrix, double[][] distanceMatrix, int[][] predecessorMatrix,
+	  								ExecutorService exec, int numThreads) {
+	  		
+		  	this.exec = exec;
+		  	this.numThreads = numThreads;
+		  	this.numNodes = numNodes;
+		  	this.current = new double[numNodes*numNodes];
+		  	this.next = new double[numNodes*numNodes];
+		  	this.currentD = new double[numNodes*numNodes];
+		  	this.nextD = new double[numNodes*numNodes];
+		  	this.currentP = new int[numNodes*numNodes];
+		  	this.nextP = new int[numNodes*numNodes];
+		  	this.maxIndex = new int[numNodes*numNodes];
+		  	Arrays.fill(maxIndex, -1);
+		  	for(int i = 0; i < numNodes; i++){
+			  	for(int j = 0; j < numNodes; j++){
+				  	current[getIndex(i,j)] = adjacencyMatrix[i][j];
+				  	currentD[getIndex(i,j)] = distanceMatrix[i][j];
+				  	currentP[getIndex(i,j)] = predecessorMatrix[i][j];
+			  	}
+		  	}
+		  	this.solved = false;		  	
+		  	
+		  	this.outAdjacency = adjacencyMatrix;
+		  	this.outDistance = distanceMatrix;
+		  	this.outPrede = predecessorMatrix;
+	  	}
+	  
+	  	public double[][] getAdjacencyMatrix() {
+	  		
+	  		for (int k = 0 ; k < numNodes*numNodes ; k++) {
+	  			
+			  	int i = getI(k);
+			  	int j = getJ(k);
+	  			
+			  	outAdjacency[i][j] = current[k];
+	  		}
+	  		
+	  		return outAdjacency;
+	  		
+	  	}
+	  	
+	  	public double[][] getDistanceMatrix() {
+	  		
+	  		for (int k = 0 ; k < numNodes*numNodes ; k++) {
+	  			
+			  	int i = getI(k);
+			  	int j = getJ(k);
+	  			
+			  	outDistance[i][j] = currentD[k];
+	  		}
+	  		
+	  		return outDistance;
+	  		
+	  	}
+	  	
+	  	public int[][] getPredecessorMatrix() {
+	  		
+	  		for (int k = 0 ; k < numNodes*numNodes ; k++) {
+	  			
+			  	int i = getI(k);
+			  	int j = getJ(k);
+	  			
+			  	outPrede[i][j] = currentP[k];
+	  		}
+	  		
+	  		return outPrede;	  		
+	  	}
+	  	
+	  	public void solve(){
+		  	if(solved){
+			  	throw new RuntimeException("Already solved");
+		  	}
+		  	for(int k = 0; k < numNodes; k++){
+			  	List<Callable<Boolean>> tasks = new ArrayList<Callable<Boolean>>();
+			  	if(current.length < numThreads){
+				  	for(int i = 0; i < current.length; i++){
+					  	tasks.add(new FloydJob(i,i+1,k));
+				  	}
+			  	}
+			  	else{
+				  	for(int t = 0; t < numThreads; t++){
+				  		int calcsPerThread = current.length/numThreads;
+					  	int lo = t * calcsPerThread;
+					  	int hi = (t+1) * calcsPerThread;
+					  	tasks.add(new FloydJob(lo,hi,k));
+				  	}
+			  	}
+			  	try {
+				  	List<Future<Boolean>> results = this.exec.invokeAll(tasks);
+				  	for(Future<Boolean> result : results){
+					  	if(!result.get().booleanValue()){
+						  	throw new RuntimeException();
+					  	}
+				  	}
+			  	} catch (InterruptedException e) {
+				  	throw new RuntimeException(e);
+			  	} catch (ExecutionException e) {
+				  	throw new RuntimeException(e);
+			  	}
+			  	double[] temp = current;
+			  	double[] tempD = currentD;
+			  	int[] tempP = currentP;
+			  	current = next;
+			  	currentD = nextD;
+			  	currentP = nextP;
+			  	next = temp;
+			  	nextD = tempD;  
+			  	nextP = tempP;  
+		  	}
+		  	next = null;
+		  	nextD = null;
+		  	nextP = null;
+		  	solved = true;
+	  	}
+	  
+	  	/**
+	  	 * 	
+	  	 * @param i must lie in in [0,numNodes)
+	  	 * @param j must lie in in [0,numNodes)
+	  	 * @return the length of the shortest directed path from node i to node j.
+	  	 *         If i == j, gives the shortest directed cycle starting at node i
+	  	 *          (note that the graph may contain nodes with self loops).  Returns
+	  	 *         Double.POSITIVE_INFINITY if there is no path from i to j.
+	  	 */
+	  	public double shorestPathLength(int i, int j){
+	  		if(!solved){
+	  			throw new RuntimeException("Must solve first");
+	  		}
+	  		return this.current[getIndex(i,j)];
+	  	}
+	  	/**
+	  	 * Example: If the path from node 2 to node 5 is an edge from 2 to 3 and then
+	  	 * an edge from 3 to 5, the return value will be
+	  	 * Arrays.asList(Integer.valueOf(2),Integer.valueOf(3),Integer.valueOf(5));
+	  	 * 
+	  	 * @param i the start of the directed path
+	  	 * @param j the end of the directed path
+	  	 * @return The shortest path starting at node i and ending at node j, or null
+	  	 *         if no such path exists.
+	  	 */
+	  	public List<Integer> shortestPath(int i, int j){    
+		  	if(current[getIndex(i,j)] == Double.POSITIVE_INFINITY){
+			  	return null;
+		  	}
+		  	else{
+			  	List<Integer> ans = new ArrayList<Integer>();      
+			  	ans.add(Integer.valueOf(i));
+			  	shortestPathHelper(i,j,ans);
+			  	return ans;
+		  	}
+	  	}
+	  
+	  	public void shortestPathHelper(int i, int j, List<Integer> partialPath){
+		  	int index = getIndex(i,j);
+		  	if(this.maxIndex[index] < 0){
+			  	partialPath.add(Integer.valueOf(j));
+		  	}
+		  	else{
+			  	shortestPathHelper(i,this.maxIndex[index],partialPath);
+			  	shortestPathHelper(this.maxIndex[index],j,partialPath);
+		  	}
+	  	}
+	  
+	  	private class FloydJob implements Callable<Boolean>{
+		  
+		  	private final int lo;
+		  	private final int hi;
+		  	private final int k;
+		  
+		  	public FloydJob(int lo, int hi, int k){
+			  	this.lo = lo;
+			  	this.hi = hi;
+			  	this.k = k;
+		  	}
+		  
+		  	@Override
+		  	public Boolean call() throws Exception {
+			  	for(int index = lo; index < hi; index++){
+				  	int i = getI(index);
+				  	int j = getJ(index);
+				  	double alternatePathValue = current[getIndex(i,k)]
+	                                   		+ current[getIndex(k,j)];
+				  	
+				  	double alternatePathValueD = currentD[getIndex(i,k)]
+                       		+ currentD[getIndex(k,j)];
+				  	
+				  	if(alternatePathValue < current[index]){
+					 	next[index] = alternatePathValue;
+					 	nextD[index] = alternatePathValueD;
+					 	nextP[index] = currentP[getIndex(k,j)];
+					 	maxIndex[index] = k;
+				  	}
+				  	else{
+					  	next[index] = current[index];
+					  	nextD[index] = currentD[index];
+					  	nextP[index] = currentP[index];
+				  	}
+			  	}
+			  	return true;
+		  	}
+	  	}
+	}
+	
+	public ConnectingGraphs findConnectingGraphs(PlusGraph[] mPG, int numberOfLastSlice, int numberOfAddedSlices) {
+		
+		ConnectingGraphs mCG = new ConnectingGraphs();
+		
+		for (int i = 0 ; i < mPG.length ; i++) {
+			
+			PlusGraph nowGraph = mPG[i];
+			
+			ArrayList<PlusEdge> edgeList = nowGraph.plusEdge;
+			ArrayList<Vertex> vertexList = nowGraph.getVertices();
+			
+			//also remember if a Vertex touches the top..
+			ArrayList<Integer> touchesTop = new ArrayList<Integer>();
+			ArrayList<Integer> touchesBottom = new ArrayList<Integer>();
+			
+			int cc=0;
+			for (PlusEdge edge : edgeList) {
+				
+				cc++;
+				
+				Vertex v1 = edge.getV1();
+				Vertex v2 = edge.getV2();
+				
+				if (v1 == null | v2 == null) IJ.error("Damn!!!");
+				
+				// use the index of the vertices as the index in the matrix			
+				int row = vertexList.indexOf(v1);		
+				
+				if (vertexIsConnected2TopAndBottom(v1, numberOfLastSlice, numberOfAddedSlices) == 1) {			
+					if(!touchesTop.contains(row)) {
+						touchesTop.add(row);	
+					}
+				}			
+				if (vertexIsConnected2TopAndBottom(v1, numberOfLastSlice, numberOfAddedSlices) == 2) {
+					if (!touchesBottom.contains(row)) {
+						touchesBottom.add(row);						
+					}
+				}
+				
+				int column = vertexList.indexOf(v2);			
+				if (vertexIsConnected2TopAndBottom(v2, numberOfLastSlice, numberOfAddedSlices) == 1) {
+					if (!touchesTop.contains(column)) {
+						touchesTop.add(column);						
+					}
+				}
+				if (vertexIsConnected2TopAndBottom(v2, numberOfLastSlice, numberOfAddedSlices) == 2) {
+					if (!touchesBottom.contains(column)) {
+						touchesBottom.add(column);						
+					}
+				}
+			}
+			
+			if (touchesTop.size() > 0 & touchesBottom.size() > 0) mCG.percolating.add(i);
+			if (touchesTop.size() > 0 & touchesBottom.size() == 0) mCG.con2Top.add(i);
+			if (touchesTop.size() == 0 & touchesBottom.size() > 0) mCG.con2Bot.add(i);
+			
+		}
+		
+		return mCG;
+		
+	}
+	
+	public ROIMorphoProps getDistances2AirFilledPores(InputOutput.MyFileCollection	mFC, ColumnRoi colRoi, MenuWaiter.ROISelectionOptions mRSO) {
+		
+		MorphologyAnalyzer morph = new MorphologyAnalyzer();
+		
+		//init output structure
+		MorphologyAnalyzer.ROIMorphoProps myR = morph.new ROIMorphoProps();
+		
+		//colRoi.nowTiff.updateAndDraw();colRoi.nowTiff.show();
+		
+		//add black invert ROI
+		ImageStack distStack = new ImageStack(colRoi.nowTiff.getWidth(), colRoi.nowTiff.getHeight());
+		ImageProcessor whiteOne = colRoi.nowTiff.getProcessor().duplicate();
+		whiteOne.fill();
+		distStack.addSlice(whiteOne);
+		//disp.displayIP(whiteOne, "test");
+		for (int z = 1 ; z < colRoi.nowTiff.getNSlices() + 1; z++) {
+			colRoi.nowTiff.setPosition(z);
+			ImageProcessor nowIP = colRoi.nowTiff.getProcessor().duplicate();
+			nowIP.invert();
+			distStack.addSlice(nowIP);
+		}
+		
+	    //monitor memory
+	    Runtime rt = Runtime.getRuntime();
+	    long currInUse = (rt.totalMemory() - rt.freeMemory()) / 1000000000;  //in GB		
+		
+		//distTiff.updateAndDraw();distTiff.show();
+		
+		//calculate distance map
+		IJ.showStatus("Performing Euklidean distance transform ...");
+		
+		short[] shortWeights = ChamferWeights3D.BORGEFORS.getShortWeights();
+		boolean normalize = true;
+		DistanceTransform3D dt = new DistanceTransform3DShort(shortWeights, normalize);
+		distStack = dt.distanceMap(distStack);
+				
+		//remove topmost slice and set to distTiff
+		distStack.deleteSlice(1);
+		ImagePlus distTiff = new ImagePlus("DistImage", distStack);
+
+		//distTiff.updateAndDraw();distTiff.show();
+		
+		//calc average distance to aerated pore
+		currInUse = (rt.totalMemory() - rt.freeMemory()) / 1000000000;  //in GB		
+		DistanceProps myDP = calculatePhaseDistanceProperties(distTiff, colRoi);
+		myR.averageDistance2PhaseBoundary = myDP.averageDistance2PhaseBoundaryInMM;
+		myR.fractionLessThan3MMFromPhaseBoundary = myDP.fractionLessThan3MMFromPhaseBoundary;
+		myR.fractionMoreThan3MMFromPhaseBoundary = myDP.fractionMoreThan3MMFromPhaseBoundary;
+		
+		//delete distTiff
+		distTiff.unlock();distTiff.flush();
+		System.gc();System.gc();
+		currInUse = (rt.totalMemory() - rt.freeMemory()) / 1000000000;  //in GB	
+		
+//		//get histogram of distances
+//		ImageStack binStack = new ImageStack(colRoi.nowTiff.getWidth(), colRoi.nowTiff.getHeight(),colRoi.nowTiff.getNSlices());			
+//		for (int z = 1 ; z < colRoi.nowTiff.getNSlices() ; z++) {  //skip first slice since it was added to sumulate the soil surface..
+//			distTiff.setPosition(z + 1);
+//			ImageProcessor thIP = distTiff.getProcessor();
+//			ImageProcessor cpIP = thIP.duplicate();			
+//			ImageProcessor binIP = cpIP.convertToByte(false);
+//			binStack.setProcessor(binIP, z);		
+//		}
+//		ImagePlus binTiff = new ImagePlus("distanceBin", binStack);
+		
+		//binTiff.updateAndDraw();binTiff.show();
+		
+		//get average distance to aerated pore
+		//myR.distanceHistogram = hist.extractHistograms8(binTiff);
+		
+		return myR;		
+		
+	}
+	
+	public ROIMorphoProps getSomeSimpleMorphoProps(InputOutput.MyFileCollection	mFC, ColumnRoi colRoi, MenuWaiter.ROISelectionOptions mRSO) {
+		
+		MorphologyAnalyzer morph = new MorphologyAnalyzer();
+		InputOutput jIO = new InputOutput();
+		BoundingBox3D mBB = new BoundingBox3D();
+		
+		//init output structure
+		MorphologyAnalyzer.ROIMorphoProps myR = morph.new ROIMorphoProps();
+		
+		//analyze air phase
+		FractalProperties myFP = morph.calculateFractalProperties(colRoi, mRSO);
+		myR.surfaceFractalDimension = myFP.surfaceFractalDim;
+		IJ.showStatus("Calculating macroporosities ...");
+		
+		//macroporosity
+		myR.phaseVolume = morph.macroPoreVolume(colRoi.nowTiff);
+		double[] bulkSoilVolume = {0, 0, 0, 0};
+		ImagePlus surfTiff = new ImagePlus();		
+		if (mRSO.choiceOfRoi.equalsIgnoreCase("RealSample") & mRSO.includeSurfaceTopography) {
+			String[] myGandS = jIO.getTheCorrectGaugeNSurfaceFiles(mFC);
+			surfTiff = jIO.openTiff3D(mFC.mySurfaceFolder + mFC.pathSep + myGandS[1]);
+			if (mFC.myCutSurfaceFolder != null) {
+				surfTiff = jIO.openTiff3D(mFC.myCutSurfaceFolder + mFC.pathSep + myGandS[1]);
+			}
+			bulkSoilVolume = morph.calculateTheBulkSoilVolume(myGandS[0], surfTiff, mRSO, mFC);
+			myR.roiBulkVolume = bulkSoilVolume[0];			
+		}
+		else { 
+			bulkSoilVolume[0] = Math.round(mRSO.areaOfInterest) * (double)colRoi.nowTiff.getNSlices();
+			myR.roiBulkVolume = bulkSoilVolume[0];
+			surfTiff = null;
+		}				
+		myR.phaseVolumeFraction = myR.phaseVolume / myR.roiBulkVolume;	
+		
+		IJ.showStatus("Identifying connected pore-clusters ...");
+
+		FloodFillComponentsLabeling3D myFCCL = new FloodFillComponentsLabeling3D(26, 32);
+		ImageStack myLabelStack = myFCCL.computeLabels(colRoi.nowTiff.getStack());
+										
+		IJ.freeMemory();IJ.freeMemory();
+		
+		//calculate surface and Euler number.. using MorphoLibJ
+		ImagePlus labelTiff = new ImagePlus();
+		labelTiff.setStack(myLabelStack);				
+		
+		int[] labels = LabelImages.findAllLabels(myLabelStack);
+		int numOfObjects = labels.length;
+		Calibration calib = labelTiff.getCalibration();
+		
+		//also find bounding boxes 
+		Box3D[] myBox = mBB.analyzeRegions(myLabelStack, labels, calib);
+		
+		//labelTiff.updateAndDraw();
+		//labelTiff.show();
+		
+		//surface and curvature
+		IntrinsicVolumesAnalyzer3D mIRA = new IntrinsicVolumesAnalyzer3D();
+		mIRA.setConnectivity(26);
+		Result[] myMorphos = mIRA.analyzeRegions(myLabelStack, labels, calib);
+		
+		double[] morphoVols = new double[myMorphos.length];
+		double[] morphoSurf = new double[myMorphos.length];
+		double[] morphoCurv = new double[myMorphos.length];
+		double[] morphoEuler = new double[myMorphos.length];
+		for (int i = 0 ; i < myMorphos.length ; i++) {
+			morphoVols[i] = myMorphos[i].volume;
+			morphoSurf[i] = myMorphos[i].surfaceArea;
+			morphoCurv[i] = 2 * Math.PI * myMorphos[i].meanBreadth;
+			morphoEuler[i] = myMorphos[i].eulerNumber;
+		}
+					
+		//myP.phaseVolume = StatUtils.sum(morphoVols);
+		myR.surfaceArea = StatUtils.sum(morphoSurf);
+		myR.meanCurvature = StatUtils.sum(morphoCurv);			
+		myR.eulerNumber = StatUtils.sum(morphoEuler);	
+		
+		//calculate percolating clusters ... needs the other parameters.. and is needed for following parameters	
+		//calculate percolating clusters ... needs the other parameters.. and is needed for following parameters	
+		ArrayList<Integer> conTop = new ArrayList<Integer>();
+		ArrayList<Integer> conBot = new ArrayList<Integer>();
+		ArrayList<Integer> isPercolating = new ArrayList<Integer>();
+		if (numOfObjects > 0) {
+			conTop = check4TouchingTheTop(labelTiff, colRoi.nowTiff, surfTiff);
+			conBot = check4TouchingTheBottom(labelTiff, colRoi.nowTiff, surfTiff);
+			isPercolating = checkForPercolatingClusters(numOfObjects, conTop, conBot);				
+		}	
+		
+		//calculate percolating phase fraction
+		double percolatingVolume = 0;
+		for (int i : isPercolating) percolatingVolume += morphoVols[i-1];   
+		myR.percolatingVolumeFraction = percolatingVolume / myR.roiBulkVolume;
+		
+		//check if volume percolates
+		myR.phasePercolates = 0;
+		if (myR.percolatingVolumeFraction > 0) myR.phasePercolates = 1;
+		
+		//calculate fraction of largest pore cluster
+		double volOfLC = StatUtils.max(morphoVols);
+		myR.largesPhaseClusterVolumeFraction = volOfLC / myR.roiBulkVolume;
+		
+		//calculate depth of phase penetration		
+		double penetrationDepth = 0;
+		for (int i = 0 ; i < myBox.length ; i++) if (myBox[i].getZMax() > penetrationDepth) penetrationDepth = myBox[i].getZMax();
+		myR.depthOfPhasePenetration = penetrationDepth;
+		
+		//calculate global connection probability (gamma)
+		double sumOfSquaredClusterSizes = 0;
+		double rF = 1000000;
+		for (int i = 0 ; i < myMorphos.length ; i++) {
+			double squaredClusterSize = morphoVols[i] / rF * morphoVols[i] / rF;
+			sumOfSquaredClusterSizes += squaredClusterSize;
+		}
+		myR.gamma = sumOfSquaredClusterSizes / (myR.phaseVolume / rF * myR.phaseVolume / rF);	
+		
+		return myR;
+		
+	}
+	
 	public void extractPoresizeDistro(String savePath, ImagePlus nowTiff, double[] classBounds) {
 		
-			
+		
 		InputOutput jIO = new InputOutput();
 		
 		int[] psd = new int[classBounds.length];
@@ -322,12 +1953,12 @@ public class MorphologyAnalyzer implements PlugIn {
 					
 					//collect according for class boundaries	
 					if (nowPix > 0) {						
-						if (nowPix >= 0) {							
-							//catch columns with very large pores
-							int enterHere = (int)Math.floor(nowPix*2);
-							if (enterHere > classBounds.length - 1) enterHere = classBounds.length - 1;
-							dcd[enterHere]++;
-						}
+						
+						//catch columns with very large pores
+						int enterHere = (int)Math.floor(nowPix);
+						if (enterHere > classBounds.length - 1) enterHere = classBounds.length - 1;
+						dcd[enterHere]++;
+
 					}
 				}
 			}				
@@ -936,15 +2567,19 @@ public class MorphologyAnalyzer implements PlugIn {
 		
 	}
 	
-	public AnisotropyResults calculateAnisotropy(boolean roiIsCylinder, ImagePlus nowTiff, double area) {
+	public ROIMorphoProps calculateAnisotropy(ROIMorphoProps myP, ImagePlus nowTiff, MenuWaiter.ROISelectionOptions mRSO, InputOutput.MyFileCollection mFC, String outAnisotPath) {
 		 
 		/////////////////////////////////////////////////////////////////////
 		// OUTSIDE ROI VOXEL STATISTICS WORK ONLY FOR FAIRLY CIRCULAR COLUMNS //
 		/////////////////////////////////////////////////////////////////////		
-
-		TailoredMaths maths = new TailoredMaths();
 		
+		TailoredMaths maths = new TailoredMaths();		
 		AnisotropyResults aRe = new AnisotropyResults();
+		InputOutput jIO = new InputOutput();
+		
+		boolean roiIsCylinder = false;
+		if (mRSO.choiceOfRoi.equalsIgnoreCase("Cylinder")) roiIsCylinder = true;
+		if (mRSO.choiceOfRoi.equalsIgnoreCase("RealSample")) roiIsCylinder = true;
 		
 		//init counts
 		int xl = nowTiff.getWidth();
@@ -1159,10 +2794,17 @@ public class MorphologyAnalyzer implements PlugIn {
 		
 		aRe.mainAlignment = mainAli;
 		
-		return aRe;
+		//transfer results to output struct
+		myP.anisotropy = aRe.anisotropy;
+		myP.mainAlignment = aRe.mainAlignment;		
+		
+		//save anisotropy statistics in file
+		jIO.writeROIAnisoResults(mFC.colName, outAnisotPath, aRe);
+		
+		return myP;
 	}
 	
-	public double calculatePercolationThreshold(ImagePlus nowTiff, int maxVol, ImagePlus surfTiff, InputOutput.MyFileCollection mFC) {
+	public ROIMorphoProps calculatePercolationThreshold(ImagePlus nowTiff, ImagePlus surfTiff, InputOutput.MyFileCollection mFC, ROIMorphoProps myP) {
 		
 		Dilate_ mD = new Dilate_();
 		
@@ -1171,39 +2813,44 @@ public class MorphologyAnalyzer implements PlugIn {
 		boolean laPerco = false;
 		int cc = 0;
 		
-		while (!laPerco) {
+		if (myP.phaseVolumeFraction > 0) {			//catch in case there are no pores..
 		
-			nowTiff = mD.dilate(nowTiff, 255, false);		
+			while (!laPerco) {
 		
-			//set percolatioin threshold..
-			percolationThreshold = macroPoreVolume(nowTiff);
+				nowTiff = mD.dilate(nowTiff, 255, false);		
 			
-			//find pore clusters in laPores and check if they form a percolating path		
-			FloodFillComponentsLabeling3D myFCCL = new FloodFillComponentsLabeling3D(26, 32);
-			ImageStack myLabelStack = myFCCL.computeLabels(nowTiff.getStack());						
-			ImagePlus laParLaTiff = new ImagePlus();
-			laParLaTiff.setStack(myLabelStack);
-			
-			int[] labels = LabelImages.findAllLabels(myLabelStack);
-			int numOfObjects = labels.length;
-			
-			cc++;
-			IJ.showStatus("Finding critical pore diameter, iteration " + cc + " ...");
-			
-			ArrayList<Integer> laConTop = check4TouchingTheTop(laParLaTiff, nowTiff, surfTiff);	
-			ArrayList<Integer> laConBot = check4TouchingTheBottom(laParLaTiff, nowTiff, surfTiff);
-			ArrayList<Integer> percolatingClusters = checkForPercolatingClusters(numOfObjects, laConTop, laConBot);
-			
-			if (!percolatingClusters.isEmpty()) {
-				laPerco = true;
-			}			
+				//set percolatioin threshold..
+				percolationThreshold = macroPoreVolume(nowTiff);
+				
+				//find pore clusters in laPores and check if they form a percolating path		
+				FloodFillComponentsLabeling3D myFCCL = new FloodFillComponentsLabeling3D(26, 32);
+				ImageStack myLabelStack = myFCCL.computeLabels(nowTiff.getStack());						
+				ImagePlus laParLaTiff = new ImagePlus();
+				laParLaTiff.setStack(myLabelStack);
+				
+				int[] labels = LabelImages.findAllLabels(myLabelStack);
+				int numOfObjects = labels.length;
+				
+				cc++;
+				IJ.showStatus("Finding critical pore diameter, iteration " + cc + " ...");
+				
+				ArrayList<Integer> laConTop = check4TouchingTheTop(laParLaTiff, nowTiff, surfTiff);	
+				ArrayList<Integer> laConBot = check4TouchingTheBottom(laParLaTiff, nowTiff, surfTiff);
+				ArrayList<Integer> percolatingClusters = checkForPercolatingClusters(numOfObjects, laConTop, laConBot);
+				
+				if (!percolatingClusters.isEmpty()) {
+					laPerco = true;
+				}			
+			}
 		}
 		
-		return percolationThreshold;
+		else myP.percolationThreshold = -1;
+		
+		return myP;
 		
 	}
 	
-	public double[] calculateCriticalPoreDiameter(ImagePlus distTiff, int maxVol, ImagePlus surfTiff, InputOutput.MyFileCollection mFC) {
+	public double[] doActuallyCalculateCriticalPoreDiameter(ImagePlus distTiff, ImagePlus surfTiff, InputOutput.MyFileCollection mFC) {
 	
 		double criticalPoreRadius = 0;
 		
@@ -2548,1619 +4195,6 @@ public class MorphologyAnalyzer implements PlugIn {
 		
 	}
 	
-	//////////////////////////////////////////////////////////////////////////////////////////////////////////
-	//////////////////////////////////////////////////////////////////////////////////////////////////////////
-	//////////////////////////////////////////////////////////////////////////////////////////////////////////
-	
-	public void tailoredPoreSpaceAnalyzer(int imageNumber, InputOutput.MyFileCollection mFC, RoiHandler.ColumnRoi colRoi, MenuWaiter.PoreSpaceAnalyzerOptions mPSA) {
-				
-		//try to free up some memory			
-		IJ.freeMemory();IJ.freeMemory();
-		
-		//check whether this is a windows OS
-		String pathSep = "/";
-		String checkname = mFC.myPreOutFolder;
-		String testString = checkname.substring(2, 3);
-		if (testString.equalsIgnoreCase("\\")) pathSep = "\\";
-		
-		InputOutput jIO = new InputOutput();
-		ROIMorphoProps myP = new ROIMorphoProps();
-		PoreClusterProps mPCP = new PoreClusterProps();		
-		ImageManipulator jIM = new ImageManipulator();
-		
-		//colRoi.nowTiff.updateAndDraw();
-		//colRoi.nowTiff.show();
-		
-		//remove holes from pore system;
-		if (mPSA.removeHoles) {
-			colRoi.nowTiff = jIM.removeHoles(colRoi.nowTiff);
-			colRoi.nowTiff.updateAndDraw();
-			//colRoi.nowTiff.show();
-		}
-		
-		//init some very basic variables..		
-		String nowImageName = mFC.colName;
-		
-		//create output folders and save statistics		
-		IJ.showStatus("Creating directories for the pore-cluster properties ...");
-		String myOutFolder = "Stats";
-		String myOutPath = mFC.myPreOutFolder + pathSep + myOutFolder;
-		new File(myOutPath).mkdir();
-		if (mPSA.performParticleAnalyses == true) new File(myOutPath + pathSep + "Clusters").mkdir();
-		if (mPSA.calcAnisotropy == true) new File(myOutPath + pathSep + "Anisotropy").mkdir();
-		if (mPSA.calcThickness == true) new File(myOutPath + pathSep + "Thickness").mkdir();		
-		if (mPSA.calcDistance == true) new File(myOutPath + pathSep + "Distance").mkdir();	
-		String outROIPath = mFC.myPreOutFolder + pathSep + "Stats" + pathSep + nowImageName + ".roi";
-		String outClustPath = mFC.myPreOutFolder + pathSep + "Stats" + pathSep + "Clusters" + pathSep + nowImageName + ".clust";		
-		String outAnisotPath = mFC.myPreOutFolder + pathSep + "Stats" + pathSep + "Anisotropy" + pathSep + nowImageName + ".aniso";
-		String outThickPath = mFC.myPreOutFolder + pathSep + "Stats" + pathSep + "Thickness" + pathSep + nowImageName + ".psd";
-		String outDistPath = mFC.myPreOutFolder + pathSep + "Stats" + pathSep + "Distance" + pathSep + nowImageName + ".dcd";
-
-		/////////////////////////////////////////////////////////////////
-		//calculate fractal dimension
-		/////////////////////////////////////////////////////////////////
-		
-		IJ.showStatus("Calculating fractal properties ...");
-		
-		if (mPSA.calcFractal == true) {
-			
-			FractalProperties myFP = calculateFractalProperties(colRoi, mPSA.mRSO);		
-
-			myP.surfaceFractalDimension = myFP.surfaceFractalDim;
-			
-		}
-		
-		IJ.freeMemory();IJ.freeMemory();
-		
-		//colRoi.nowTiff.show();
-				
-		/////////////////////////////////////////////////////////////////
-		//calculate anisotropy
-		/////////////////////////////////////////////////////////////////
-		
-		IJ.showStatus("Investigating anisotropies ...");
-		
-		if (mPSA.calcAnisotropy == true) {
-
-			AnisotropyResults arreArre = new AnisotropyResults(); 
-			
-			boolean roiIsCylindrical = false;
-			if (mPSA.mRSO.choiceOfRoi.equalsIgnoreCase("Cylinder")) roiIsCylindrical = true;
-			if (mPSA.mRSO.choiceOfRoi.equalsIgnoreCase("RealSample")) roiIsCylindrical = true;
-			
-			arreArre = calculateAnisotropy(roiIsCylindrical, colRoi.nowTiff, mPSA.mRSO.areaOfInterest);
-			myP.anisotropy = arreArre.anisotropy;
-			myP.mainAlignment = arreArre.mainAlignment;			
-			
-			//save anisotropy statistics in file
-			jIO.writeROIAnisoResults(nowImageName, outAnisotPath, arreArre);
-
-		}
-		
-		//colRoi.nowTiff.show();
-				
-		IJ.freeMemory();IJ.freeMemory();
-		
-		/////////////////////////////////////////////////////////////////		
-		//calculate macroporosity
-		/////////////////////////////////////////////////////////////////
-		
-		IJ.showStatus("Calculating macroporosities ...");
-		
-		if (myP.phaseVolume == 0) myP.phaseVolume = macroPoreVolume(colRoi.nowTiff);		
-		
-		double[] bulkSoilVolume = {0, 0, 0, 0};
-		ImagePlus surfTiff = new ImagePlus();
-		if (mPSA.mRSO.choiceOfRoi.equalsIgnoreCase("RealSample") & mPSA.mRSO.includeSurfaceTopography) {
-			String[] myGandS = jIO.getTheCorrectGaugeNSurfaceFiles(mFC);
-			surfTiff = jIO.openTiff3D(mFC.mySurfaceFolder + pathSep + myGandS[1]);
-			if (mFC.myCutSurfaceFolder != null) {
-				surfTiff = jIO.openTiff3D(mFC.myCutSurfaceFolder + pathSep + myGandS[1]);
-			}
-			bulkSoilVolume = calculateTheBulkSoilVolume(myGandS[0], surfTiff, mPSA. mRSO, mFC);
-			myP.roiBulkVolume = bulkSoilVolume[0];			
-		}
-		else { 
-			bulkSoilVolume[0] = Math.round(mPSA.mRSO.areaOfInterest) * (double)colRoi.nowTiff.getNSlices();
-			myP.roiBulkVolume = bulkSoilVolume[0];
-			surfTiff = null;
-		}
-		
-		myP.phaseVolumeFraction = myP.phaseVolume / myP.roiBulkVolume;	
-				
-		IJ.freeMemory();IJ.freeMemory();
-
-		/////////////////////////////////////////////////////////////////
-		// do particle analyses
-		/////////////////////////////////////////////////////////////////
-		
-		//check if the clusters need to be identified
-		mPCP.containsAParticleAnalysis = false;
-		if (mPSA.performParticleAnalyses == true) {
-		
-			mPCP.containsAParticleAnalysis = true;
-			
-			////////////////////////////////////////////////////////
-			// get clusters	
-			////////////////////////////////////////////////////////
-			
-			IJ.showStatus("Identifying connected pore-clusters ...");
-
-			FloodFillComponentsLabeling3D myFCCL = new FloodFillComponentsLabeling3D(26, 32);
-			ImageStack myLabelStack = myFCCL.computeLabels(colRoi.nowTiff.getStack());
-											
-			IJ.freeMemory();IJ.freeMemory();
-			
-			//calculate surface and Euler number.. using MorphoLibJ
-			ImagePlus labelTiff = new ImagePlus();
-			labelTiff.setStack(myLabelStack);				
-			
-			int[] labels = LabelImages.findAllLabels(myLabelStack);
-			int numOfObjects = labels.length;
-			Calibration calib = labelTiff.getCalibration();
-			
-			//labelTiff.updateAndDraw();
-			//labelTiff.show();
-			
-			//surface and curvature
-			IntrinsicVolumesAnalyzer3D mIRA = new IntrinsicVolumesAnalyzer3D();
-			mIRA.setConnectivity(26);
-			Result[] myMorphos = mIRA.analyzeRegions(myLabelStack, labels, calib);
-			
-			double[] morphoVols = new double[myMorphos.length];
-			double[] morphoSurf = new double[myMorphos.length];
-			double[] morphoCurv = new double[myMorphos.length];
-			double[] morphoEuler = new double[myMorphos.length];
-			for (int i = 0 ; i < myMorphos.length ; i++) {
-				morphoVols[i] = myMorphos[i].volume;
-				morphoSurf[i] = myMorphos[i].surfaceArea;
-				morphoCurv[i] = 2 * Math.PI * myMorphos[i].meanBreadth;
-				morphoEuler[i] = myMorphos[i].eulerNumber;
-			}
-						
-			//myP.phaseVolume = StatUtils.sum(morphoVols);
-			myP.surfaceArea = StatUtils.sum(morphoSurf);
-			myP.meanCurvature = StatUtils.sum(morphoCurv);			
-			myP.eulerNumber = StatUtils.sum(morphoEuler);	
-			
-			//calculate percolating clusters ... needs the other parameters.. and is needed for following parameters	
-			ArrayList<Integer> conTop = new ArrayList<Integer>();
-			ArrayList<Integer> conBot = new ArrayList<Integer>();
-			ArrayList<Integer> isPercolating = new ArrayList<Integer>();
-			if (numOfObjects > 0) {
-				conTop = check4TouchingTheTop(labelTiff, colRoi.nowTiff, surfTiff);
-				conBot = check4TouchingTheBottom(labelTiff, colRoi.nowTiff, surfTiff);
-				isPercolating = checkForPercolatingClusters(numOfObjects, conTop, conBot);				
-			}
-			
-			//free memory	
-			IJ.freeMemory();IJ.freeMemory();
-			
-			//catch in case that numOfObjects < 0
-			boolean hasItObjects = true;
-			if (numOfObjects < 1) {
-				hasItObjects = false;
-				numOfObjects = 1;
-			}
-				
-			// init variables for export of results			
-			int[] id = new int[numOfObjects];	
-			
-			double[] volume = new double[numOfObjects];						//Vol: particle volume
-			double[] surfaceArea = new double[numOfObjects];				//SA: surface area (0 if too small for mesh to be produced; see warning log)
-			
-			double[] xCenter = new double[numOfObjects];					//x Cent: x-coordinate of particle centroid
-			double[] yCenter = new double[numOfObjects];					//y Cent: y-coordinate of particle centroid
-			double[] zCenter = new double[numOfObjects];					//z Cent: z-coordinate of particle centroid
-			int[] xMin = new int[numOfObjects];								//x Min: min x-coordinate of particle 
-			int[] yMin = new int[numOfObjects];								//y Min: min y-coordinate of particle 
-			int[] zMin = new int[numOfObjects];								//z Min: min z-coordinate of particle 
-			int[] xMax = new int[numOfObjects];								//x Max: max x-coordinate of particle 
-			int[] yMax = new int[numOfObjects];								//y Max: max y-coordinate of particle 
-			int[] zMax = new int[numOfObjects];								//z Max: max z-coordinate of particle 
-			
-			boolean[] tTop = new boolean[numOfObjects];						//cluster is touching top..		
-			boolean[] tBot = new boolean[numOfObjects];						//cluster is touching bot..		
-			boolean[] percolating = new boolean[numOfObjects];				//cluster is percolating or not..			
-		
-			double[] euler = new double[numOfObjects];						//Euler (xi): Euler characteristic of the particle
-			double[] meanCurvature = new double[numOfObjects];						//Holes (beta1): number of topological holes (handles) in the particle
-						
-			//sort results 
-			int[] sortedIndices = AndAllTheRest.getIndicesInOrder(morphoVols);
-			
-			//write results into a biiiiig table		
-			if (hasItObjects) {
-				for (int i = 0; i < morphoVols.length; i++) {			
-					if (morphoVols[sortedIndices[i]] > 0) {			
-						
-						IJ.showStatus("Sorting out properties of the individual pore-clusters ...");
-						
-						id[i] = sortedIndices[i] + 1;				
-						volume[i] = morphoVols[sortedIndices[i]];
-		
-						surfaceArea[i] = morphoSurf[sortedIndices[i]];		
-						meanCurvature[i] = morphoCurv[sortedIndices[i]];
-						euler[i] = morphoEuler[sortedIndices[i]];
-	
-					}
-				}
-			}
-
-			//also find percolating clusters
-			for (int i = 0 ; i < id.length ; i++) {
-				if (conTop.contains(id[i])) tTop[i] = true;
-				else  tTop[i] = false;
-				
-				if (conBot.contains(id[i])) tBot[i] = true;
-				else  tBot[i] = false;
-				
-				if (isPercolating.contains(id[i])) percolating[i] = true;
-				else  percolating[i] = false;
-			}
-			
-			//assign results to output structure		
-			mPCP.hasItObjects = hasItObjects;
-			mPCP.id = id;
-			
-			mPCP.volume = volume;
-			mPCP.surfaceArea = surfaceArea;
-			mPCP.meanCurvature = meanCurvature;		
-			mPCP.euler = euler;
-			
-			mPCP.xCenter = xCenter;
-			mPCP.yCenter = yCenter;		
-			mPCP.zCenter = zCenter;
-			mPCP.minX = xMin;
-			mPCP.minY = yMin;
-			mPCP.minZ = zMin;
-			mPCP.maxX = xMax;
-			mPCP.maxY = yMax;
-			mPCP.maxZ = zMax;
-
-			mPCP.touchesTop = tTop;
-			mPCP.touchesBot = tBot;
-			mPCP.isPercolating = percolating;	
-							
-			/*//calculate connected correlation length and chi
-			if (mPSA.calcChi == true) {						
-				myP = calculateChiOfPercolation(labelTiff, mFC, myP);
-			}
-			else {
-				double[] dummy = new double[myP.id.length];
-				for (int i = 0 ; i < myP.id.length ; i++) dummy[i] = -1;				
-				myP.connectedCorrelationLength = dummy;
-				myP.chiOfPercolation = dummy;				
-			}*/			
-			
-			//calculate global connection probability (gamma)
-			double sumOfSquaredClusterSizes = 0;
-			double rF = 1000000;
-			for (int i = 0 ; i < mPCP.id.length ; i++) {
-				double squaredClusterSize = mPCP.volume[i] / rF * mPCP.volume[i] / rF;
-				sumOfSquaredClusterSizes += squaredClusterSize;
-			}
-			myP.gamma = sumOfSquaredClusterSizes / (myP.phaseVolume / rF * myP.phaseVolume / rF);			
-						
-			//save desired images
-			if (mPSA.plotLabels == true) {
-				myOutFolder = "ClusterLabels";
-				myOutPath = mFC.myPreOutFolder + pathSep + myOutFolder;
-				new File(myOutPath).mkdir();				
-				String clusterLabelImageName = nowImageName + "_ClusterLables.tif";
-				jIO.tiffSaver(myOutPath, clusterLabelImageName, labelTiff);
-				
-				if (!mPSA.plotPercolation & !mPSA.plotPoresConnected2Top) {
-					labelTiff.unlock();
-					labelTiff.flush();
-				}
-			}
-			
-			//top-connected porosity calculation..
-			double topConVolume = 0; 
-			ArrayList<Integer> touchesTopList = new ArrayList<Integer>();
-			for (int i = 0 ; i < percolating.length ; i++) if (mPCP.touchesTop[i]) {				
-				touchesTopList.add(id[i]);	
-				topConVolume += volume[i];
-			}
-			myP.volumeConnected2Top = topConVolume;
-			if (mPSA.plotPoresConnected2Top) {
-				
-				ImagePlus touchesTopImp = extractSpecificPoreLabels(labelTiff, touchesTopList);
-								
-				myOutFolder = "VolumeConnected2Top";
-				myOutPath = mFC.myPreOutFolder + pathSep + myOutFolder;
-				new File(myOutPath).mkdir();
-				String nowDir = mFC.myPreOutFolder + pathSep + myOutFolder;		
-				String volumeImageName = nowImageName + "_VolCon2Top.tif";	
-				jIO.tiffSaver(nowDir, volumeImageName, touchesTopImp);
-				
-				touchesTopImp.unlock();touchesTopImp.flush();				
-			}			
-		
-			//percolating porosity calculation..
-			double percVolume = 0; 
-			ArrayList<Integer> percolatingClusters = new ArrayList<Integer>();
-			for (int i = 0 ; i < percolating.length ; i++) if (percolating[i]) {
-				percolatingClusters.add(id[i]);
-				percVolume += volume[i];
-			}
-			myP.percolatingVolumeFraction = percVolume / myP.roiBulkVolume;
-			if (mPSA.plotPercolation & percVolume > 0) {
-				
-				ImagePlus percPorosityImp = extractSpecificPoreLabels(labelTiff, percolatingClusters);
-				myOutFolder = "PercolatingVolume";
-				myOutPath = mFC.myPreOutFolder + pathSep + myOutFolder;
-				new File(myOutPath).mkdir();
-				String nowDir = mFC.myPreOutFolder + pathSep + myOutFolder;		
-				String volumeImageName = nowImageName + "_PercVol.tif";	
-				jIO.tiffSaver(nowDir, volumeImageName, percPorosityImp);
-				
-				percPorosityImp.unlock();percPorosityImp.flush();				
-			}
-			
-			labelTiff.unlock();labelTiff.flush();
-			
-			System.gc();System.gc();		
-			IJ.freeMemory();IJ.freeMemory();
-			System.gc();System.gc();
-			IJ.wait(2000);
-			IJ.freeMemory();
-						
-			////////////////////////////////////////////////////////
-			//calculate thicknesses
-			////////////////////////////////////////////////////////
-			
-			LocalThicknessWrapper myLTW = new LocalThicknessWrapper();
-			myLTW.calibratePixels = false;
-			myLTW.maskThicknessMap = true;
-			myLTW.threshold = 128;
-			myLTW.setSilence(true);
-			ImagePlus thickTiff = null;
-			if (mPSA.plotThickness == true | mPSA.calcThickness == true) {					
-				if (mPSA.mRSO.includeSurfaceTopography) myLTW.processImage(colRoi.surfaceNotCut);
-				else myLTW.processImage(colRoi.nowTiff);				
-				thickTiff = myLTW.getResultImage();
-				myP.averagePhaseDiameter = calculateAverageValue(thickTiff);
-				
-				//extract pore size distribution				
-				double[] classBounds = new double[200];
-				for (int i = 0 ; i < classBounds.length ; i++) classBounds[i] = 0.5 * i;
-				classBounds[classBounds.length - 1] = 100000;
-				
-				extractPoresizeDistro(outThickPath, thickTiff, classBounds);
-				
-				//delete image from heap in case it is not going to be saved..
-				if (mPSA.plotThickness == false) {
-					thickTiff.unlock();thickTiff.flush();
-				}
-			}
-			
-			if (mPSA.plotThickness == true) {			
-				myOutFolder = "Thickness";
-				myOutPath = mFC.myPreOutFolder + pathSep + myOutFolder;
-				new File(myOutPath).mkdir();
-				String nowDir = myOutPath;		
-				String thicknessImageName = nowImageName + "_Thickness.tif";
-				jIO.tiffSaver(nowDir, thicknessImageName, thickTiff);			
-				
-				thickTiff.unlock();thickTiff.flush();
-			}			
-			
-			System.gc();System.gc();		
-			IJ.freeMemory();IJ.freeMemory();
-			System.gc();System.gc();
-			
-			////////////////////////////////////////////////////////
-			// calculate critical pore diameter
-			////////////////////////////////////////////////////////			
-			
-			if (mPSA.calcCriticalPoreDiameter == true | mPSA.plotDistanceMap) {
-				
-				//check which clusters are percolating and write them into a list..
-				//ArrayList<Integer> percolatingClusters = new ArrayList<Integer>();
-				//for (int i = 0 ; i < isPercolating.length ; i++) if (isPercolating[i] == true) percolatingClusters.add(i + 1);
-				
-				//if there is not even one cluster, the critical pore diameters is <= image resolution
-				myP.criticalPhaseDiameter = -1 ;
-				
-				ImagePlus distTiff = colRoi.nowTiff.duplicate();
-				
-				//create a distance map
-				if ((mPSA.calcCriticalPoreDiameter & !percolatingClusters.isEmpty()) | mPSA.plotDistanceMap | mPSA.calcDistance) {
-					
-					IJ.showStatus("Performing Euklidean distance transform ...");
-					
-					float[] floatWeights = ChamferWeights3D.BORGEFORS.getFloatWeights();
-					boolean normalize = true;
-					DistanceTransform3D dt = new DistanceTransform3DFloat(floatWeights, normalize);
-					ImageStack result = dt.distanceMap(colRoi.nowTiff.getStack());
-					
-					distTiff = new ImagePlus("dist",result);
-					
-					//extract distance classes 
-					double[] classBounds = new double[200];
-					for (int i = 0 ; i < classBounds.length ; i++) classBounds[i] = 0.5 * i;
-					extractDistanceDistro(outDistPath, distTiff, classBounds);
-					
-					//save average distance
-					myP.averageDistance2PhaseBoundary = calculateAverageValue(distTiff);
-
-				}
-				
-				if (mPSA.plotDistanceMap) {
-					myOutFolder = "DistanceMap";
-					myOutPath = mFC.myPreOutFolder + pathSep + myOutFolder;
-					new File(myOutPath).mkdir();
-					String nowDir = mFC.myPreOutFolder + pathSep + "DistanceMap";		
-					String distImageName = nowImageName + "_DistanceMap.tif";
-					jIO.tiffSaver(nowDir, distImageName, distTiff);
-				}
-					
-				//calculate critical pore diameter	
-				if (mPSA.calcCriticalPoreDiameter) {
-					if (!percolatingClusters.isEmpty()) {
-				
-						myP.phasePercolates = 1;
-									
-						int maxVolume = (int)Math.round(volume[0]) + 1;
-						double[] results = calculateCriticalPoreDiameter(distTiff, maxVolume, surfTiff, mFC);
-						myP.criticalPhaseDiameter = results[0]; 
-						myP.percolationThreshold = results[1] / myP.roiBulkVolume;
-						
-					}
-					else {
-						
-						myP.phasePercolates = 0;
-						
-						int maxVolume = (int)Math.round(volume[0]) + 1;
-						
-						if (myP.phaseVolumeFraction > 0) {			//catch in case there are no pores..
-							myP.percolationThreshold = calculatePercolationThreshold(colRoi.nowTiff.duplicate(), maxVolume, surfTiff, mFC) / myP.roiBulkVolume;
-						}
-						else myP.percolationThreshold = -1;
-							
-					}
-				}
-				
-//				if (mPSA.calcKT87Volume) {
-//					
-//					ImagePlus kt87Volume = new ImagePlus();
-//					
-//					if (myP.criticalPhaseDiameter > 6) {
-//					
-//						double myThreshold = myP.criticalPhaseDiameter / 2 / 3; // divided by 2 because the distanceTiff shows the radii, not the diameters
-//						
-//						kt87Volume = extractKT87volume(distTiff, myThreshold, surfTiff, mFC);
-//						
-//						//calculate KT87 porosity
-//						//myP.KT87VolumeFraction = calcVolume(kt87Volume) / myP.roiBulkVolume;				
-//					
-//						//plot KT87volume
-//						if (mPSA.plotKTVolume) {
-//							myOutFolder = "KT87Volume";
-//							myOutPath = mFC.myPreOutFolder + pathSep + myOutFolder;
-//							new File(myOutPath).mkdir();	
-//							String nowDir = mFC.myPreOutFolder + pathSep + "KT87Volume";	
-//							String KT87ImageName = nowImageName + "_KT87Volume.tif";
-//							jIO.tiffSaver(nowDir, KT87ImageName, kt87Volume);									
-//						}						
-//					}
-//					else {						
-//						
-//						//myP.KT87VolumeFraction = myP.percolatingVolumeFraction;
-//						
-//					}			
-//					
-//					kt87Volume.unlock();kt87Volume.flush();
-//					
-//				}
-//				
-//				distTiff.unlock();distTiff.flush();
-				
-			}
-		}		//closes if-tag checking whether the particle analyses tag
-		
-		System.gc();System.gc();
-		IJ.showStatus("Trying to clean up memory ... ");
-		IJ.freeMemory();IJ.freeMemory();
-		System.gc();System.gc();
-		
-		//do thickness calculation without particle analyzer
-		if (!mPSA.performParticleAnalyses & mPSA.plotThickness) {
-			LocalThicknessWrapper myLTW = new LocalThicknessWrapper();
-			myLTW.calibratePixels = false;
-			myLTW.maskThicknessMap = true;
-			myLTW.threshold = 128;
-			myLTW.setSilence(true);
-			ImagePlus thickTiff = null;								
-			if (mPSA.mRSO.includeSurfaceTopography) myLTW.processImage(colRoi.surfaceNotCut);
-			else myLTW.processImage(colRoi.nowTiff);				
-			thickTiff = myLTW.getResultImage();						
-			IJ.freeMemory();IJ.freeMemory();
-			myP.averagePhaseDiameter = calculateAverageValue(thickTiff);
-			
-			myOutFolder = "PoreThick";
-			myOutPath = mFC.myPreOutFolder + pathSep + myOutFolder;
-			new File(myOutPath).mkdir();
-			String nowDir = mFC.myPreOutFolder + pathSep + "PoreThick";		
-			String thicknessImageName = nowImageName + "_Thickness.tif";
-			jIO.tiffSaver(nowDir, thicknessImageName, thickTiff);
-		}
-		
-		System.gc();System.gc();
-		IJ.showStatus("Trying to clean up memory ... ");
-		IJ.freeMemory();IJ.freeMemory();
-		System.gc();System.gc();
-		
-		//write Results
-		IJ.showStatus("Writing results ... ");
-		jIO.writeROIMorphoResults(nowImageName, outROIPath, myP);
-		
-		if (mPSA.performParticleAnalyses == true) jIO.writeClusterMorphoResults(nowImageName, outClustPath, mPCP);
-		
-	}
-	
-	public double calcVolume(ImagePlus nowTiff) {
-		
-		double myVolume = 0;
-		
-		for (int z = 1 ; z <= nowTiff.getNSlices() ; z++) {	
-			
-			nowTiff.setPosition(z);
-			ImageProcessor nowIP = nowTiff.getProcessor();			
-			
-			//loop through all pixel within cross-section
-			for (int x = 0 ; x < nowTiff.getWidth() ; x++) {
-				for (int y = 0 ; y < nowTiff.getHeight() ; y++) {							
-					int nowPixel = nowIP.getPixel(x, y);
-					if (nowPixel > 1) myVolume++;
-				}
-			}				
-		}		
-		
-		return myVolume;
-		
-	}
-	
-	public ImagePlus extractKT87volume(ImagePlus distTiff, double threshold, ImagePlus surfTiff, InputOutput.MyFileCollection mFC) {
-		
-		Dilate_ mD = new Dilate_();
-		
-		//set all values smaller than the threshold to 0
-		ImageStack largerPores = new ImageStack(distTiff.getWidth(), distTiff.getHeight());
-		ImagePlus laPores = new ImagePlus();
-		for (int z = 1 ; z <= distTiff.getNSlices() ; z++) {	
-			
-			distTiff.setPosition(z);
-			ImageProcessor nowIP = distTiff.getProcessor();
-			ImageProcessor laIP = new ByteProcessor(distTiff.getWidth(), distTiff.getHeight());
-			
-			//loop through all pixel within cross-section
-			for (int x = 0 ; x < distTiff.getWidth() ; x++) {
-				for (int y = 0 ; y < distTiff.getHeight() ; y++) {							
-					double nowPixel = nowIP.getPixelValue(x, y);
-					if (nowPixel >= threshold) laIP.putPixel(x, y, 255);
-					else laIP.putPixel(x, y, 0);							
-				}
-			}					
-			largerPores.addSlice(laIP);
-		}		
-		laPores.setStack(largerPores);
-		
-		//laPores.updateAndDraw();
-		//laPores.show();
-						
-		IJ.freeMemory();IJ.freeMemory();
-		
-		//find pore clusters in laPores and check if they form a percolating path		
-		FloodFillComponentsLabeling3D myFCCL = new FloodFillComponentsLabeling3D(26, 32);
-		ImageStack myLabelStack = myFCCL.computeLabels(laPores.getStack());						
-		ImagePlus laParLaTiff = new ImagePlus();
-		laParLaTiff.setStack(myLabelStack);
-		
-		int[] labels = LabelImages.findAllLabels(myLabelStack);
-		int numOfObjects = labels.length;
-		
-		ArrayList<Integer> laConTop = check4TouchingTheTop(laParLaTiff, laPores, surfTiff);	
-		ArrayList<Integer> laConBot = check4TouchingTheBottom(laParLaTiff, laPores, surfTiff);
-		ArrayList<Integer> percolatingClusters = checkForPercolatingClusters(numOfObjects, laConTop, laConBot);
-
-		//remove all isolated clusters
-		ImageStack outStack = new ImageStack(laParLaTiff.getWidth(), laParLaTiff.getHeight());
-		ImagePlus outTiff = new ImagePlus();
-		for(int z = 0 ; z < laParLaTiff.getNSlices() ; z++) {
-			
-			laParLaTiff.setSlice(z + 1);
-			ImageProcessor nowIP = laParLaTiff.getProcessor();
-			ImageProcessor outIP = new ByteProcessor(nowIP.getWidth(), nowIP.getHeight());
-			
-			for (int x = 0 ; x < nowIP.getWidth() ; x++) {
-				for (int y = 0 ; y < nowIP.getHeight() ; y++) {
-					
-					int nowPix = (int)Math.round(nowIP.getPixelValue(x, y));
-					if (percolatingClusters.contains(nowPix)) outIP.putPixel(x, y, 255);
-					else outIP.putPixel(x, y, 0);
-					
-				}
-			}
-			
-			outStack.addSlice(outIP);
-			
-		}
-		
-		outTiff.setStack(outStack);
-		
-		//dilate until resolution is reached again
-		
-		for (int i = 0 ; i < (int)Math.round(threshold) ; i++) outTiff = mD.dilate(outTiff, 255, false);
-		 
-		return outTiff;
-				
-	}
-	
-	public double calculateAverageValue(ImagePlus thickTiff) {
-		
-		ArrayList<Float> listOfThicknesses = new ArrayList<Float>();
-		
-		for (int z = 0 ; z < thickTiff.getNSlices() ; z++) {
-			
-			thickTiff.setSlice(z + 1);
-			ImageProcessor nowIP = thickTiff.getProcessor();
-			
-			for (int x = 0 ; x < thickTiff.getWidth() ; x++) {
-				for (int y = 0 ; y < thickTiff.getHeight() ; y++) {
-					
-					float nowPix = nowIP.getPixelValue(x, y);
-					if (nowPix > 0) listOfThicknesses.add(nowPix);
-					
-				}
-			}
-		}
-		
-		double[] thickArray = new double[listOfThicknesses.size()]; 
-		for (int i = 0 ; i < thickArray.length ; i++) thickArray[i] = listOfThicknesses.get(i);
-		
-		double avgThick = StatUtils.mean(thickArray);
-		
-		return avgThick;
-	}
-	
-	public DistanceProps calculatePhaseDistanceProperties(ImagePlus thickTiff, RoiHandler.ColumnRoi pRoi) {
-		
-		DistanceProps mDP = new DistanceProps();
-		HistogramStuff hist = new HistogramStuff();
-			
-		//calcluate 3 mm cutoff
-		double my3mm = 3f / (pRoi.voxelSizeInMicron / 1000);
-		
-		//extract histogram
-		int[] myHist = hist.extractHistograms16(thickTiff);
-		myHist[0] = 0;
-		
-		//caclulate aerated voxels
-		float ovox = 0;
-		float avox = 0;
-		for (int i = 0 ; i < my3mm ; i++) ovox += myHist[i];
-		for (int i = (int)Math.ceil(my3mm) ; i < myHist.length ; i++) avox += myHist[i];
-		
-		//assign results
-		mDP.averageDistance2PhaseBoundaryInMM = hist.findMeanFromHistogram(myHist);
-		mDP.medianDistance2PhaseBoundaryInMM = hist.findMedianFromHistogram(myHist);
-		mDP.fractionLessThan3MMFromPhaseBoundary = ovox / (pRoi.area * thickTiff.getNSlices());
-		mDP.fractionMoreThan3MMFromPhaseBoundary = avox / (pRoi.area * thickTiff.getNSlices());;
-		
-		return mDP;
-	}
-	
-	public ImagePlus findClusterConnected2Top(ImagePlus nowTiff, double drainingDepthInVx) {
-		
-		BoundingBox3D mBB = new BoundingBox3D();
-		
-		//nowTiff.updateAndDraw();nowTiff.show();
-		
-		//find connected pore clusters
-		IJ.showStatus("Find air phases connected to top..");
-		FloodFillComponentsLabeling3D myFCCL = new FloodFillComponentsLabeling3D(26, 32);
-		ImageStack myLabelStack = myFCCL.computeLabels(nowTiff.getStack());
-		
-		//calculate surface and Euler number.. using MorphoLibJ
-		ImagePlus labelTiff = new ImagePlus();
-		labelTiff.setStack(myLabelStack);				
-		
-		//get Topmost coordinate of each cluster
-		int[] labels = LabelImages.findAllLabels(myLabelStack);
-		int numOfObjects = labels.length;
-		Calibration calib = labelTiff.getCalibration();		
-		Box3D[] myBox = mBB.analyzeRegions(myLabelStack, labels, calib);
-		
-		//labelTiff.updateAndDraw();labelTiff.show();
-			
-		// check if the cluster is draining
-		ArrayList<Integer> isDraining = new ArrayList<Integer>();
-		if (numOfObjects > 0 ) {	
-			for (int i = 0 ; i < myBox.length ; i++) {
-				if (myBox[i].getZMin() <= drainingDepthInVx) isDraining.add(i + 1);
-			}
-		}		
-		
-		//extract Image
-		ImagePlus drainingClusters = extractSpecificPoreLabels(labelTiff, isDraining);
-		
-		//touchesTopImp.updateAndDraw();touchesTopImp.show();
-							
-		return drainingClusters;
-				
-	}
-	
-	public ImagePlus findClusterConnected2Bottom(ImagePlus nowTiff, double wettingHeightInVX) {
-		
-		BoundingBox3D mBB = new BoundingBox3D();
-		
-		//find connected pore clusters
-		FloodFillComponentsLabeling3D myFCCL = new FloodFillComponentsLabeling3D(26, 32);
-		ImageStack myLabelStack = myFCCL.computeLabels(nowTiff.getStack());
-		
-		//calculate surface and Euler number.. using MorphoLibJ
-		ImagePlus labelTiff = new ImagePlus();
-		labelTiff.setStack(myLabelStack);
-		int[] labels = LabelImages.findAllLabels(myLabelStack);
-		int numOfObjects = labels.length;
-		Calibration calib = labelTiff.getCalibration();			
-		Box3D[] myBox = mBB.analyzeRegions(myLabelStack, labels, calib);
-		
-		//calculate percolating clusters ... needs the other parameters.. and is needed for following parameters	
-		ArrayList<Integer> isWetting = new ArrayList<Integer>();
-		if (numOfObjects > 0) {	
-			for (int i = 0 ; i < myBox.length ; i++) {
-				if (myBox[i].getZMin() >= wettingHeightInVX) isWetting.add(i);
-			}
-		}		
-		
-		//extract Image
-		ImagePlus touchesTopImp = extractSpecificPoreLabels(labelTiff, isWetting);
-							
-		return touchesTopImp;
-				
-	}
-
-	public double tMaxLaplace(ImageStack nowStack, ImageStack lapStack, int myMode) {
-		
-		HistogramStuff hist = new HistogramStuff();
-		ImageManipulator jIM = new ImageManipulator();
-		
-		ImagePlus lapTiff = new ImagePlus();
-		lapTiff.setStack(lapStack);
-		
-		ImagePlus origTiff = new ImagePlus();
-		origTiff.setStack(nowStack);
-	
-		//get histogram of the gradient image
-		int[] myHistGradient = hist.sampleHistogram(lapTiff);				
-		myHistGradient[0] = 0;
-		int myCutoffGradient = hist.findTheKnee(myHistGradient);
-		
-		//segment gradient image..
-		ImagePlus myGradientMask = lapTiff.duplicate();
-		myGradientMask = jIM.binarizeGradientMask(myGradientMask, myCutoffGradient);
-		//myGradientMask.show();
-		
-		//sample upper threshold for this segment
-		double weightSum = 0;
-		double weightAndSampleSum = 0;
-		for (int i = 0 ; i < lapStack.getSize() ; i++) {
-			
-			IJ.showStatus("Calculating threshold from Laplace mask slice " + (i+1) + "/" + lapTiff.getNSlices());
-			
-			//set all image to the correct position
-			origTiff.setPosition(i+1); //remember that this image has one slice more on top and bottom, respectively..
-			lapTiff.setPosition(i+1);
-			myGradientMask.setPosition(i+1);
-			
-			//get each images IPs
-			ImageProcessor origIP = origTiff.getProcessor();
-			ImageProcessor gradIP = lapTiff.getProcessor();
-			ImageProcessor maskIP = myGradientMask.getProcessor();
-	
-			//because imageCalculator does not work... do it by hand.. again..
-			for (int x = 0 ; x < origIP.getWidth(); x++) {
-				for (int y = 0 ; y < origIP.getHeight(); y++) {
-					if (maskIP.get(x, y) > 0 && origIP.get(x, y) > 0 && origIP.get(x, y) < myMode) {
-						double nowWeight = gradIP.getPixelValue(x, y);
-						double nowSample = origIP.getPixelValue(x, y);
-						weightSum = weightSum + nowWeight;
-						weightAndSampleSum = weightAndSampleSum + nowWeight * nowSample;
-					}							
-				}
-			}
-		}		
-		
-		double tMax = weightAndSampleSum / weightSum;
-		
-		return tMax;
-	}
-
-	public double tMaxSobel(ImageStack nowStack, ImageStack sobStack, int myMode) {
-	
-		//init units
-		HistogramStuff hist = new HistogramStuff();
-		ImageManipulator jIM = new ImageManipulator();
-		
-		//init variables
-		ImagePlus gradTiff = new ImagePlus();
-		gradTiff.setStack(sobStack);
-		
-		ImagePlus torigTiff = new ImagePlus();
-		torigTiff.setStack(nowStack);
-		
-		//get histogram of the gradient image
-		int[] myHistGradient = hist.sampleHistogram(gradTiff);				
-		myHistGradient[0] = 0;
-		int myCutoffGradient = hist.findTheKnee(myHistGradient);
-		
-		//segment gradient image..
-		ImagePlus myGradientMask = gradTiff.duplicate();
-		myGradientMask = jIM.binarizeGradientMask(myGradientMask, myCutoffGradient);
-		//myGradientMask.show();
-		
-		//sample upper threshold for this segment
-		double weightSum = 0;
-		double weightAndSampleSum = 0;
-		for (int i = 0 ; i < sobStack.getSize() ; i++) {
-			
-			IJ.showStatus("Calculating threshold from Sobel mask slice " + (i+1) + "/" + gradTiff.getNSlices());
-			
-			//set all image to the correct position
-			torigTiff.setPosition(i+1); //remember that this image has one slice more on top and bottom, respectively..
-			gradTiff.setPosition(i+1);
-			myGradientMask.setPosition(i+1);
-			
-			//get each images IPs
-			ImageProcessor origIP = torigTiff.getProcessor();
-			ImageProcessor gradIP = gradTiff.getProcessor();
-			ImageProcessor maskIP = myGradientMask.getProcessor();		
-	
-			//because imageCalculator does not work... do it by hand.. again..
-			for (int x = 0 ; x < origIP.getWidth(); x++) {
-				for (int y = 0 ; y < origIP.getHeight(); y++) {
-					if (maskIP.get(x, y) > 0 && origIP.get(x, y) > 0 && origIP.get(x, y) < myMode) {
-						double nowWeight = gradIP.getPixelValue(x, y);
-						double nowSample = origIP.getPixelValue(x, y);
-						weightSum = weightSum + nowWeight;
-						weightAndSampleSum = weightAndSampleSum + nowWeight * nowSample;
-					}							
-				}
-			}
-		}		
-		
-		double tMax = weightAndSampleSum / weightSum;
-		
-		return tMax;
-	}
-
-	public double macroPoreVolume(ImagePlus nowTiff) {
-		
-		double macroPoreVolume = 0;
-		
-		int nslices = nowTiff.getNSlices();
-		
-		for (int i = 0 ; i < nslices ; i++) {
-			
-			nowTiff.setPosition(i+1);
-			ImageProcessor myIP = nowTiff.getProcessor();
-			int[] nowHist = myIP.getHistogram();
-			
-			macroPoreVolume += nowHist[255];
-						
-		}
-		
-		return macroPoreVolume;
-	}
-
-	public ImagePlus findTheLargestCluster(ImagePlus nowTiff, int indexOfLargestCluster) {
-		
-		int i;
-		ImageStack lStack = new ImageStack(nowTiff.getWidth(), nowTiff.getHeight());
-		ImagePlus lTiff = new ImagePlus();
-		
-		//nowTiff.draw();
-		//nowTiff.show();
-		
-		for (i = 0 ; i < nowTiff.getNSlices() ; i++) {
-			
-			nowTiff.setPosition(i + 1);
-			ImageProcessor nowIP = nowTiff.getProcessor();
-			
-			IJ.showStatus("Isolating largest cluster in slice #" + (i + 1) + "/" + (nowTiff.getNSlices()+1));				
-			
-			ImageProcessor modIP = new ByteProcessor(nowTiff.getWidth(), nowTiff.getHeight());
-			
-			for (int x = 0 ; x < nowIP.getWidth() ; x++) {
-				for (int y = 0 ; y < nowIP.getHeight() ; y++) {
-					int nowPix = Math.round(nowIP.getPixelValue(x, y));					
-					if (nowPix == indexOfLargestCluster) modIP.putPixelValue(x, y, 255);
-					else modIP.putPixelValue(x, y, 0);					
-				}			
-			}								
-			lStack.addSlice(modIP);
-		}
-		lTiff.setStack(lStack);
-		
-		return lTiff;
-	}
-	
-	public class AnisotropyResults {
-		
-		public double[] x;
-		public double[] y;
-		public double[] z;
-		
-		public double[] xy;		
-		public double[] yx;
-		
-		public double[] dxz;
-		public double[] dyz;
-		public double[] dxyz;
-		public double[] dyxz;
-		
-		public double[] uxz;
-		public double[] uyz;
-		public double[] uxyz;
-		public double[] uyxz;
-		
-		public double anisotropy;
-		public String mainAlignment;			
-		
-	}
-	
-	public class PlusVertex extends Vertex {
-		
-		public ArrayList<PlusEdge> plusBranches = null;
-		
-		public PlusVertex() {
-			
-			super();
-			
-			this.plusBranches = new ArrayList<PlusEdge>();			
-			
-		}
-		
-		public ArrayList<PlusEdge> getPlusBranches() {
-			return this.plusBranches;
-		}
-		
-		public void setPlusBranches(ArrayList<PlusEdge> nowBranches) {
-			this.plusBranches = nowBranches;
-		}
-		
-	}
-	
-	public class PlusEdge extends Edge {
-		
-		private RollerCaster rC = new RollerCaster();
-		public double v1Dist;
-		public double v2Dist;
-		public ArrayList<Double> distance = null;
-		
-		public double constrictionFactor; 
-		public double bottleNeck;
-		public double lengthReduction;
-		
-		public PlusVertex plusV1 = null;
-		public PlusVertex plusV2 = null;
-		
-		public PlusEdge(Vertex v1, Vertex v2, ArrayList<Point> slabs, double length) {
-			
-			super(v1, v2, slabs, length);
-			
-			this.distance = new ArrayList<Double>();
-			this.constrictionFactor = 0; 
-			this.v1Dist = 0;
-			this.v2Dist = 0;
-			this.bottleNeck = 0;
-			this.lengthReduction = 0;
-			
-		}
-		
-	}
-	
-	public class PlusGraph extends Graph {
-		
-		public ArrayList<PlusEdge> plusEdge = null;	
-		public ArrayList<PlusVertex> plusVertex = null;
-		public ArrayList<Vertex> topVerts = null;
-		public ArrayList<Vertex> botVerts = null;
-		
-		public PlusGraph() {
-			
-			super();
-			
-			this.plusEdge = new ArrayList <PlusEdge>();
-			this.plusVertex = new ArrayList <PlusVertex>();
-			
-			this.topVerts = new ArrayList<Vertex>();
-			this.botVerts = new ArrayList<Vertex>();			
-			
-		}
-		
-		public ArrayList<PlusVertex> getPlusVertices() {
-			return this.plusVertex;			
-		}
-		
-	}
-	
-	public class ROIMorphoProps {
-		
-		public double roiBulkVolume;		
-		public double phaseVolume;
-		public double phaseVolumeFraction;
-		public double surfaceArea;		
-		public double meanCurvature;
-		public double eulerNumber;
-		
-		public double gamma;
-		
-		public double averagePhaseDiameter;
-		public double averageDistance2PhaseBoundary;
-		public double fractionLessThan3MMFromPhaseBoundary;
-		public double fractionMoreThan3MMFromPhaseBoundary;
-		
-		public double surfaceFractalDimension;					
-		
-		public double anisotropy;		
-		public String mainAlignment;
-			
-		public int phasePercolates;	
-		public double criticalPhaseDiameter;		
-		public double percolatingVolumeFraction;
-		public double percolationThreshold;
-		public double largesPhaseClusterVolumeFraction;
-		
-		public double volumeConnected2Top;
-		public double volumeFractionConnected2Bottom;
-		
-		public double depthOfPhasePenetration;
-
-		public int[] distanceHistogram;		
-		
-	}
-	
-	public class DistanceProps {
-		
-		public double averageDistance2PhaseBoundaryInMM;
-		public double medianDistance2PhaseBoundaryInMM;
-		public double maxDistance2PhaseBoundaryInMM;
-		public double modeDistance2PhaseBoundaryInMM;
-		public double fractionLessThan3MMFromPhaseBoundary;
-		public double fractionMoreThan3MMFromPhaseBoundary;
-		
-	}
-	
-	public class PoreClusterProps {
-			
-		public boolean hasItObjects;
-		public boolean containsAParticleAnalysis;
-		public int[] id;								//ID: unique particle identifier; this number is the label used for the particle in all calculations and output
-		public double[] volume;							//Vol: particle volume
-		public double[] surfaceArea;					//SA: surface area (0 if too small for mesh to be produced; see warning log)
-		public double[] meanCurvature;
-		public double[] euler;	
-
-		public boolean[] isPercolating;
-		public boolean[] touchesTop;
-		public boolean[] touchesBot;
-		
-		public double[] xCenter;						//x Cent: x-coordinate of particle centroid
-		public double[] yCenter;						//y Cent: y-coordinate of particle centroid
-		public double[] zCenter;						//z Cent: z-coordinate of particle centroid
-		
-		public int[] minZ;
-		public int[] maxZ;
-		public int[] minX; 
-		public int[] maxX;
-		public int[] minY;
-		public int[] maxY;
-	}
-
-	public class ParallelFloydWarshall {
-	  
-		//Ross Anderson's parallel Floyd-Warshall algorithm
-		
-		private ExecutorService exec;		  
-		private int numThreads;
-		private double[] current;
-		private double[] next;
-		
-		private double[] currentD;
-		private double[] nextD;
-		
-		private int[] currentP;
-		private int[] nextP;
-		  
-		private int[] maxIndex;
-		private int numNodes;
-		private boolean solved;
-		
-		private double[][] outAdjacency;
-		private double[][] outDistance;
-		private int[][] outPrede;
-		
-		private int getIndex(int i, int j){
-			return i*numNodes+j;
-	  	}
-	  
-	  	private int getI(int index){
-	  		return index / numNodes;
-	  	}
-	  
-	  	private int getJ(int index){
-	  		return index % numNodes;
-	  	}
-	  
-	  	/**
-	   	* @param numNodes the number of nodes in the graph
-	   	* @param distances the matrix of distances between nodes, indexed from 0 to
-	   	*                  numNodes-1.  distances[i][j] cost of a directed edge from
-	   	*                  i to j.  Must be Double.POSITIVE_INFINITY if the edge is
-	   	*                  not present.  distance[i][i] is a self arc (allowed).
-	   	*/
-	  	public ParallelFloydWarshall(int numNodes, double[][] adjacencyMatrix, double[][] distanceMatrix, int[][] predecessorMatrix,
-	  								ExecutorService exec, int numThreads) {
-	  		
-		  	this.exec = exec;
-		  	this.numThreads = numThreads;
-		  	this.numNodes = numNodes;
-		  	this.current = new double[numNodes*numNodes];
-		  	this.next = new double[numNodes*numNodes];
-		  	this.currentD = new double[numNodes*numNodes];
-		  	this.nextD = new double[numNodes*numNodes];
-		  	this.currentP = new int[numNodes*numNodes];
-		  	this.nextP = new int[numNodes*numNodes];
-		  	this.maxIndex = new int[numNodes*numNodes];
-		  	Arrays.fill(maxIndex, -1);
-		  	for(int i = 0; i < numNodes; i++){
-			  	for(int j = 0; j < numNodes; j++){
-				  	current[getIndex(i,j)] = adjacencyMatrix[i][j];
-				  	currentD[getIndex(i,j)] = distanceMatrix[i][j];
-				  	currentP[getIndex(i,j)] = predecessorMatrix[i][j];
-			  	}
-		  	}
-		  	this.solved = false;		  	
-		  	
-		  	this.outAdjacency = adjacencyMatrix;
-		  	this.outDistance = distanceMatrix;
-		  	this.outPrede = predecessorMatrix;
-	  	}
-	  
-	  	public double[][] getAdjacencyMatrix() {
-	  		
-	  		for (int k = 0 ; k < numNodes*numNodes ; k++) {
-	  			
-			  	int i = getI(k);
-			  	int j = getJ(k);
-	  			
-			  	outAdjacency[i][j] = current[k];
-	  		}
-	  		
-	  		return outAdjacency;
-	  		
-	  	}
-	  	
-	  	public double[][] getDistanceMatrix() {
-	  		
-	  		for (int k = 0 ; k < numNodes*numNodes ; k++) {
-	  			
-			  	int i = getI(k);
-			  	int j = getJ(k);
-	  			
-			  	outDistance[i][j] = currentD[k];
-	  		}
-	  		
-	  		return outDistance;
-	  		
-	  	}
-	  	
-	  	public int[][] getPredecessorMatrix() {
-	  		
-	  		for (int k = 0 ; k < numNodes*numNodes ; k++) {
-	  			
-			  	int i = getI(k);
-			  	int j = getJ(k);
-	  			
-			  	outPrede[i][j] = currentP[k];
-	  		}
-	  		
-	  		return outPrede;	  		
-	  	}
-	  	
-	  	public void solve(){
-		  	if(solved){
-			  	throw new RuntimeException("Already solved");
-		  	}
-		  	for(int k = 0; k < numNodes; k++){
-			  	List<Callable<Boolean>> tasks = new ArrayList<Callable<Boolean>>();
-			  	if(current.length < numThreads){
-				  	for(int i = 0; i < current.length; i++){
-					  	tasks.add(new FloydJob(i,i+1,k));
-				  	}
-			  	}
-			  	else{
-				  	for(int t = 0; t < numThreads; t++){
-				  		int calcsPerThread = current.length/numThreads;
-					  	int lo = t * calcsPerThread;
-					  	int hi = (t+1) * calcsPerThread;
-					  	tasks.add(new FloydJob(lo,hi,k));
-				  	}
-			  	}
-			  	try {
-				  	List<Future<Boolean>> results = this.exec.invokeAll(tasks);
-				  	for(Future<Boolean> result : results){
-					  	if(!result.get().booleanValue()){
-						  	throw new RuntimeException();
-					  	}
-				  	}
-			  	} catch (InterruptedException e) {
-				  	throw new RuntimeException(e);
-			  	} catch (ExecutionException e) {
-				  	throw new RuntimeException(e);
-			  	}
-			  	double[] temp = current;
-			  	double[] tempD = currentD;
-			  	int[] tempP = currentP;
-			  	current = next;
-			  	currentD = nextD;
-			  	currentP = nextP;
-			  	next = temp;
-			  	nextD = tempD;  
-			  	nextP = tempP;  
-		  	}
-		  	next = null;
-		  	nextD = null;
-		  	nextP = null;
-		  	solved = true;
-	  	}
-	  
-	  	/**
-	  	 * 	
-	  	 * @param i must lie in in [0,numNodes)
-	  	 * @param j must lie in in [0,numNodes)
-	  	 * @return the length of the shortest directed path from node i to node j.
-	  	 *         If i == j, gives the shortest directed cycle starting at node i
-	  	 *          (note that the graph may contain nodes with self loops).  Returns
-	  	 *         Double.POSITIVE_INFINITY if there is no path from i to j.
-	  	 */
-	  	public double shorestPathLength(int i, int j){
-	  		if(!solved){
-	  			throw new RuntimeException("Must solve first");
-	  		}
-	  		return this.current[getIndex(i,j)];
-	  	}
-	  	/**
-	  	 * Example: If the path from node 2 to node 5 is an edge from 2 to 3 and then
-	  	 * an edge from 3 to 5, the return value will be
-	  	 * Arrays.asList(Integer.valueOf(2),Integer.valueOf(3),Integer.valueOf(5));
-	  	 * 
-	  	 * @param i the start of the directed path
-	  	 * @param j the end of the directed path
-	  	 * @return The shortest path starting at node i and ending at node j, or null
-	  	 *         if no such path exists.
-	  	 */
-	  	public List<Integer> shortestPath(int i, int j){    
-		  	if(current[getIndex(i,j)] == Double.POSITIVE_INFINITY){
-			  	return null;
-		  	}
-		  	else{
-			  	List<Integer> ans = new ArrayList<Integer>();      
-			  	ans.add(Integer.valueOf(i));
-			  	shortestPathHelper(i,j,ans);
-			  	return ans;
-		  	}
-	  	}
-	  
-	  	public void shortestPathHelper(int i, int j, List<Integer> partialPath){
-		  	int index = getIndex(i,j);
-		  	if(this.maxIndex[index] < 0){
-			  	partialPath.add(Integer.valueOf(j));
-		  	}
-		  	else{
-			  	shortestPathHelper(i,this.maxIndex[index],partialPath);
-			  	shortestPathHelper(this.maxIndex[index],j,partialPath);
-		  	}
-	  	}
-	  
-	  	private class FloydJob implements Callable<Boolean>{
-		  
-		  	private final int lo;
-		  	private final int hi;
-		  	private final int k;
-		  
-		  	public FloydJob(int lo, int hi, int k){
-			  	this.lo = lo;
-			  	this.hi = hi;
-			  	this.k = k;
-		  	}
-		  
-		  	@Override
-		  	public Boolean call() throws Exception {
-			  	for(int index = lo; index < hi; index++){
-				  	int i = getI(index);
-				  	int j = getJ(index);
-				  	double alternatePathValue = current[getIndex(i,k)]
-	                                   		+ current[getIndex(k,j)];
-				  	
-				  	double alternatePathValueD = currentD[getIndex(i,k)]
-                       		+ currentD[getIndex(k,j)];
-				  	
-				  	if(alternatePathValue < current[index]){
-					 	next[index] = alternatePathValue;
-					 	nextD[index] = alternatePathValueD;
-					 	nextP[index] = currentP[getIndex(k,j)];
-					 	maxIndex[index] = k;
-				  	}
-				  	else{
-					  	next[index] = current[index];
-					  	nextD[index] = currentD[index];
-					  	nextP[index] = currentP[index];
-				  	}
-			  	}
-			  	return true;
-		  	}
-	  	}
-	}
-	
-	public ConnectingGraphs findConnectingGraphs(PlusGraph[] mPG, int numberOfLastSlice, int numberOfAddedSlices) {
-		
-		ConnectingGraphs mCG = new ConnectingGraphs();
-		
-		for (int i = 0 ; i < mPG.length ; i++) {
-			
-			PlusGraph nowGraph = mPG[i];
-			
-			ArrayList<PlusEdge> edgeList = nowGraph.plusEdge;
-			ArrayList<Vertex> vertexList = nowGraph.getVertices();
-			
-			//also remember if a Vertex touches the top..
-			ArrayList<Integer> touchesTop = new ArrayList<Integer>();
-			ArrayList<Integer> touchesBottom = new ArrayList<Integer>();
-			
-			int cc=0;
-			for (PlusEdge edge : edgeList) {
-				
-				cc++;
-				
-				Vertex v1 = edge.getV1();
-				Vertex v2 = edge.getV2();
-				
-				if (v1 == null | v2 == null) IJ.error("Damn!!!");
-				
-				// use the index of the vertices as the index in the matrix			
-				int row = vertexList.indexOf(v1);		
-				
-				if (vertexIsConnected2TopAndBottom(v1, numberOfLastSlice, numberOfAddedSlices) == 1) {			
-					if(!touchesTop.contains(row)) {
-						touchesTop.add(row);	
-					}
-				}			
-				if (vertexIsConnected2TopAndBottom(v1, numberOfLastSlice, numberOfAddedSlices) == 2) {
-					if (!touchesBottom.contains(row)) {
-						touchesBottom.add(row);						
-					}
-				}
-				
-				int column = vertexList.indexOf(v2);			
-				if (vertexIsConnected2TopAndBottom(v2, numberOfLastSlice, numberOfAddedSlices) == 1) {
-					if (!touchesTop.contains(column)) {
-						touchesTop.add(column);						
-					}
-				}
-				if (vertexIsConnected2TopAndBottom(v2, numberOfLastSlice, numberOfAddedSlices) == 2) {
-					if (!touchesBottom.contains(column)) {
-						touchesBottom.add(column);						
-					}
-				}
-			}
-			
-			if (touchesTop.size() > 0 & touchesBottom.size() > 0) mCG.percolating.add(i);
-			if (touchesTop.size() > 0 & touchesBottom.size() == 0) mCG.con2Top.add(i);
-			if (touchesTop.size() == 0 & touchesBottom.size() > 0) mCG.con2Bot.add(i);
-			
-		}
-		
-		return mCG;
-		
-	}
-	
-	public ROIMorphoProps getDistances2AirFilledPores(InputOutput.MyFileCollection	mFC, ColumnRoi colRoi, MenuWaiter.ROISelectionOptions mRSO) {
-		
-		MorphologyAnalyzer morph = new MorphologyAnalyzer();
-		
-		//init output structure
-		MorphologyAnalyzer.ROIMorphoProps myR = morph.new ROIMorphoProps();
-		
-		//colRoi.nowTiff.updateAndDraw();colRoi.nowTiff.show();
-		
-		//add black invert ROI
-		ImageStack distStack = new ImageStack(colRoi.nowTiff.getWidth(), colRoi.nowTiff.getHeight());
-		ImageProcessor whiteOne = colRoi.nowTiff.getProcessor().duplicate();
-		whiteOne.fill();
-		distStack.addSlice(whiteOne);
-		//disp.displayIP(whiteOne, "test");
-		for (int z = 1 ; z < colRoi.nowTiff.getNSlices() + 1; z++) {
-			colRoi.nowTiff.setPosition(z);
-			ImageProcessor nowIP = colRoi.nowTiff.getProcessor().duplicate();
-			nowIP.invert();
-			distStack.addSlice(nowIP);
-		}
-		
-	    //monitor memory
-	    Runtime rt = Runtime.getRuntime();
-	    long currInUse = (rt.totalMemory() - rt.freeMemory()) / 1000000000;  //in GB		
-		
-		//distTiff.updateAndDraw();distTiff.show();
-		
-		//calculate distance map
-		IJ.showStatus("Performing Euklidean distance transform ...");
-		
-		short[] shortWeights = ChamferWeights3D.BORGEFORS.getShortWeights();
-		boolean normalize = true;
-		DistanceTransform3D dt = new DistanceTransform3DShort(shortWeights, normalize);
-		distStack = dt.distanceMap(distStack);
-				
-		//remove topmost slice and set to distTiff
-		distStack.deleteSlice(1);
-		ImagePlus distTiff = new ImagePlus("DistImage", distStack);
-
-		//distTiff.updateAndDraw();distTiff.show();
-		
-		//calc average distance to aerated pore
-		currInUse = (rt.totalMemory() - rt.freeMemory()) / 1000000000;  //in GB		
-		DistanceProps myDP = calculatePhaseDistanceProperties(distTiff, colRoi);
-		myR.averageDistance2PhaseBoundary = myDP.averageDistance2PhaseBoundaryInMM;
-		myR.fractionLessThan3MMFromPhaseBoundary = myDP.fractionLessThan3MMFromPhaseBoundary;
-		myR.fractionMoreThan3MMFromPhaseBoundary = myDP.fractionMoreThan3MMFromPhaseBoundary;
-		
-		//delete distTiff
-		distTiff.unlock();distTiff.flush();
-		System.gc();System.gc();
-		currInUse = (rt.totalMemory() - rt.freeMemory()) / 1000000000;  //in GB	
-		
-//		//get histogram of distances
-//		ImageStack binStack = new ImageStack(colRoi.nowTiff.getWidth(), colRoi.nowTiff.getHeight(),colRoi.nowTiff.getNSlices());			
-//		for (int z = 1 ; z < colRoi.nowTiff.getNSlices() ; z++) {  //skip first slice since it was added to sumulate the soil surface..
-//			distTiff.setPosition(z + 1);
-//			ImageProcessor thIP = distTiff.getProcessor();
-//			ImageProcessor cpIP = thIP.duplicate();			
-//			ImageProcessor binIP = cpIP.convertToByte(false);
-//			binStack.setProcessor(binIP, z);		
-//		}
-//		ImagePlus binTiff = new ImagePlus("distanceBin", binStack);
-		
-		//binTiff.updateAndDraw();binTiff.show();
-		
-		//get average distance to aerated pore
-		//myR.distanceHistogram = hist.extractHistograms8(binTiff);
-		
-		return myR;		
-		
-	}
-	
-	public ROIMorphoProps getSomeSimpleMorphoProps(InputOutput.MyFileCollection	mFC, ColumnRoi colRoi, MenuWaiter.ROISelectionOptions mRSO) {
-		
-		MorphologyAnalyzer morph = new MorphologyAnalyzer();
-		InputOutput jIO = new InputOutput();
-		BoundingBox3D mBB = new BoundingBox3D();
-		
-		//init output structure
-		MorphologyAnalyzer.ROIMorphoProps myR = morph.new ROIMorphoProps();
-		
-		//analyze air phase
-		FractalProperties myFP = morph.calculateFractalProperties(colRoi, mRSO);
-		myR.surfaceFractalDimension = myFP.surfaceFractalDim;
-		IJ.showStatus("Calculating macroporosities ...");
-		
-		//macroporosity
-		myR.phaseVolume = morph.macroPoreVolume(colRoi.nowTiff);
-		double[] bulkSoilVolume = {0, 0, 0, 0};
-		ImagePlus surfTiff = new ImagePlus();		
-		if (mRSO.choiceOfRoi.equalsIgnoreCase("RealSample") & mRSO.includeSurfaceTopography) {
-			String[] myGandS = jIO.getTheCorrectGaugeNSurfaceFiles(mFC);
-			surfTiff = jIO.openTiff3D(mFC.mySurfaceFolder + mFC.pathSep + myGandS[1]);
-			if (mFC.myCutSurfaceFolder != null) {
-				surfTiff = jIO.openTiff3D(mFC.myCutSurfaceFolder + mFC.pathSep + myGandS[1]);
-			}
-			bulkSoilVolume = morph.calculateTheBulkSoilVolume(myGandS[0], surfTiff, mRSO, mFC);
-			myR.roiBulkVolume = bulkSoilVolume[0];			
-		}
-		else { 
-			bulkSoilVolume[0] = Math.round(mRSO.areaOfInterest) * (double)colRoi.nowTiff.getNSlices();
-			myR.roiBulkVolume = bulkSoilVolume[0];
-			surfTiff = null;
-		}				
-		myR.phaseVolumeFraction = myR.phaseVolume / myR.roiBulkVolume;	
-		
-		IJ.showStatus("Identifying connected pore-clusters ...");
-
-		FloodFillComponentsLabeling3D myFCCL = new FloodFillComponentsLabeling3D(26, 32);
-		ImageStack myLabelStack = myFCCL.computeLabels(colRoi.nowTiff.getStack());
-										
-		IJ.freeMemory();IJ.freeMemory();
-		
-		//calculate surface and Euler number.. using MorphoLibJ
-		ImagePlus labelTiff = new ImagePlus();
-		labelTiff.setStack(myLabelStack);				
-		
-		int[] labels = LabelImages.findAllLabels(myLabelStack);
-		int numOfObjects = labels.length;
-		Calibration calib = labelTiff.getCalibration();
-		
-		//also find bounding boxes 
-		Box3D[] myBox = mBB.analyzeRegions(myLabelStack, labels, calib);
-		
-		//labelTiff.updateAndDraw();
-		//labelTiff.show();
-		
-		//surface and curvature
-		IntrinsicVolumesAnalyzer3D mIRA = new IntrinsicVolumesAnalyzer3D();
-		mIRA.setConnectivity(26);
-		Result[] myMorphos = mIRA.analyzeRegions(myLabelStack, labels, calib);
-		
-		double[] morphoVols = new double[myMorphos.length];
-		double[] morphoSurf = new double[myMorphos.length];
-		double[] morphoCurv = new double[myMorphos.length];
-		double[] morphoEuler = new double[myMorphos.length];
-		for (int i = 0 ; i < myMorphos.length ; i++) {
-			morphoVols[i] = myMorphos[i].volume;
-			morphoSurf[i] = myMorphos[i].surfaceArea;
-			morphoCurv[i] = 2 * Math.PI * myMorphos[i].meanBreadth;
-			morphoEuler[i] = myMorphos[i].eulerNumber;
-		}
-					
-		//myP.phaseVolume = StatUtils.sum(morphoVols);
-		myR.surfaceArea = StatUtils.sum(morphoSurf);
-		myR.meanCurvature = StatUtils.sum(morphoCurv);			
-		myR.eulerNumber = StatUtils.sum(morphoEuler);	
-		
-		//calculate percolating clusters ... needs the other parameters.. and is needed for following parameters	
-		//calculate percolating clusters ... needs the other parameters.. and is needed for following parameters	
-		ArrayList<Integer> conTop = new ArrayList<Integer>();
-		ArrayList<Integer> conBot = new ArrayList<Integer>();
-		ArrayList<Integer> isPercolating = new ArrayList<Integer>();
-		if (numOfObjects > 0) {
-			conTop = check4TouchingTheTop(labelTiff, colRoi.nowTiff, surfTiff);
-			conBot = check4TouchingTheBottom(labelTiff, colRoi.nowTiff, surfTiff);
-			isPercolating = checkForPercolatingClusters(numOfObjects, conTop, conBot);				
-		}	
-		
-		//calculate percolating phase fraction
-		double percolatingVolume = 0;
-		for (int i : isPercolating) percolatingVolume += morphoVols[i-1];   
-		myR.percolatingVolumeFraction = percolatingVolume / myR.roiBulkVolume;
-		
-		//check if volume percolates
-		myR.phasePercolates = 0;
-		if (myR.percolatingVolumeFraction > 0) myR.phasePercolates = 1;
-		
-		//calculate fraction of largest pore cluster
-		double volOfLC = StatUtils.max(morphoVols);
-		myR.largesPhaseClusterVolumeFraction = volOfLC / myR.roiBulkVolume;
-		
-		//calculate depth of phase penetration		
-		double penetrationDepth = 0;
-		for (int i = 0 ; i < myBox.length ; i++) if (myBox[i].getZMax() > penetrationDepth) penetrationDepth = myBox[i].getZMax();
-		myR.depthOfPhasePenetration = penetrationDepth;
-		
-		//calculate global connection probability (gamma)
-		double sumOfSquaredClusterSizes = 0;
-		double rF = 1000000;
-		for (int i = 0 ; i < myMorphos.length ; i++) {
-			double squaredClusterSize = morphoVols[i] / rF * morphoVols[i] / rF;
-			sumOfSquaredClusterSizes += squaredClusterSize;
-		}
-		myR.gamma = sumOfSquaredClusterSizes / (myR.phaseVolume / rF * myR.phaseVolume / rF);	
-		
-		return myR;
-		
-	}
 }
 
 

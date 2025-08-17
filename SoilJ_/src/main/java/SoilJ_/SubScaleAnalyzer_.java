@@ -138,7 +138,7 @@ public class SubScaleAnalyzer_ extends ImagePlus implements PlugIn  {
 					RoiHandler.ColumnRoi colRoi = roi.prepareDesiredRoi(mFC, nowTiff, mPSA.mRSO, mPSA.imagePhase2BeAnalyzed, mPSA.nameOfAnalyzedPhase);
 													
 					//apply analyzes
-					morph.tailoredPoreSpaceAnalyzer(j, mFC, colRoi, mPSA);
+					morph.aTailoredPoreSpaceAnalyzer(j, mFC, colRoi, mPSA);
 				}
 			}
 		}

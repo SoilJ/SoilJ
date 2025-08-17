@@ -98,7 +98,7 @@ public class PoreSpaceAnalyzer_ extends ImagePlus implements PlugIn  {
 			System.gc();System.gc();			
 			
 			//apply analyzes
-			morph.tailoredPoreSpaceAnalyzer(i, mFC, colRoi, mPSA);		
+			morph.aTailoredPoreSpaceAnalyzer(i, mFC, colRoi, mPSA);		
 			
 			//try to free up some memory
 			colRoi.nowTiff.unlock();			

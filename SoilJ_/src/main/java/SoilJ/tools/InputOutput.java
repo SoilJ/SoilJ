@@ -219,6 +219,24 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		
 	}
 		
+	public ImagePlus loadSurfaceTiff(MyFileCollection mFC, MenuWaiter.ROISelectionOptions mRSO) {
+		
+		//load surface Tiff in case it is desired
+		ImagePlus surfTiff = new ImagePlus();
+		if (mRSO.choiceOfRoi.equalsIgnoreCase("RealSample") & mRSO.includeSurfaceTopography) {
+			String[] myGandS = getTheCorrectGaugeNSurfaceFiles(mFC);
+			surfTiff = openTiff3D(mFC.mySurfaceFolder + mFC.pathSep + myGandS[1]);
+			if (mFC.myCutSurfaceFolder != null) {
+				surfTiff = openTiff3D(mFC.myCutSurfaceFolder + mFC.pathSep + myGandS[1]);
+			}		
+		}
+		else 
+			surfTiff = null;
+	
+		return surfTiff;
+		
+	}
+	
 	public MyFileCollection addCurrentFileInfo(MyFileCollection mFC) {
 		
 		String pathSep = "\\";
