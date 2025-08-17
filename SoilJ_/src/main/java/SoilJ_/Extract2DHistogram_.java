@@ -179,7 +179,8 @@ public class Extract2DHistogram_ extends ImagePlus implements PlugIn  {
 						new File(mFC.myGradientFolder).mkdir();
 					}
 				}
-				gradTiff = jOD.createGradientImage(mFC, jIO.openTiff3D(mFC));
+				boolean saveImg = true;
+				gradTiff = jOD.createGradientImage(mFC, jIO.openTiff3D(mFC), saveImg);
 			}
 			if (!e2DH.calcGradientImage) {
 				try {			

@@ -3747,7 +3747,7 @@ public class ImageManipulator implements PlugIn {
 		
 	}
 	
-	public ImagePlus extractPOMandRoots(ImagePlus nowTiff, InputOutput.MyFileCollection mFC, MenuWaiter.POMThresholderMenuReturn mTMR) {
+	public ImagePlus extractPOMandRootsOldStyle_deprecated(ImagePlus nowTiff, InputOutput.MyFileCollection mFC, MenuWaiter.POMThresholderMenuReturn mTMR) {
 		
 		//init
 		ImageCalculator myIC =  new ImageCalculator();		
@@ -3803,11 +3803,12 @@ public class ImageManipulator implements PlugIn {
 			}
 			purgedTiff.setStack(lowerCutoff + "_" + upperCutoff, purgedStack);
 
-			//run an erosion operation on the extracted gray range 
-			purgedTiff = jE.erode(purgedTiff, 255, true);
+			//run erosion operations on the extracted gray range 	
+			for (int o = 0 ; o < mTMR.openingSteps ; o++) purgedTiff = jE.erode(purgedTiff, 255, true);
 			
-			//run a dilation operation on the extracted gray range 
-			purgedTiff = jD.dilate(purgedTiff, 255, true);
+			//run dilation operations on the extracted gray range 
+			for (int o = 0 ; o < mTMR.openingSteps ; o++) purgedTiff = jD.dilate(purgedTiff, 255, true);
+
 			
 			//carry out a closing again to fill holes
 			purgedTiff = jD.dilate(purgedTiff, 255, true);
@@ -3837,6 +3838,77 @@ public class ImageManipulator implements PlugIn {
 		//outTiff.show();
 		
 		return outTiff;
+	}
+	
+	public ImagePlus extractPOMandRoots(ImagePlus nowTiff, InputOutput.MyFileCollection mFC, MenuWaiter.POMThresholderMenuReturn mTMR) {
+		
+		//init
+		ImageCalculator myIC =  new ImageCalculator();		
+
+		Erode_ jE = new Erode_();
+		Dilate_ jD = new Dilate_();
+		ObjectDetector jOD = new ObjectDetector();
+		
+		//set up results image
+		ImageStack purgedStack = new ImageStack(nowTiff.getWidth(), nowTiff.getHeight());
+		ImagePlus purgedTiff = new ImagePlus();
+		
+		//calculate black top hat image
+		ImagePlus closedTiff = jOD.applyClosing2Image(mFC, nowTiff, false);
+		
+		//closedTiff.updateAndDraw();closedTiff.show();
+		
+		//calculate black top hat image
+		ImagePlus gradTiff = jOD.createGradientImage(mFC, nowTiff, false);
+			
+		//gradTiff.updateAndDraw();gradTiff.show();
+		
+		//cut out POM, roots, earthworms, etc..
+		for (int z = 1 ; z < nowTiff.getNSlices() + 1 ; z++) {
+			
+			IJ.showStatus("Extracting POM, roots, earthwomrs, etc. in slice " + z + "/" + nowTiff.getNSlices());
+			
+			nowTiff.setPosition(z);
+			closedTiff.setPosition(z);
+			gradTiff.setPosition(z);
+			
+			ImageProcessor nowIP = nowTiff.getProcessor();
+			ImageProcessor closedIP = closedTiff.getProcessor();
+			ImageProcessor gradIP = gradTiff.getProcessor();
+			ImageProcessor purgedIP = new ByteProcessor(nowTiff.getWidth(), nowTiff.getHeight());
+			
+			for (int x = 0 ; x < nowTiff.getWidth() ; x++) {		
+				for (int y = 0 ; y < nowTiff.getHeight() ; y++) {					
+					int nowgray = (int)nowIP.getPixelValue(x, y);
+					int closedgray = (int)Math.round(closedIP.getPixelValue(x, y));
+					int gradgray = (int)Math.round(gradIP.getPixelValue(x, y));
+					int modgray = 255;
+					if (nowgray < mTMR.minThreshold) modgray = 0;
+					if (nowgray > mTMR.maxThreshold) modgray = 0;
+					if (closedgray - nowgray > mTMR.blackTopHatThreshold) modgray = 0;
+					if (gradgray > mTMR.gradientThreshold) modgray = 0;
+					purgedIP.putPixel(x, y, modgray);
+				}
+			}
+			purgedStack.addSlice(purgedIP);
+		}
+		purgedTiff.setStack("", purgedStack);
+
+		//carry out a closing..
+		purgedTiff = jE.erode(purgedTiff, 255, true);
+		purgedTiff = jD.dilate(purgedTiff, 255, true);
+				
+		if (mTMR.minPOMVoxelNumber > 0) {
+			
+			IJ.showStatus("Filtering out smaller fragments...");			
+			purgedTiff = filterOutSmallClusters(purgedTiff, mTMR.minPOMVoxelNumber);
+			
+		}
+		
+		//outTiff.updateAndDraw();
+		//outTiff.show();
+		
+		return purgedTiff;
 	}
 	
 	public ImagePlus filterOutSmallClusters(ImagePlus nowTiff, int minVoxNumber) {

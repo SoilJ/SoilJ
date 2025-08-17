@@ -369,6 +369,10 @@ public class MenuWaiter implements PlugIn {
 		public int minThreshold = 0;
 		public int maxThreshold = 0;
 		public int minPOMVoxelNumber;
+		public int openingSteps = 0;
+		
+		public int blackTopHatThreshold;
+		public int gradientThreshold;
 		
 		public double windowSize;
 		public double overlap;
@@ -3595,15 +3599,21 @@ public class MenuWaiter implements PlugIn {
 		gd.addMessage("");
 		gd.addMessage("Make sure that you have run 'CalibrateGrayValues' when you apply this option!!!");
 
-		gd.addNumericField("Enter the lower threshold for segmenting the image ", 9000, 0, 5, "");
+		gd.addNumericField("Enter the lower threshold for segmenting the image ", 10000, 0, 5, "");
 
-		gd.addNumericField("Enter the upper threshold for segmenting the image ", 16000, 0, 5, "");
+		gd.addNumericField("Enter the upper threshold for segmenting the image ", 16500, 0, 5, "");
 		
-		gd.addNumericField("Enter gray-value range of search window", 3800, 0, 5, "");
+		gd.addNumericField("Enter black top hat image threshold ", 900, 0, 5, "");
+		
+		gd.addNumericField("Enter gradient image threshold ", 9000, 0, 5, "");
+		
+		//gd.addNumericField("Enter gray-value range of search window ", 3500, 0, 5, "");
+		
+		//gd.addNumericField("How many erosions steps do you want to run on each range ", 2, 0, 1, "");
 
-		gd.addNumericField("Enter search window overlap in percent", 90, 0, 2, "");
+		//gd.addNumericField("Enter search window overlap in percent ", 80, 0, 2, "");
 		
-		gd.addNumericField("Filter away all POM or root clusters with less than ", 25, 0, 5, " voxels (0 will skip this step)");
+		gd.addNumericField("Filter away all POM or root clusters with less than ", 50, 0, 5, " voxels (0 will skip this step)");
 
 		//saving options
 		gd.addMessage("");
@@ -3611,7 +3621,7 @@ public class MenuWaiter implements PlugIn {
 
 		gd.addCheckbox("Save the segmented, 3-D binary images", true);
 
-		gd.addCheckbox("Save segmentation results as overlays in some sample slices", true);		
+		//gd.addCheckbox("Save segmentation results as overlays in some sample slices", true);		
 		
 		String myReference = "If you are using this plugin please cite the following references: \n\n";
 		gd.setInsets(40, 0, 0);gd.addMessage(myReference);
@@ -3627,14 +3637,18 @@ public class MenuWaiter implements PlugIn {
 	    	mTMR.minThreshold = (int)Math.round(gd.getNextNumber());
 	    	mTMR.maxThreshold = (int)Math.round(gd.getNextNumber());
 
-	    	mTMR.windowSize = gd.getNextNumber();
-	    	mTMR.overlap = gd.getNextNumber();
+	    	//mTMR.windowSize = gd.getNextNumber();
+	    	//mTMR.openingSteps = (int)Math.round(gd.getNextNumber());
+	    	//mTMR.overlap = gd.getNextNumber();
 
+	    	mTMR.blackTopHatThreshold = (int)Math.round(gd.getNextNumber());
+	    	mTMR.gradientThreshold = (int)Math.round(gd.getNextNumber());
+	    	
 	    	mTMR.minPOMVoxelNumber = (int)Math.round(gd.getNextNumber());
 	    	
 	    	//get saving options
 	    	mTMR.save3DImage = gd.getNextBoolean();
-	    	mTMR.save4Evaluation = gd.getNextBoolean();	
+	    	//mTMR.save4Evaluation = gd.getNextBoolean();	
 
 	      	return mTMR;
 	    }

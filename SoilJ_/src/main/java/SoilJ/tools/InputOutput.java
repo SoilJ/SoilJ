@@ -1551,7 +1551,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
             myString += "phase is percolating:              "	+ rMP.phasePercolates + "\n";
             myString += "critical diameter:                 "	+ String.format("%2.2f",rMP.criticalPhaseDiameter) + " vx res\n";
 
-            myString += "percolating volume fraction:       "   + String.format("%1.4e",rMP.percolatingVolumeFraction) + "\n";
+            myString += "percolating volume:                "   + String.format("%1.4e",rMP.percolatingVolumeFraction) + " vx\n";
             myString += "phase volume connected to top:     "   + String.format("%1.4e",rMP.volumeConnected2Top) + " vx\n";
             myString += "mean curvature:                    "	+ String.format("%1.4e",rMP.meanCurvature) + "\n";
             

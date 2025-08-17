@@ -67,10 +67,10 @@ public class ExtractPOMAndRoots_ extends ImagePlus implements PlugIn  {
 		MenuWaiter.POMThresholderMenuReturn mTMR = menu.showPOMThresholdingDialog();
 		if (mTMR == null) return;
 		String thresholds = "";
-		if (mTMR.minThreshold > 0) thresholds = "" + mTMR.minThreshold / 100 + "h";
-		if (mTMR.maxThreshold > 0) thresholds = thresholds + "_" + mTMR.maxThreshold / 100 + "h";
+		thresholds = "" + mTMR.minThreshold / 100 + "h";
+		thresholds += "_" + mTMR.maxThreshold / 100 + "h";
 		
-		myOutFolder = "POM" + thresholds + "_W" + (int)Math.round(mTMR.windowSize / 100) + "h_Over" + (int)Math.round(mTMR.overlap) + "p";
+		myOutFolder = "POM" + thresholds + "_BTHTh" + (int)Math.round(mTMR.blackTopHatThreshold / 100) + "h_GradTh" + (int)Math.round(mTMR.gradientThreshold / 100) + "h";
 	
 		//select file or files
 	  	InputOutput.MyFileCollection mFC = jIO.fileSelector("Please choose a file or folder with your image data");

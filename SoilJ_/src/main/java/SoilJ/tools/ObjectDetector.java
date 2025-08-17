@@ -491,19 +491,34 @@ public class ObjectDetector implements PlugIn {
 		return radialgrayValues;
 	}
 	
-	public ImagePlus createGradientImage(InputOutput.MyFileCollection mFC, ImagePlus myTiff) {
+	public ImagePlus createGradientImage(InputOutput.MyFileCollection mFC, ImagePlus myTiff, boolean saveImg) {
 		
 		InputOutput jIO = new InputOutput();
 		
-		ImageStack nowStack = myTiff.getStack();
+		ImageStack nowStack = myTiff.getStack().duplicate();
 		Strel3D se = CubeStrel.fromDiameter(2);
 		ImageStack grad = Morphology.gradient(nowStack, se);
 		
 		ImagePlus gradTiff = new ImagePlus("Gradient3D", grad);
 	
-		jIO.tiffSaver(mFC.myGradientFolder, mFC.fileName, gradTiff);
+		if (saveImg) jIO.tiffSaver(mFC.myGradientFolder, mFC.fileName, gradTiff);
 		
 		return gradTiff;		
+	}
+	
+	public ImagePlus applyClosing2Image(InputOutput.MyFileCollection mFC, ImagePlus myTiff, boolean saveImg) {
+		
+		InputOutput jIO = new InputOutput();
+		
+		ImageStack nowStack = myTiff.getStack().duplicate();
+		Strel3D se = CubeStrel.fromDiameter(4);
+		ImageStack closed = Morphology.closing(nowStack, se);
+		
+		ImagePlus closedTiff = new ImagePlus("", closed);
+	
+		if (saveImg) jIO.tiffSaver(mFC.myGradientFolder, mFC.fileName, closedTiff);
+		
+		return closedTiff;		
 	}
 	
 	public SampleBrightness getSampleBrightness(ImagePlus nowTiff, ObjectDetector.ColCoords3D jCO) {
