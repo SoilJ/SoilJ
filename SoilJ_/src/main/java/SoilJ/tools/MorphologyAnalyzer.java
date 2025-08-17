@@ -2863,7 +2863,7 @@ public class MorphologyAnalyzer implements PlugIn {
 				touchesTopList.add(id[i]);	
 				topConVolume += volume[i];
 			}
-			myP.volumeFractionConnected2Top = topConVolume / myP.roiBulkVolume;
+			myP.volumeConnected2Top = topConVolume;
 			if (mPSA.plotPoresConnected2Top) {
 				
 				ImagePlus touchesTopImp = extractSpecificPoreLabels(labelTiff, touchesTopList);
@@ -3616,7 +3616,7 @@ public class MorphologyAnalyzer implements PlugIn {
 		public double percolationThreshold;
 		public double largesPhaseClusterVolumeFraction;
 		
-		public double volumeFractionConnected2Top;
+		public double volumeConnected2Top;
 		public double volumeFractionConnected2Bottom;
 		
 		public double depthOfPhasePenetration;

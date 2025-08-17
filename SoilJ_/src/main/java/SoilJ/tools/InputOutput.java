@@ -1521,7 +1521,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
             myString += "phase volume fraction:             "	+ String.format("%1.4e",rMP.phaseVolumeFraction) + "\n";
             myString += "surface area:                      "	+ String.format("%1.6e",rMP.surfaceArea) + " px\n";
            
-            myString += "average phase thickness:           "	+ String.format("%3.3f",rMP.averagePhaseDiameter) + " res\n";
+            myString += "average phase thickness:           "	+ String.format("%3.3f",rMP.averagePhaseDiameter) + " vx res\n";
             myString += "average distance phase-boundary:   "	+ String.format("%3.3f",rMP.averageDistance2PhaseBoundary) + " res\n";
             myString += "surface fractal dimension:         "	+ String.format("%1.3f",rMP.surfaceFractalDimension) + "\n";
             
@@ -1531,13 +1531,13 @@ public class InputOutput extends ImagePlus implements PlugIn {
             myString += "gamma (connection probability):    "	+ String.format("%1.3f",rMP.gamma) + "\n";
             myString += "Euler number:                      "	+ String.format("%1.6e",rMP.eulerNumber) + "\n";
             myString += "phase is percolating:              "	+ rMP.phasePercolates + "\n";
-            myString += "critical diameter:                 "	+ String.format("%2.2f",rMP.criticalPhaseDiameter) + "\n";
+            myString += "critical diameter:                 "	+ String.format("%2.2f",rMP.criticalPhaseDiameter) + " vx res\n";
 
             myString += "percolating volume fraction:       "   + String.format("%1.4e",rMP.percolatingVolumeFraction) + "\n";
-            myString += "volume fraction connected to top:  "   + String.format("%1.4e",rMP.volumeFractionConnected2Top) + "\n";
+            myString += "phase volume connected to top:     "   + String.format("%1.4e",rMP.volumeConnected2Top) + " vx\n";
             myString += "mean curvature:                    "	+ String.format("%1.4e",rMP.meanCurvature) + "\n";
             
-            myString += "percolation threshold:              "   + String.format("%1.4e",rMP.percolationThreshold) + "\n";
+            myString += "percolation threshold:             "   + String.format("%1.4e",rMP.percolationThreshold) + "\n";
             
             String cMyString = myString.replace(',', '.');
             w.write(cMyString);

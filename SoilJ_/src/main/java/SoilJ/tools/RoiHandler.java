@@ -561,7 +561,7 @@ public class RoiHandler implements PlugIn {
 				}
 				
 				double myOldRadius = StatUtils.mean(avgRadius) - cutAwayFromXY;				// mean of the slice-averages
-				double myRadius = 0;
+				double myRadius = myOldRadius;
 				if (cutAwayFromXY > 0) myRadius = myOldRadius - cutAwayFromXY;	
 				if (keepRadiusAroundCentralAxis > 0) myRadius = keepRadiusAroundCentralAxis;				
 				area = myRadius * myRadius * Math.PI;										// > area
