@@ -86,7 +86,8 @@ public class PoreSpaceAnalyzer_ extends ImagePlus implements PlugIn  {
 			//cut roi		
 			mFC.startSlice = startStopSlices[0];
 			mFC.stopSlice = startStopSlices[1];
-			RoiHandler.ColumnRoi colRoi = roi.prepareDesiredRoi(mFC, jIO.openTiff3DSomeSlices(mFC, colSlices), mPSA.mRSO, mPSA.imagePhase2BeAnalyzed, mPSA.nameOfAnalyzedPhase);
+			ImagePlus nowTiff = jIO.openTiff3DSomeSlices(mFC, colSlices);
+			RoiHandler.ColumnRoi colRoi = roi.prepareDesiredRoi(mFC, nowTiff, mPSA.mRSO, mPSA.imagePhase2BeAnalyzed, mPSA.nameOfAnalyzedPhase);
 			
 			System.gc();System.gc();
 			IJ.showStatus("Trying to clean up memory ... ");

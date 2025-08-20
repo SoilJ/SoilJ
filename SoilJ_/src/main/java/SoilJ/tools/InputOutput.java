@@ -4235,11 +4235,11 @@ public class InputOutput extends ImagePlus implements PlugIn {
 			
 		}
 		if (mRSO.cutAwayFromTop < 0) mRSO.cutAwayFromTop = 0;
-		if (startSlice == 0) startSlice = 1; 			
+		if (startSlice == 0) startSlice = 0; 			
 		
 		if (mRSO.cutZPercent) {
 			startSlice = (int)Math.round((float)mRSO.cutAwayFromTop / 100f * (float)mFC.nOfSlices);
-			if (startSlice == 0) startSlice = 1; 
+			if (startSlice == 0) startSlice = 0; 
 			if (mRSO.cutAwayFromBottom == 0) stopSlice = mFC.nOfSlices;
 			else stopSlice = mFC.nOfSlices - (int)Math.round((float)mRSO.cutAwayFromBottom / 100f * (float)mFC.nOfSlices);
 		}
