@@ -309,8 +309,7 @@ public class MorphologyAnalyzer implements PlugIn {
 		if (mPSA.calcThickness == true) new File(myOutPath + pathSep + "Thickness").mkdir();		
 		if (mPSA.calcDistance == true) new File(myOutPath + pathSep + "Distance").mkdir();	
 		String outROIPath = mFC.myPreOutFolder + pathSep + "Stats" + pathSep + nowImageName + ".roi";				
-		String outAnisotPath = mFC.myPreOutFolder + pathSep + "Stats" + pathSep + "Anisotropy" + pathSep + nowImageName + ".aniso";
-
+		
 		//load surface Tiff if desired
 		ImagePlus surfTiff = jIO.loadSurfaceTiff(mFC, mPSA.mRSO);
 		
@@ -335,7 +334,7 @@ public class MorphologyAnalyzer implements PlugIn {
 		
 		IJ.showStatus("Investigating anisotropies ...");		
 		if (mPSA.calcAnisotropy == true) {			
-			myP = calculateAnisotropy(myP, colRoi.nowTiff, mPSA.mRSO, mFC, outAnisotPath);
+			myP = calculateAnisotropy(myP, colRoi.nowTiff, mPSA.mRSO, mFC);
 		}
 		
 		//colRoi.nowTiff.show();
@@ -2567,7 +2566,7 @@ public class MorphologyAnalyzer implements PlugIn {
 		
 	}
 	
-	public ROIMorphoProps calculateAnisotropy(ROIMorphoProps myP, ImagePlus nowTiff, MenuWaiter.ROISelectionOptions mRSO, InputOutput.MyFileCollection mFC, String outAnisotPath) {
+	public ROIMorphoProps calculateAnisotropy(ROIMorphoProps myP, ImagePlus nowTiff, MenuWaiter.ROISelectionOptions mRSO, InputOutput.MyFileCollection mFC) {
 		 
 		/////////////////////////////////////////////////////////////////////
 		// OUTSIDE ROI VOXEL STATISTICS WORK ONLY FOR FAIRLY CIRCULAR COLUMNS //
@@ -2576,6 +2575,8 @@ public class MorphologyAnalyzer implements PlugIn {
 		TailoredMaths maths = new TailoredMaths();		
 		AnisotropyResults aRe = new AnisotropyResults();
 		InputOutput jIO = new InputOutput();
+		
+		String outAnisotPath = mFC.myPreOutFolder + mFC.pathSep + "Stats" + mFC.pathSep + "Anisotropy" + mFC.pathSep + mFC.colName + ".aniso";
 		
 		boolean roiIsCylinder = false;
 		if (mRSO.choiceOfRoi.equalsIgnoreCase("Cylinder")) roiIsCylinder = true;
