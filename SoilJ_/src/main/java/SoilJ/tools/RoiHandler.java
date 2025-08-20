@@ -642,7 +642,7 @@ public class RoiHandler implements PlugIn {
 				//outTiffs[0].show();				
 				
 				//also cut ROI
-				for (int i = mFC.startSlice ; i < mFC.stopSlice - mFC.startSlice ; i++) {
+				for (int i = mFC.startSlice ; i < mFC.stopSlice ; i++) {
 					colRoi.pRoi[i - mFC.startSlice] = colRoi.pRoi[i];
 					if (colRoi.iRoi != null) colRoi.iRoi[i - mFC.startSlice] = colRoi.iRoi[i];
 				}				

@@ -1321,11 +1321,11 @@ public class InputOutput extends ImagePlus implements PlugIn {
 			IJ.showStatus("Opening sample slice " + (i + 1) + "/" + sampleSlices.length + " ...");
 			
 			try {
-				ImageProcessor nowIP = oT3D.openImage(mFC.nowTiffPath, sampleSlices[i]).getProcessor();
+				ImageProcessor nowIP = oT3D.openTiff(mFC.nowTiffPath, sampleSlices[i] + 1).getProcessor();
 				outStack.addSlice(nowIP);
 			}	
 			catch(Exception e){
-				IJ.error("Something was fishy when trying to open "+ sampleSlices.length +" sample slices from " + mFC.colName);
+				IJ.error("Something was fishy when trying to open 2-D image #" + (i + 1) +" sample slices from " + mFC.colName);
 			}		
 			
 		}
@@ -1348,7 +1348,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
 			IJ.showStatus("Opening sample slice " + (i + 1) + "/" + sampleSlices.length + " ...");
 			
 			try {
-				ImageProcessor nowIP = oT3D.openImage(nowTiffPath, sampleSlices[i]).getProcessor();
+				ImageProcessor nowIP = oT3D.openTiff(nowTiffPath, sampleSlices[i + 1]).getProcessor();
 				outStack.addSlice(nowIP);
 			}	
 			catch(Exception e){}		

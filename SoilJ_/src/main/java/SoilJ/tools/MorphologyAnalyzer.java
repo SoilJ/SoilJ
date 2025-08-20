@@ -768,7 +768,7 @@ public class MorphologyAnalyzer implements PlugIn {
 		ImagePlus distTiff = new ImagePlus("dist",result);
 		
 		//cut away voxels outside ROI
-		if (mPSA.mRSO.choiceOfRoi.equals("RealSample") | mPSA.mRSO.choiceOfXYRoi.equals("Cylinder")) {
+		if (mPSA.mRSO.choiceOfRoi.equals("RealSample") | mPSA.mRSO.choiceOfRoi.equals("Cylinder")) {
 			
 			ImageStack cutStack = new ImageStack(distTiff.getWidth(), distTiff.getHeight());
 			
