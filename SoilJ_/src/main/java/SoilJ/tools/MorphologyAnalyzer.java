@@ -796,8 +796,7 @@ public class MorphologyAnalyzer implements PlugIn {
 				//remove voxels outside ROI
 				nowIP.setRoi(cutRoi);
 				nowIP.setColor(0);
-				nowIP.fillOutside(cutRoi);				
-				
+				nowIP.fillOutside(cutRoi);
 				
 				cutStack.addSlice(nowIP);
 			}
