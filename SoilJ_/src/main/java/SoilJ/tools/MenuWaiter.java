@@ -100,6 +100,8 @@ public class MenuWaiter implements PlugIn {
 	
 	public class RootExtractionOptions {
 		
+		public int minThreshold = 0;
+		public int maxThreshold = 0;		
 		public boolean doNotProcessOriginalResolution = false;
 		public double thresholdVesselness; 
 		public double smallesAllowedElongation;
@@ -133,7 +135,6 @@ public class MenuWaiter implements PlugIn {
 		public int minClusterSize = 5000;
 
 	}
-
 
 	public class MedianFilterAndUnsharpMaskReturn {
 
@@ -3597,7 +3598,7 @@ public class MenuWaiter implements PlugIn {
 		gd.addMessage("Organic Material Segmentation Options");
 	
 		gd.addMessage("");
-		gd.addMessage("Make sure that you have run 'CalibrateGrayValues' when you apply this option!!!");
+		gd.addMessage("Make sure that you have run 'CalibrateGrayValues' when you use this plugin!!!");
 
 		gd.addNumericField("Enter the lower threshold for segmenting the image ", 10000, 0, 5, "");
 
@@ -3621,7 +3622,7 @@ public class MenuWaiter implements PlugIn {
 
 		gd.addCheckbox("Save the segmented, 3-D binary images", true);
 
-		//gd.addCheckbox("Save segmentation results as overlays in some sample slices", true);		
+		gd.addCheckbox("Save segmentation results as overlays in some sample slices", false);		
 		
 		String myReference = "If you are using this plugin please cite the following references: \n\n";
 		gd.setInsets(40, 0, 0);gd.addMessage(myReference);
@@ -3648,7 +3649,7 @@ public class MenuWaiter implements PlugIn {
 	    	
 	    	//get saving options
 	    	mTMR.save3DImage = gd.getNextBoolean();
-	    	//mTMR.save4Evaluation = gd.getNextBoolean();	
+	    	mTMR.save4Evaluation = gd.getNextBoolean();	
 
 	      	return mTMR;
 	    }
@@ -3685,22 +3686,34 @@ public class MenuWaiter implements PlugIn {
 		RootExtractionOptions mREO = new RootExtractionOptions();
 		
 		GenericDialog gd = new GenericDialog("Give me some root extraction parameters, please.");
+		
+		//gd.addMessage("");
+		//gd.addMessage("Make sure that you have run 'CalibrateGrayValues' when you use this plugin!!!");
 
+		//gd.addNumericField("Enter the lower threshold for segmenting the image ", 10000, 0, 5, "");
+
+		//gd.addNumericField("Enter the upper threshold for segmenting the image ", 16500, 0, 5, "");
+
+		gd.addMessage("");
+		
 		//prepare radio box with the choices
 		gd.addCheckbox("Do you want to skip calculating on the original image resoluttion (check if your image sizes are large)", false);
-		gd.addNumericField("Please enter the minimum vesselness a root must have", 0.3, 1);
-		gd.addNumericField("Please enter the minimum length in voxels a root must have", 5, 1);
+		gd.addNumericField("Please enter the minimum vesselness a root must have", 0, 1, 3, " (a value of 0 switches of this filter criterion)");
+		gd.addNumericField("Please enter the minimum length in voxels a root must have", 30, 1);
 		//gd.addNumericField("Please enter maximum footprint of the Gaussian Blur", 100, 0);
 		
 		//show dialog
 		gd.showDialog();
 	    if (gd.wasCanceled()) return null;
 	    else {
-	    	//get ROI typ
+	    	
+	    	//mREO.minThreshold = (int)Math.round(gd.getNextNumber());
+	    	//mREO.maxThreshold = (int)Math.round(gd.getNextNumber());
+	    	
 	    	mREO.doNotProcessOriginalResolution = gd.getNextBoolean();
 	    	mREO.thresholdVesselness = gd.getNextNumber();
 	    	mREO.smallesAllowedElongation = gd.getNextNumber();
-	    	//mBEO.maximumBlurring = (int)gd.getNextNumber();
+	    	
 	    }
 		
 		return mREO;

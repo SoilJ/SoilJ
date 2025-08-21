@@ -185,7 +185,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		
 		mFC.somethingIsWrong = false;
 		
-		mFC.nowTiffPath = mFC.myBaseFolder + pathSep + mFC.fileName;	
+		mFC.nowTiffPath = mFC.myBaseFolder + pathSep + mFC.myTiffs[0];	
 		
 		FileInfo[] fI = Opener.getTiffFileInfo(mFC.nowTiffPath);
 		
