@@ -374,7 +374,7 @@ public class MorphologyAnalyzer implements PlugIn {
 		// calculate Distance
 		/////////////////////////////////////////////////////////////////
 		
-		if (!mPSA.calcDistance | mPSA.plotDistanceMap) {
+		if (mPSA.calcDistance | mPSA.plotDistanceMap) {
 			myP = calculateDistanceDistribution(mFC, colRoi, myP, mPSA);
 		}
 					
