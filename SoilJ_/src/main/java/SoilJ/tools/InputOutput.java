@@ -809,7 +809,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
 				testFile = fileEntry.getName();
 				if (testFile.length() >= 3) {
 					subString = testFile.substring(testFile.length() - 3,testFile.length());
-					if (subString.equals("tif")) myTiffs.add(testFile);									
+					if (subString.equals("tif") || subString.equals("iff") || subString.equals("iff")) myTiffs.add(testFile);									
 				}			
 			}
 			
@@ -1321,7 +1321,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
 			IJ.showStatus("Opening sample slice " + (i + 1) + "/" + sampleSlices.length + " ...");
 			
 			try {
-				ImageProcessor nowIP = oT3D.openTiff(mFC.nowTiffPath, sampleSlices[i] + 1).getProcessor();
+				ImageProcessor nowIP = oT3D.openTiff(mFC.nowTiffPath, sampleSlices[i]).getProcessor();
 				outStack.addSlice(nowIP);
 			}	
 			catch(Exception e){
@@ -1348,7 +1348,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
 			IJ.showStatus("Opening sample slice " + (i + 1) + "/" + sampleSlices.length + " ...");
 			
 			try {
-				ImageProcessor nowIP = oT3D.openTiff(nowTiffPath, sampleSlices[i + 1]).getProcessor();
+				ImageProcessor nowIP = oT3D.openTiff(nowTiffPath, sampleSlices[i]).getProcessor();
 				outStack.addSlice(nowIP);
 			}	
 			catch(Exception e){}		

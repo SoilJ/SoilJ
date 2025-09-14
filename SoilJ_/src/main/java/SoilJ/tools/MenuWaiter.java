@@ -3295,7 +3295,7 @@ public class MenuWaiter implements PlugIn {
 				mCFS.ratioBetweenInnerAndOuterRadius = 0.75;//gd2.getNextNumber();			
 				mCFS.maxCVOfWallThickness = 0.14;//gd2.getNextNumber();
 				mCFS.CVWallBrightnessThresh = 0.14;//gd2.getNextNumber();
-				mCFS.percentToleratedDifference = 0.2;//gd2.getNextNumber();
+				mCFS.percentToleratedDifference = 1;//gd2.getNextNumber();
 	
 				//get optimization parameters;				
 				mCFS.medianFilter2D = 0;//(int)Math.round(gd2.getNextNumber());

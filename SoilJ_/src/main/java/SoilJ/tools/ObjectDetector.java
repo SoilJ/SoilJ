@@ -1804,7 +1804,7 @@ public class ObjectDetector implements PlugIn {
 			
 			//check start of column			
 			boolean isCool = true;
-			for (int i = 0 ; i < validationRange; i++) {
+			for (int i = 0 ; i < validationRange ; i++) {
 				
 				isCool = false;
 				if (z.contains(i)) isCool = true;			

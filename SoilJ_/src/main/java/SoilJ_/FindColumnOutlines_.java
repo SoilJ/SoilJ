@@ -129,7 +129,7 @@ public class FindColumnOutlines_ extends ImagePlus implements PlugIn  {
 			}
 			
 			//try to find column outline but catch in case they were not found			
-			try {
+			//try {
 				
 				//if column is not a steel column
 				if (!jCFS.isSteel) {					// menu selection whether steel cylinder
@@ -246,10 +246,10 @@ public class FindColumnOutlines_ extends ImagePlus implements PlugIn  {
 					
 				}
 			}
-			catch(Exception e) {
-				failedColumnDetection.add(mFC.myTiffs[i]);
-			}
-		}
+//			catch(Exception e) {
+//				failedColumnDetection.add(mFC.myTiffs[i]);
+//			}
+//		}
 		
 		if (failedColumnDetection.size() == 0) {
 			IJ.log("It appears that the column detection went smoothly for all samples.\n "
