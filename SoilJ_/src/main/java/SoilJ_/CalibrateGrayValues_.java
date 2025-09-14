@@ -87,7 +87,6 @@ public class CalibrateGrayValues_ extends ImagePlus implements PlugIn  {
 		mFC.myOutFolder = myOutPath;
 				
 		//loop over 3D images
-		int errorCounts = 0;
 		for (i = 0 ; i < mFC.myTiffs.length ; i++) {  //myTiffs.length
 
 			//try to free up some memory

@@ -257,7 +257,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		mFC.nowHeight = fI[0].height;		
 		mFC.bitDepth = fI[0].getBytesPerPixel() * 8;
 		
-		String ending = mFC.fileName.substring(mFC.fileName.length()-1, mFC.fileName.length());
+		String ending = mFC.fileName.substring(mFC.fileName.length()-2, mFC.fileName.length());
 		if (ending.equalsIgnoreCase("ff")) mFC.colName = mFC.fileName.substring(0, mFC.fileName.length() - 5);
 		else mFC.colName = mFC.fileName.substring(0, mFC.fileName.length() - 4);
 		
