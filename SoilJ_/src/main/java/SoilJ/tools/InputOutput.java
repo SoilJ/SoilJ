@@ -190,14 +190,14 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		FileInfo[] fI = Opener.getTiffFileInfo(mFC.nowTiffPath);
 		
 		mFC.fileInfo = fI;
-		//mFC.fileName = fI[0].fileName;
+		mFC.fileName = fI[0].fileName;
 		mFC.nOfSlices = fI[0].nImages;	
 		mFC.nowWidth = fI[0].width;
 		mFC.nowHeight = fI[0].height;		
 		mFC.bitDepth = 8 * fI[0].getBytesPerPixel();
 		
 		String ending = mFC.fileName.substring(mFC.fileName.length() - 2, mFC.fileName.length());
-		if (ending.equalsIgnoreCase("ff")) mFC.fileName.substring(0, mFC.fileName.length() - 5);
+		if (ending.equalsIgnoreCase("ff")) mFC.colName = mFC.fileName.substring(0, mFC.fileName.length() - 5);
 		else mFC.colName = mFC.fileName.substring(0, mFC.fileName.length() - 4);		
 					
 		/*if (mFC.nOfSlices == 0) {
@@ -4211,7 +4211,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		ObjectDetector jOD = new ObjectDetector();
 		
 		//check if soil surface should be taken into account
-		int topSurface = 0;
+		int topSurface = 1;
 		int botSurface = mFC.nOfSlices;
 		if (mRSO.includeSurfaceTopography) {			
 			MorphologyAnalyzer.SurfaceStatistics mST = jOD.extractSurfaceStatistics(mFC);

@@ -2758,16 +2758,14 @@ public class MorphologyAnalyzer implements PlugIn {
 		aRe.uxyz = maths.compileStatistics(interCountUXYZ, xl, yl, Math.sqrt(3));
 		aRe.uyxz = maths.compileStatistics(interCountUYXZ, xl, yl, Math.sqrt(3));
 		
-		//calculate intermediate statistics..
-		double aniHor = (aRe.x[0] + aRe.y[0]) / 2;
-		double aniVert = aRe.z[0];
-		double[] aniSums = {aniHor, aniVert};
+		//calculate intermediate statistics..		
+		double[] aniSums = {aRe.x[0], aRe.y[0], aRe.z[0]};
 				
 		double aniMin = StatUtils.min(aniSums);
 		double aniMax = StatUtils.max(aniSums);
 
 		//calc anisotropy
-		aRe.anisotropy = (aniMax - aniMin) / ((aniMax + aniMin) / 2);
+		aRe.anisotropy = (aniMax - aniMin) / aniMax;
 			
 		//get direction of main alignment
 //		int[] mainAli = {0, 0, 0};		
@@ -2790,7 +2788,7 @@ public class MorphologyAnalyzer implements PlugIn {
 //		}		
 		
 		String mainAli = "horizontal";
-		if (aniHor > aniVert) mainAli = "vertical";
+		if (aniMin == aRe.z[0]) mainAli = "vertical";
 		
 		aRe.mainAlignment = mainAli;
 		
