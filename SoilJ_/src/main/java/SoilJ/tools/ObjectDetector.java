@@ -27,6 +27,7 @@ import org.apache.commons.math3.stat.StatUtils;
 import org.apache.commons.math3.stat.descriptive.rank.Median;
 
 import SoilJ.tools.HistogramStuff.IlluminationInfo;
+import SoilJ.tools.MenuWaiter.ColumnFinderMenuReturn;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.ImageStack;
@@ -74,6 +75,15 @@ public class ObjectDetector implements PlugIn {
 	
 	public static final long MilliSecondsOfOneDay=86400000L;
 	
+	public class WallProperties {
+		
+		public double wallMeanGray;
+		public double wallCVGray;
+		public double wallQ25;
+		public double wallQ75;
+		
+	}
+	
 	public class RadialFacts {
 		
 		public double[][] radialProfile;		
@@ -110,6 +120,8 @@ public class ObjectDetector implements PlugIn {
 		public double CVOfWallThickness;
 		public double CVOfWallBrightness;
 		public double ratioBetweenOuterAndInnerRadius;
+		
+		public WallProperties wallProps;
 		
 		//global props
 		public boolean columnIsAtThisDepth;		
@@ -294,7 +306,14 @@ public class ObjectDetector implements PlugIn {
 		
 		public double[] airWallContrast;
 		public double[] absoluteWallgrayValue;
+		public double[] wallQ25;
+		public double[] wallQ75;
+		public double[] wallCV;
 		public double[] wallSoilStdContrastThreshold;		
+		public double topGuideWallGray;
+		public double botGuideWallGray;
+		public double topGuideWallCV;
+		public double botGuideWallCV;
 				
 	}
 	
@@ -722,6 +741,7 @@ public class ObjectDetector implements PlugIn {
 		HistogramStuff hist = new HistogramStuff();
 		RoiHandler roi = new RoiHandler();
 		FitStuff fit = new FitStuff();
+		DisplayThings dT = new DisplayThings();
 		
 		//init varis
 		HistogramStuff.IlluminationInfo jII = hist.new IlluminationInfo();
@@ -1603,6 +1623,10 @@ public class ObjectDetector implements PlugIn {
 	
 		outCoords.airWallContrast = nowCoords.airWallContrast[i];
 		outCoords.absoluteWallgrayValue = nowCoords.absoluteWallgrayValue[i];
+		outCoords.wallProps = new WallProperties();
+		outCoords.wallProps.wallQ25 = nowCoords.wallQ25[i];
+		//outCoords.wallProps.wallQ75 = nowCoords.wallQ75[i];
+		outCoords.CVOfWallBrightness = nowCoords.wallCV[i];
 		
 		outCoords.wallSoilStdContrastThreshold = nowCoords.wallSoilStdContrastThreshold[i];		
 			
@@ -1617,11 +1641,16 @@ public class ObjectDetector implements PlugIn {
 				
 		InputOutput jIO = new InputOutput();
 		RankFilters rF = new RankFilters();
+		DisplayThings dT = new DisplayThings();
+		HistogramStuff hist = new HistogramStuff();
 		
 		//find topmost found column part in samCoords
-		int soFarOnTop = 99999;
+		int soFarOnTop = 0;
 		int findCounter = 0;
-		int topNumber = 0;
+		int topNumber = 3;
+		double nowWallCV = samCoords.topGuideWallCV;
+		int nowWallGray = (int)Math.round(samCoords.topGuideWallGray);
+		int upperBound = 1;
 		for (int i = 0 ; i < samCoords.columnIsAtThisDepth.length ; i++) { // throw away the first find because it is often suboptimal
 			if (samCoords.columnIsAtThisDepth[i]) {
 				findCounter++;
@@ -1655,9 +1684,26 @@ public class ObjectDetector implements PlugIn {
 		int minAddSize = (int)Math.floor(mFC.nOfSlices / 800) + 1;
 		if (minAddSize == 1) minAddSize = 2;
 		
+		int whileLoopCounter = 0;		
+		InputOutput.SampleTiffWrapper sTW = null;
 		while (toAdd.size() < minAddSize) {	
 			
-			InputOutput.SampleTiffWrapper sTW = jIO.assembleRepresentativeSample(mFC, referenceFrame);		
+			try {
+				sTW = jIO.assembleRepresentativeSample(mFC, referenceFrame);		
+			}
+			catch(Exception e) {
+				return null;
+			}
+
+			//prevent endless loop in case algorithm gets stuck
+			if (whileLoopCounter > 2) {				
+				IJ.log("It appears that the topfinder got stuck.. let's start over ..");
+				return null;
+			}
+			
+			//count attempts to find top
+			whileLoopCounter++;
+			IJ.log("Initiated topfinder loop #" + whileLoopCounter + " for " + mFC.fileName);
 			
 			int cc = 0;
 			while (!sTW.hasConverged){  //loop until convergence
@@ -1673,29 +1719,43 @@ public class ObjectDetector implements PlugIn {
 					sTW.samTiff.setPosition(i+1);
 					ImageProcessor myIP = sTW.samTiff.getProcessor().duplicate();
 					
-					//fill zero values with background
-					ImageProcessor zeroIP = myIP.duplicate(); 
-					zeroIP.threshold(1);
-					zeroIP.dilate();
+					//test if largest value at this depth is at least larger than wallQ25
+					ColCoords2D nowSlice = new ColCoords2D();
+					int[] myHist = myIP.getHistogram();
+					int maxHist = hist.findMaxFromHistogram(myHist);
 					
-					ArrayList<Integer> fringeVoxels = new ArrayList<Integer>();
-					for (int x = 0 ; x < zeroIP.getWidth() ; x++) {
-						for (int y = 0 ; y < zeroIP.getHeight() ; y++) {
-							int oldP = (int)Math.round(myIP.getPixelValue(x, y));
-							int newP = (int)Math.round(zeroIP.getPixelValue(x, y));
-							if (oldP > 0 & newP > 0) fringeVoxels.add((int)Math.round(myIP.getPixelValue(x, y)));					
+					if (maxHist < nowWallGray - nowWallGray * nowWallCV) {
+						nowSlice.columnIsAtThisDepth = false;
+						upperBound = sTW.samSlices[i];
+					}
+					else {
+						
+						//fill zero values with background
+						ImageProcessor zeroIP = myIP.duplicate(); 
+						zeroIP.threshold(1);
+						zeroIP.dilate();
+						
+						//dT.displayIP(zeroIP, "zero");
+						
+						ArrayList<Integer> fringeVoxels = new ArrayList<Integer>();
+						for (int x = 0 ; x < zeroIP.getWidth() ; x++) {
+							for (int y = 0 ; y < zeroIP.getHeight() ; y++) {
+								int oldP = (int)Math.round(myIP.getPixelValue(x, y));
+								int newP = (int)Math.round(zeroIP.getPixelValue(x, y));
+								if (oldP > 0 & newP > 0) fringeVoxels.add((int)Math.round(myIP.getPixelValue(x, y)));					
+							}
 						}
+						double[] fillValue = new double[fringeVoxels.size()];
+						for (int j = 0 ; j < fringeVoxels.size() ; j++) fillValue[j] = fringeVoxels.get(j);
+						if (!jCFS.isAlreadyNormalized) {
+							int meanFillValue = (int)Math.round(StatUtils.mean(fillValue));					
+							myIP.min(meanFillValue);
+						}
+						
+						//apply 2-D median filter and go for it...
+						rF.rank(myIP, jCFS.medianFilter2D, RankFilters.MEDIAN);
+						nowSlice = findColumnWalls2D(sTW.samSlices[i], myIP, nowTop, jCFS);	
 					}
-					double[] fillValue = new double[fringeVoxels.size()];
-					for (int j = 0 ; j < fringeVoxels.size() ; j++) fillValue[j] = fringeVoxels.get(j);
-					if (!jCFS.isAlreadyNormalized) {
-						int meanFillValue = (int)Math.round(StatUtils.mean(fillValue));					
-						myIP.min(meanFillValue);
-					}
-					
-					//apply 2-D median filter and go for it...
-					rF.rank(myIP, jCFS.medianFilter2D, RankFilters.MEDIAN);
-					ColCoords2D nowSlice = findColumnWalls2D(sTW.samSlices[i], myIP, nowTop, jCFS);	
 					
 					if (nowSlice.columnIsAtThisDepth) {
 						nowOnTop = sTW.samSlices[i];
@@ -1759,7 +1819,7 @@ public class ObjectDetector implements PlugIn {
 					for (int y = 0 ; y < zeroIP.getHeight() ; y++) {
 						int oldP = (int)Math.round(myIP.getPixelValue(x, y));
 						int newP = (int)Math.round(zeroIP.getPixelValue(x, y));
-						if (oldP > 0 & newP >0) fringeVoxels.add((int)Math.round(myIP.getPixelValue(x, y)));					
+						if (oldP > 0 & newP > 0) fringeVoxels.add((int)Math.round(myIP.getPixelValue(x, y)));					
 					}
 				}
 				double[] fillValue = new double[fringeVoxels.size()];
@@ -1767,9 +1827,22 @@ public class ObjectDetector implements PlugIn {
 				int meanFillValue = (int)Math.round(StatUtils.mean(fillValue));
 				myIP.min(meanFillValue);
 				
-				//apply 2-D median filter and go for it...				
+				//apply 2-D median filter			
 				rF.rank(myIP, jCFS.medianFilter2D, RankFilters.MEDIAN);
-				topCoords[i] = findColumnWalls2D(valiSeries[i], myIP, formerTop, jCFS); 
+				
+				//add wall gray knowledge of topmost founbd slice
+				ColumnFinderMenuReturn pimpedCFS = jCFS;
+				pimpedCFS.isAlreadyNormalized = true;
+				pimpedCFS.fixedWallGrayValue = nowWallGray;
+				pimpedCFS.stdFixedWallGrayValue = (int) Math.round(nowWallCV * nowWallGray);
+				pimpedCFS.grayValueOfWallIsKnown = true; 
+				pimpedCFS.minColGV = (int)Math.round(0.9 * (nowWallGray - nowWallGray * nowWallCV));	
+				pimpedCFS.maxColGV = (int)Math.round(1.2 * nowWallGray);	
+				pimpedCFS.CVWallBrightnessThresh = 1.5 * nowWallCV;
+				//pimpedCFS.debug = true;
+								
+				//and try to find the top of the column
+				topCoords[i] = findColumnWalls2D(valiSeries[i], myIP, formerTop, pimpedCFS); 
 				
 				if (topCoords[i].columnIsAtThisDepth) {
 					z.add(i);			
@@ -1818,9 +1891,11 @@ public class ObjectDetector implements PlugIn {
 				double yc = Math.abs(topCoords[i].yCenter - StatUtils.percentile(y, 50)) / StatUtils.percentile(y, 50);
 				if (yc > jCFS.percentToleratedDifference / 100) isCool = false;
 				
-				double medianWB = StatUtils.percentile(wb, 50);
-				double wbc = Math.abs(topCoords[i].CVOfWallBrightness - medianWB) / StatUtils.percentile(wb, 50);
-				if (wbc > 10 * jCFS.percentToleratedDifference / 100) isCool = false;  //for PVC columns this criterion needs to be relaxed
+				//double medianWB = StatUtils.percentile(wb, 50);
+				//double wbc = Math.abs(topCoords[i].CVOfWallBrightness - medianWB) / StatUtils.percentile(wb, 50);
+				//if (wbc > 10 * jCFS.percentToleratedDifference / 100) isCool = false;  //for PVC columns this criterion needs to be relaxed
+				
+				if (topCoords[i].CVOfWallBrightness > 2 * nowWallCV) isCool = false;  //if wall CV is too large
 				
 				if (isCool) toAdd.add(i);
 			}
@@ -1848,6 +1923,8 @@ public class ObjectDetector implements PlugIn {
 		
 		//create output coordinates
 		ColCoords3D outCoords = initColCords3D(toAdd.size() + samCoords.zmid.length - notAdd);
+		outCoords.botGuideWallCV = samCoords.botGuideWallCV;
+		outCoords.botGuideWallGray = samCoords.botGuideWallGray;
 		for (int i = 0 ; i < toAdd.size() ; i++) {			
 			outCoords = plug2DInto3DCoords(i, topCoords[toAdd.get(i)], outCoords);			
 		}		
@@ -2041,7 +2118,9 @@ public class ObjectDetector implements PlugIn {
 		
 		//find topmost found column part in samCoords
 		int soFarOnBot = 99999;
-		int botNumber = 0;
+		int botNumber = samCoords.columnIsAtThisDepth.length - 4;		
+		double nowWallCV = samCoords.botGuideWallCV;
+		int nowWallGray = (int)Math.round(samCoords.botGuideWallGray);
 		for (int i = samCoords.columnIsAtThisDepth.length - 1; i > 0 ; i--) { // throw away the first find because it is often suboptimal
 			if (samCoords.columnIsAtThisDepth[i]) {
 				soFarOnBot = (int)Math.round(samCoords.zmid[i]);
@@ -2072,11 +2151,22 @@ public class ObjectDetector implements PlugIn {
 		int minAddSize = (int)Math.floor(mFC.nOfSlices / 800) + 1;
 		if (minAddSize == 1) minAddSize = 2;
 		
+		int whileLoopCounter = 0;
 		while (toAdd.size() < minAddSize) {
 		
 			//define starting set of Tiffs			
 			InputOutput.SampleTiffWrapper sTW = jIO.assembleRepresentativeSample(mFC, referenceFrame);		
-				
+			
+			//prevent endless loop in case algorithm gets stuck
+			if (whileLoopCounter > 2) {
+				IJ.log("It appears that the bottomfinder got stuck.. let's start over ..");
+				return null;
+			}
+			
+			//count attempts to find bottom
+			whileLoopCounter++;
+			IJ.log("Initiated bottomfinder loop #" + whileLoopCounter + " for " + mFC.fileName);
+						
 			int cc = 0;
 			while (!sTW.hasConverged){  //loop until convergence
 			
@@ -2189,9 +2279,21 @@ public class ObjectDetector implements PlugIn {
 				//ImagePlus test = new ImagePlus("",myIP);
 				//test.show();
 				
-				//apply 2-D median filter and go for it...
+				//apply 2-D median filter
 				if (jCFS.medianFilter2D > 0) rF.rank(myIP, jCFS.medianFilter2D, RankFilters.MEDIAN);
-				botCoords[i] = findColumnWalls2D(valiSeries[i], myIP, outBot, jCFS); 
+				
+				//add wall gray knowledge of topmost founbd slice
+				ColumnFinderMenuReturn pimpedCFS = jCFS;
+				pimpedCFS.isAlreadyNormalized = true;
+				pimpedCFS.fixedWallGrayValue = nowWallGray;
+				pimpedCFS.stdFixedWallGrayValue = (int) Math.round(nowWallCV * nowWallGray);				
+				pimpedCFS.grayValueOfWallIsKnown = true; 
+				pimpedCFS.minColGV = (int)Math.round(nowWallGray - nowWallGray * nowWallCV);	
+				pimpedCFS.maxColGV = (int)Math.round(1.2 * nowWallGray);	
+				//pimpedCFS.debug = true;
+				
+				//and try to find the bottom of the column				
+				botCoords[i] = findColumnWalls2D(valiSeries[i], myIP, outBot, pimpedCFS); 
 				
 				//test.show();
 				
@@ -2258,8 +2360,9 @@ public class ObjectDetector implements PlugIn {
 				double yc = Math.abs(botCoords[i].yCenter - StatUtils.percentile(y, 50)) / StatUtils.percentile(y, 50);
 				if (yc > jCFS.percentToleratedDifference / 100) isCool = false;
 								
-				double wbc = Math.abs(botCoords[i].CVOfWallBrightness - StatUtils.percentile(wb, 50)) / StatUtils.percentile(wb, 50);
-				if (wbc > 10 * jCFS.percentToleratedDifference / 100) isCool = false;  //criterion needs to be relaxed for the wall brightness coefficient of variation
+				if (botCoords[i].absoluteWallgrayValue < 0.7 * nowWallGray) isCool = false;
+				
+				if (botCoords[i].CVOfWallBrightness > 2 * nowWallCV) isCool = false;
 				
 				if (isCool) toAdd.add(i);
 			}
@@ -2831,10 +2934,6 @@ public class ObjectDetector implements PlugIn {
 		
 	}	
 	
-
-	
-	
-	
 	public BestWallFinds findBestWallDetectionPerSector(int numOfSectors, int i, float[] xOD, float[] yOD, double[] myAngle, ColCoords3D prelimCC) {
 				
 		BestWallFinds bWF = new BestWallFinds();
@@ -3030,14 +3129,20 @@ public class ObjectDetector implements PlugIn {
 		int minWallBrightness = (int) Math.round((double)(1 - expectedCVOfWallgrayValues) * (double)jII.quantile99);
 		int maxWallBrightness = (int) Math.round((double)(1 + expectedCVOfWallgrayValues) * (double)jII.quantile99);
 		
-		//adjust min and max wall brightnesses to predefined values
-		if (jCFS.minColGV > 0) minWallBrightness = jCFS.minColGV;
-		if (jCFS.maxColGV > 0) maxWallBrightness = jCFS.maxColGV;
-		
 		//set a lower threshold for inner edge detection
 		double lowerStandardThreshold4InnerPeri = minAirColGradient / 5;
 		double upperStandardThreshold4InnerPeri = minAirColGradient * 5;
 		
+		//adjust min and max wall brightnesses to predefined values
+		if (jCFS.minColGV > 0) {
+			minWallBrightness = jCFS.minColGV;
+			lowerStandardThreshold4InnerPeri = minWallBrightness;
+		}
+		if (jCFS.maxColGV > 0) {
+			maxWallBrightness = jCFS.maxColGV;
+			upperStandardThreshold4InnerPeri = maxWallBrightness;
+		}
+				
 		//xy coordinates of radial wall-interface search-lines
 		double[][] x = new double[myAngle.length][(int)Math.round(startingPoint + 1)];
 		double[][] y = new double[myAngle.length][(int)Math.round(startingPoint + 1)];
@@ -3424,7 +3529,8 @@ public class ObjectDetector implements PlugIn {
 				//check quality of fit and wall find
 				double wallThickness = 0.5 * (fO.majorRadius /  - fI.majorRadius + fO.minorRadius - fI.minorRadius);		
 				double wallThicknessCV = calculateCVOfWallThickness(fI, fO);
-				double CVOfWallBrightness = calculateCVOfWallBrightness(myIP, fI, fO);
+				WallProperties myWall = obtainWallProperties(myIP, fI, fO);
+				double CVOfWallBrightness = myWall.wallCVGray;
 				// allow larger wall Brightness thresolds for small wall thicknesses
 				if (wallThickness < 30) adaptedCVWallThicknessThresh = (double)30 / wallThickness * jCFS.maxCVOfWallThickness;
 				
@@ -3531,7 +3637,8 @@ public class ObjectDetector implements PlugIn {
 					wallThickness = 0.5 * (fO.majorRadius - fI.majorRadius + fO.minorRadius - fI.minorRadius);		
 					double ratioOuterInnerRadius = (fI.majorRadius + fI.minorRadius) / (fO.majorRadius + fO.minorRadius);				
 					wallThicknessCV = calculateCVOfWallThickness(fI, fO);
-					CVOfWallBrightness = calculateCVOfWallBrightness(myIP, fI, fO);
+					myWall = obtainWallProperties(myIP, fI, fO);
+					CVOfWallBrightness = myWall.wallCVGray;
 					
 					if (wallThickness < myWindowSize + 3) R2 = 0.99 * jCFS.r2Thresh;
 					if (CVOfWallBrightness > adaptedCVWallThicknessThresh) R2 = 0.99 * jCFS.r2Thresh;
@@ -3545,7 +3652,7 @@ public class ObjectDetector implements PlugIn {
 		}
 		
 		//set inner column interface for non-Aluminium columns
-		if (!jCFS.isAlu & fO.R2 > jCFS.r2Thresh) {	
+		if (!jCFS.isAlu) {	
 			fI = fO.duplicate();
 			fI.minorRadius -= jCFS.wallThickness;	
 			fI.majorRadius -= jCFS.wallThickness;
@@ -3561,11 +3668,12 @@ public class ObjectDetector implements PlugIn {
 		if (colDetected) if (myContrast < jCFS.stdThreshold) colDetected = false; //if there is no column, this will be the case..
 		
 		double wallThickness = 0;
-		if (jCFS.isAlu & colDetected) {
+		if (colDetected) {
 			wallThickness = 0.5 * (fO.majorRadius - fI.majorRadius + fO.minorRadius - fI.minorRadius);		
 			double ratioOuterInnerRadius = (fI.majorRadius + fI.minorRadius) / (fO.majorRadius + fO.minorRadius);
 			double wallThicknessCV = calculateCVOfWallThickness(fI, fO);
-			double CVOfWallBrightness = calculateCVOfWallBrightness(myIP, fI, fO);			
+			WallProperties myWall = obtainWallProperties(myIP, fI, fO);
+			double CVOfWallBrightness = myWall.wallCVGray;			
 			
 			if (Double.isNaN(fI.R2)) colDetected = false;
 			if (fI.R2 < jCFS.r2Thresh) colDetected = false;				
@@ -3573,7 +3681,10 @@ public class ObjectDetector implements PlugIn {
 			if (ratioOuterInnerRadius < jCFS.ratioBetweenInnerAndOuterRadius) colDetected = false;
 			if (wallThicknessCV > adaptedCVWallThicknessThresh) colDetected = false;
 			if (Double.isNaN(wallThicknessCV)) colDetected = false;
-			if (CVOfWallBrightness > jCFS.CVWallBrightnessThresh) colDetected = false;
+			if (CVOfWallBrightness > 2 * jCFS.CVWallBrightnessThresh) colDetected = false;
+			if (jCFS.isAlreadyNormalized) {
+				if (myWall.wallMeanGray < jCFS.absoluteWallgrayValue - jCFS.stdFixedWallGrayValue) colDetected = false;
+			}
 		}
 		
 		//transfer results to output vector
@@ -3604,7 +3715,11 @@ public class ObjectDetector implements PlugIn {
 			i2D.wallThickness = wallThickness;
 			i2D.CVOfWallThickness = calculateCVOfWallThickness(fI, fO);
 			i2D.ratioBetweenOuterAndInnerRadius = calculateRatioBetweenOuterAndInnerRadius(fI, fO);
-			i2D.CVOfWallBrightness = calculateCVOfWallBrightness(myIP, fI, fO);
+			
+			WallProperties myWall = obtainWallProperties(myIP, fI, fO);
+			i2D.CVOfWallBrightness = myWall.wallCVGray;
+			i2D.absoluteWallgrayValue = myWall.wallMeanGray;
+			i2D.wallProps = myWall;
 		}
 				
 		//have a look at the found perimeters .. if program is run in debug mode..
@@ -3613,7 +3728,7 @@ public class ObjectDetector implements PlugIn {
 			if (fO.R2 > 0.98 & !colDetected) {
 				IJ.showStatus("There was something funny with the initial parameter guesses..\n" 
 						+ "Let me try to fit find the outlines for this depth again!");
-				IJ.wait(4000);
+				IJ.wait(400);
 			}
 			else {
 				jCFS.debug = displayFoundOutlines(sliceNum, myIP, fO, fI, xOD, yOD, xID, yID, i2D, jCFS, adaptedCVWallThicknessThresh);
@@ -3666,8 +3781,9 @@ public class ObjectDetector implements PlugIn {
 		if (!jCFS.isPVC & fI != null) gd.addMessage("Wall thickness: " + String.format("%3.2f\t",(float)i2D.wallThickness));
 		
 		if (!jCFS.isPVC & fI != null) gd.addMessage("CV of wall thickness: " + String.format("%3.2f\t",(float)i2D.CVOfWallThickness) + " while criterion was set to < " + String.format("%1.4f\t",(float)adaptedCVWallThicknessThresh));
-		if (!jCFS.isPVC & fI != null) gd.addMessage("ratio between outer and inner radius was " + String.format("%1.4f\t",(float)i2D.ratioBetweenOuterAndInnerRadius) + " while criterion was set to > " + String.format("%1.4f\t",(float)jCFS.ratioBetweenInnerAndOuterRadius));				
-		if (!jCFS.isPVC & fI != null) gd.addMessage("CV of wall gray values was " + String.format("%1.4f\t",(float)calculateCVOfWallBrightness(myIP, fI, fO)) + " while criterion was set to > " + String.format("%1.4f\t",(float)jCFS.CVWallBrightnessThresh));				
+		if (!jCFS.isPVC & fI != null) gd.addMessage("ratio between outer and inner radius was " + String.format("%1.4f\t",(float)i2D.ratioBetweenOuterAndInnerRadius) + " while criterion was set to > " + String.format("%1.4f\t",(float)jCFS.ratioBetweenInnerAndOuterRadius));
+		WallProperties myWall = obtainWallProperties(myIP, fI, fO);
+		if (!jCFS.isPVC & fI != null) gd.addMessage("CV of wall gray values was " + String.format("%1.4f\t",(float)myWall.wallCVGray) + " while criterion was set to > " + String.format("%1.4f\t",(float)jCFS.CVWallBrightnessThresh));				
 		
 		gd.addCheckbox("Switch off Visualization mode", false);
 		
@@ -3718,11 +3834,14 @@ public class ObjectDetector implements PlugIn {
 		
 		double[] airWallContrast = new double[colHeight];
 		double[] absoluteWallgrayValue = new double[colHeight];
+		double[] wallQ25 = new double[colHeight];
+		double[] wallQ75 = new double[colHeight];
+		double[] wallCV = new double[colHeight];
 	
 		double[] wallSoilStdContrastThreshold = new double[colHeight];	
 		
 		//best ColCoords so far
-		ColCoords2D bestCoords = median3DCoords(prelimCC);			// take the median coordinates of the perliminary Column outlines for a first best guess
+		ColCoords2D bestCoords = median3DCoords(prelimCC);			// take the median coordinates of the preliminary Column outlines for a first best guess
 		
 		//init wall finder parameters
 		bestCoords.airWallContrast = jCFS.airWallContrast;			// take the air / wall contrast that was entered by the user in the menu (jCFS)
@@ -3735,7 +3854,7 @@ public class ObjectDetector implements PlugIn {
 			ImageProcessor nowIP = nowTiff.getProcessor();		
 			ImageProcessor myIP = nowIP.duplicate();
 			jII = probeIlluminationLevel(myIP, bestCoords, true);			// probeIlluminationLevel = ????????????????
-		} // end colHeight
+		} 
 		
 		//re-find the column's outer wall		
 		for (int i = 0 ; i < colHeight ; i++) {  
@@ -3800,7 +3919,7 @@ public class ObjectDetector implements PlugIn {
 			
                     
 			//find the wall;
-			ColCoords2D i2D = findColumnWalls2D(sampleSlices[i], myIP, bestCoords, jCFS);	// for the sample sclies find the column wall outlines, returns 2D elliptical coordinates
+			ColCoords2D i2D = findColumnWalls2D(sampleSlices[i], myIP, bestCoords, jCFS);	// for the sample slices find the column wall outlines, returns 2D elliptical coordinates
 			
 			//catch bug that makes first fit worse than other due to bad initial parameter estimation
 			if (!i2D.columnIsAtThisDepth & i2D.outerR2 > 0.98) {
@@ -3832,7 +3951,18 @@ public class ObjectDetector implements PlugIn {
 			wallThickness[i] = i2D.wallThickness;
 			
 			airWallContrast[i] = i2D.airWallContrast;
-			absoluteWallgrayValue[i] = i2D.absoluteWallgrayValue;
+			if (i2D.wallProps!=null) {
+				absoluteWallgrayValue[i] = Math.round(i2D.wallProps.wallMeanGray);
+				wallQ25[i] = Math.round(i2D.wallProps.wallQ25);
+				wallQ75[i] = Math.round(i2D.wallProps.wallQ75);
+				wallCV[i] = i2D.wallProps.wallCVGray;
+			}
+			else {
+				absoluteWallgrayValue[i] = -1;
+				wallQ25[i] = -1;
+				wallQ75[i] = -1;
+				wallCV[i] = -1;
+			}
 			
 			wallSoilStdContrastThreshold[i] = i2D.wallSoilStdContrastThreshold;
 		
@@ -3858,6 +3988,9 @@ public class ObjectDetector implements PlugIn {
 		
 		preciseCC.airWallContrast = airWallContrast;
 		preciseCC.absoluteWallgrayValue = absoluteWallgrayValue;
+		preciseCC.wallQ25 = wallQ25;
+		preciseCC.wallQ75 = wallQ75;
+		preciseCC.wallCV = wallCV;
 		
 		preciseCC.wallSoilStdContrastThreshold = wallSoilStdContrastThreshold;
 				
@@ -3887,6 +4020,37 @@ public class ObjectDetector implements PlugIn {
 			preciseCC.tiltTotal = tilt[2];
 		}
 		
+		//set reasonable grayvalue thresholds
+		double medianwallCV = StatUtils.percentile(wallCV, 50);
+		double[] top5AbsoluteGray = new double[5];
+		double[] bot5AbsoluteGray = new double[5];
+		double[] top5AbsoluteCV = new double[5];
+		double[] bot5AbsoluteCV = new double[5];
+		int cc=0;
+		for (int i = 0 ; i < preciseCC.wallCV.length ; i++) {
+			if (preciseCC.outerR2[i] > jCFS.r2Thresh && preciseCC.columnIsAtThisDepth[i]) {
+				top5AbsoluteGray[cc] = preciseCC.absoluteWallgrayValue[i];		
+				top5AbsoluteCV[cc] = preciseCC.wallCV[i];	
+				cc++;
+			}
+			if (cc == 5) break;
+		}
+		
+		cc=0;
+		for (int i = preciseCC.wallCV.length - 1 ; i > -1 ; i--) {
+			if (preciseCC.outerR2[i] > jCFS.r2Thresh && preciseCC.columnIsAtThisDepth[i]) {
+				bot5AbsoluteGray[cc] = preciseCC.absoluteWallgrayValue[i];
+				bot5AbsoluteCV[cc] = preciseCC.wallCV[i];
+				cc++;				
+			}
+			if (cc == 5) break;
+		}		
+		
+		preciseCC.topGuideWallGray = StatUtils.percentile(top5AbsoluteGray, 50);
+		preciseCC.botGuideWallGray = StatUtils.percentile(bot5AbsoluteGray, 50);
+		preciseCC.topGuideWallCV = StatUtils.percentile(top5AbsoluteCV, 50);
+		preciseCC.botGuideWallCV = StatUtils.percentile(bot5AbsoluteCV, 50);
+				
 		return preciseCC;
 	}
 	
@@ -4006,6 +4170,8 @@ public class ObjectDetector implements PlugIn {
 						
 		outCoords.airWallContrast = new double[size];	
 		outCoords.absoluteWallgrayValue = new double[size];	
+		outCoords.wallCV = new double[size];
+		outCoords.wallQ25 = new double[size];
 		outCoords.wallSoilStdContrastThreshold = new double[size];
 		
 		return outCoords;
@@ -4036,7 +4202,8 @@ public class ObjectDetector implements PlugIn {
 		outCoords.columnIsAtThisDepth[i] = inCoords.columnIsAtThisDepth;	
 						
 		outCoords.airWallContrast[i] = inCoords.airWallContrast;	
-		outCoords.absoluteWallgrayValue[i] = inCoords.absoluteWallgrayValue;	
+		outCoords.absoluteWallgrayValue[i] = inCoords.absoluteWallgrayValue;
+		outCoords.wallCV[i] = inCoords.wallProps.wallCVGray;
 		outCoords.wallSoilStdContrastThreshold[i] = inCoords.wallSoilStdContrastThreshold;
 		
 		return outCoords;
@@ -4070,7 +4237,8 @@ public class ObjectDetector implements PlugIn {
 			outCoords.columnIsAtThisDepth[placings[j]] = inCoords.columnIsAtThisDepth[goodSlices[j]];	
 							
 			outCoords.airWallContrast[placings[j]] = inCoords.airWallContrast[goodSlices[j]];	
-			outCoords.absoluteWallgrayValue[placings[j]] = inCoords.absoluteWallgrayValue[goodSlices[j]];	
+			outCoords.absoluteWallgrayValue[placings[j]] = inCoords.absoluteWallgrayValue[goodSlices[j]];
+			outCoords.wallCV[placings[j]] = inCoords.wallCV[goodSlices[j]];
 			outCoords.wallSoilStdContrastThreshold[placings[j]] = inCoords.wallSoilStdContrastThreshold[goodSlices[j]];
 		}
 		
@@ -4098,6 +4266,7 @@ public class ObjectDetector implements PlugIn {
 				outerRadiusWithoutBevel.add(0.5 * samCoords.outerMajorRadius[j] + 0.5 * samCoords.outerMinorRadius[j]);
 			}
 		}
+		
 		double[] outerRadius = new double[outerRadiusWithoutBevel.size()]; 
 		for (int i = 0 ; i < outerRadius.length ; i++) outerRadius[i] = outerRadiusWithoutBevel.get(i);
 		double medianOuterRadius = StatUtils.percentile(outerRadius, 50);
@@ -4105,10 +4274,11 @@ public class ObjectDetector implements PlugIn {
 		//find all parts of the column with outer radii smaller than xxx * median WallThickness
 		ArrayList<Double> bevelRadius = new ArrayList<Double>();
 		ArrayList<Double> z = new ArrayList<Double>();
-		for (int i = 0 ; i < validDataAtLocationZ.size() ; i++) {
+		for (int i = validDataAtLocationZ.size() / 2 ; i < validDataAtLocationZ.size() ; i++) {  //only start searching from the vertical centrer bottomwards
 			int j = validDataAtLocationZ.get(i);
 			double outerRadiusNow = 0.5 * samCoords.outerMajorRadius[j] + 0.5 * samCoords.outerMinorRadius[j];
-			if (outerRadiusNow < 0.975 * medianOuterRadius) {
+			double bevelstartThreshold = 0.995 * medianOuterRadius;
+			if (outerRadiusNow < bevelstartThreshold) {
 				bevelRadius.add(outerRadiusNow);
 				z.add(samCoords.zmid[j]);
 			}
@@ -5157,10 +5327,11 @@ public class ObjectDetector implements PlugIn {
 				
 	}
 	
-	public double calculateCVOfWallBrightness(ImageProcessor myIP, FitStuff.FittedEllipse fI, FitStuff.FittedEllipse fO) {
+	public WallProperties obtainWallProperties(ImageProcessor myIP, FitStuff.FittedEllipse fI, FitStuff.FittedEllipse fO) {
 		
 		RoiHandler roi = new RoiHandler();
 		HistogramStuff hist = new HistogramStuff();
+		WallProperties myWall = new WallProperties();
 		
 		PolygonRoi inner = roi.makeRoiFromFittedEllipse(fI);
 		PolygonRoi outer = roi.makeRoiFromFittedEllipse(fO);
@@ -5176,12 +5347,20 @@ public class ObjectDetector implements PlugIn {
 		int[] myHist = nowIP.getHistogram();
 		myHist[0] = 0; //set zeros to zero
 		
+		int myQ25 = hist.findQuantileFromHistogram(myHist, 0.25);
+		int myQ75 = hist.findQuantileFromHistogram(myHist, 0.75);
+		
 		float myMean = hist.findMeanFromHistogram(myHist);
 		double myStd = hist.findStdFromHistogram(myHist, myMean);
 		
 		double myCVofWallgrayValues = myStd / myMean;
 		
-		return myCVofWallgrayValues;
+		myWall.wallMeanGray = myMean;
+		myWall.wallCVGray = myCVofWallgrayValues;
+		myWall.wallQ25 = myQ25;
+		myWall.wallQ75 = myQ75;
+		
+		return myWall;
 		
 	}
 	

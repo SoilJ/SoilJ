@@ -97,7 +97,7 @@ public class CalibrateGrayValues_ extends ImagePlus implements PlugIn  {
 			mFC = jIO.addCurrentFileInfo(mFC);
 			
 			//check if everything is in order
-			if (mFC.somethingIsWrong) {
+			if (mFC.columnHasNotBeenFound) {
 				IJ.error(mFC.eMsg);
 				return;
 			}

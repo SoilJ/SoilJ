@@ -94,7 +94,7 @@ public class StraightenAndCenter_ extends ImagePlus implements PlugIn  {
 			jIO.addCurrentFileInfo(mFC);
 			
 			//check if everything is in order
-			if (mFC.somethingIsWrong) {
+			if (mFC.columnHasNotBeenFound) {
 				IJ.error(mFC.eMsg);
 				return;
 			}

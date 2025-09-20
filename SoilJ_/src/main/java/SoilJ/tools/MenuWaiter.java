@@ -2,6 +2,7 @@ package SoilJ.tools;
 
 import java.awt.Font;
 import java.io.File;
+import java.io.Serializable;
 
 import org.apache.commons.math3.stat.StatUtils;
 
@@ -2982,7 +2983,7 @@ public class MenuWaiter implements PlugIn {
 		return mDS;
 	}
 
-	public class ColumnFinderMenuReturn {
+	public class ColumnFinderMenuReturn implements Serializable {
 
 		public boolean isAlreadyNormalized;
 		public boolean isSteel;
@@ -3041,6 +3042,69 @@ public class MenuWaiter implements PlugIn {
 		public int maxFittingAttempts;		//attempts allowed to fiddle with "airWallContrast" and "wallSoilStdContrastThreshold" to find the edge
 		public int maxNumberOfOutliers4PerimeterFits;
 
+	}
+	
+	public ColumnFinderMenuReturn deepCopyCFS(ColumnFinderMenuReturn virginCFS, ColumnFinderMenuReturn jCFS) {
+		
+		virginCFS.isAlreadyNormalized = jCFS.isAlreadyNormalized;
+		virginCFS.isSteel = jCFS.isSteel;
+		virginCFS.isPVC = jCFS.isPVC;
+		virginCFS.isAlu = jCFS.isAlu;
+		virginCFS.try2FindColumnTopAndBottom = jCFS.try2FindColumnTopAndBottom;
+		virginCFS.hasBevel = jCFS.hasBevel;
+		virginCFS.grayValueOfWallIsKnown = jCFS.grayValueOfWallIsKnown;
+		virginCFS.putColumnStraight = jCFS.putColumnStraight;
+		virginCFS.doAResliceFirst = jCFS.doAResliceFirst;
+		
+		//cut off of top and bottom
+		virginCFS.topCutOff = jCFS.topCutOff;
+		virginCFS.botCutOff = jCFS.botCutOff;
+
+		//debug settings
+		virginCFS.debug = jCFS.debug;
+		virginCFS.showRadialProfiles = jCFS.showRadialProfiles;
+		virginCFS.showFit = jCFS.showFit;
+
+		//???
+		virginCFS.segmentLength = jCFS.segmentLength;
+
+		//a priori fixed column properties..
+		virginCFS.outerDiameter = jCFS.outerDiameter;
+		virginCFS.minColGV = jCFS.minColGV;
+		virginCFS.maxColGV = jCFS.maxColGV;
+		virginCFS.wallThickness = jCFS.wallThickness;
+		virginCFS.topOfColumn = jCFS.topOfColumn;
+		virginCFS.bottomOfColumn = jCFS.bottomOfColumn;
+		virginCFS.fixedWallGrayValue = jCFS.fixedWallGrayValue;
+		virginCFS.stdFixedWallGrayValue = jCFS.stdFixedWallGrayValue;		
+
+		//fitting parameters needed for finding outer wall
+		virginCFS.airWallContrast = jCFS.airWallContrast;
+		virginCFS.airDividedByWall = jCFS.airDividedByWall;
+
+		//fitting parameter for finding inner wall
+		virginCFS.wallSoilStdContrastThreshold = jCFS.wallSoilStdContrastThreshold;
+
+		//parameters needed to decide whether the column is at this depth
+		virginCFS.CVWallBrightnessThresh = jCFS.CVWallBrightnessThresh;
+		virginCFS.maxCVOfWallThickness = jCFS.maxCVOfWallThickness;
+		virginCFS.stdThreshold = jCFS.stdThreshold;
+		virginCFS.ratioBetweenInnerAndOuterRadius = jCFS.ratioBetweenInnerAndOuterRadius;
+		virginCFS.percentToleratedDifference = jCFS.percentToleratedDifference;
+
+		//if column has already been normalized
+		virginCFS.absoluteWallgrayValue = jCFS.absoluteWallgrayValue;
+
+		//optimaization parameters
+		virginCFS.applyUmask = jCFS.applyUmask;
+		virginCFS.medianFilter2D = jCFS.medianFilter2D;
+		virginCFS.medianFilter = jCFS.medianFilter;
+		virginCFS.r2Thresh = jCFS.r2Thresh;
+		virginCFS.maxFittingAttempts = jCFS.maxFittingAttempts;		//attempts allowed to fiddle with "airWallContrast" and "wallSoilStdContrastThreshold" to find the edge
+		virginCFS.maxNumberOfOutliers4PerimeterFits = jCFS.maxNumberOfOutliers4PerimeterFits;
+		
+		return virginCFS;
+		
 	}
 
 	public ColumnFinderMenuReturn showColumnStraightenerMenu() {
@@ -3134,7 +3198,7 @@ public class MenuWaiter implements PlugIn {
 
 		String[] columnMaterials = {"aluminium or PVC column and a BAD contrast between soil matrix and wall",
 				"aluminium or PVC column and a GOOD contrast between soil matrix and wall", "steel"};
-		gd.addRadioButtonGroup("What kind of material is your column made of?", columnMaterials, 3, 1, columnMaterials[1]);
+		gd.addRadioButtonGroup("What kind of material is your column made of?", columnMaterials, 3, 1, columnMaterials[0]);
 
 		String myReference = "If you are using this plugin please cite the following references: \n\n";
 		gd.setInsets(40, 0, 0);gd.addMessage(myReference);
@@ -3198,7 +3262,7 @@ public class MenuWaiter implements PlugIn {
 	    gd2.addNumericField("optional: what is the minimum possible gray value of the column material?", 0, 0, 6, "");	
 	    gd2.addNumericField("optional: what is the maximum possible gray value of the column material?", 0, 0, 6, "");	
 	    
-		if (mCFS.isPVC == true | mCFS.isSteel == true) gd2.addNumericField("How thick is the column wall in pixels? ", 0, 0, 6, "");
+		if (mCFS.isPVC == true | mCFS.isSteel == true) gd2.addNumericField("How thick is the column wall in pixels? ", 20, 0, 6, "");
 		if (!mCFS.try2FindColumnTopAndBottom) {
 			gd2.addNumericField("In which layer is the top of the column? (if you do not want to search for it)", 1, 0, 4, "");
 			gd2.addNumericField("In which layer is the bottom of the column? (enter '1' for the bottommost layer)", 1, 0, 4, "");
@@ -3243,7 +3307,7 @@ public class MenuWaiter implements PlugIn {
 					+ "decrease this value if the perimeter is found outside the column)");
 		    gd.setInsets(40, 0, 0);gd.addMessage(insertSpace);					
 			
-			gd2.addChoice("Select an R2 criterion according to the noise level in image and your image size", noiseLevel, noiseLevel[4]);		
+			gd2.addChoice("Select an R2 criterion according to the noise level in image and your image size", noiseLevel, noiseLevel[5]);		
 			gd.setInsets(40, 0, 0);gd.addMessage("The R2 corresponds to the coefcicient of determination of the ellipse fit to the found positions of the column wall. "
 					+ "The larger the R2 criteria is put, the more precise column location will be found;/n"
 					+ "However, the more noise inherent to the image, the less accurate the colum location can be determined.\n"

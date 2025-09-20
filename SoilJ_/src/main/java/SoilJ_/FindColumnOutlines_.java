@@ -62,6 +62,15 @@ public class FindColumnOutlines_ extends ImagePlus implements PlugIn  {
 		jCFS = menu.showColumnFinderDialog();											// menu where user chooses whether to find top & bottom, whether z-axis, good or bad contrast, steel cylinder, etc.
 		if (jCFS == null) return;
 		
+		//remember virgin jCFS values
+	    double virCVWallBrightnessThresh = jCFS.CVWallBrightnessThresh;
+	    int virFixedWallGrayValue = jCFS.fixedWallGrayValue;
+	    boolean virGrayValueIsKnown = jCFS.grayValueOfWallIsKnown;
+	    boolean virIsAlreadyNormalized = jCFS.isAlreadyNormalized;
+	    int virMaxColGV = jCFS.maxColGV;
+	    int virMinColGV = jCFS.minColGV;
+	    int stdFixedWallGrayValue = jCFS.stdFixedWallGrayValue;
+	    
 		//read file or files
 		InputOutput.MyFileCollection mFC = jIO.fileSelector("Please choose a file or folder with your image data"); 	// chose the images for which to find outline
 	 		
@@ -83,12 +92,26 @@ public class FindColumnOutlines_ extends ImagePlus implements PlugIn  {
 		int errorCounts = 0;
 		for (int i = 0 ; i < mFC.myTiffs.length ; i++) {
 	
+			//try to purge unnecessary memory
+			System.gc();
+			IJ.wait(200);
+			System.gc();
+			
+			//restart with the virgin jCFS file values
+		    jCFS.CVWallBrightnessThresh = virCVWallBrightnessThresh;
+		    jCFS.fixedWallGrayValue = virFixedWallGrayValue;
+		    jCFS.grayValueOfWallIsKnown = virGrayValueIsKnown;
+		    jCFS.isAlreadyNormalized = virIsAlreadyNormalized;
+		    jCFS.maxColGV = virMaxColGV;
+		    jCFS.minColGV = virMinColGV;
+		    jCFS.stdFixedWallGrayValue = stdFixedWallGrayValue;
+			
 			//assign tiff file
 			mFC.fileName = mFC.myTiffs[i];				// fileName in mFC conatins current information that is then overwritten for next image
 			mFC = jIO.addCurrentFileInfo(mFC);	
 			
 			mFC.startSlice = 1;							// start at top
-			mFC.stopSlice = mFC.nOfSlices + 1;			// to bottom
+			mFC.stopSlice = mFC.nOfSlices;			   // to bottom
 			if (!jCFS.try2FindColumnTopAndBottom) {		// promting settings (chosen by user in menu) >> should program try to find the top and the bottom ? only either currently not possible
 				mFC.startSlice = jCFS.topOfColumn;			// if it should not look for bottom >> take top as given in menu
 				if (jCFS.bottomOfColumn > 1) mFC.stopSlice = jCFS.bottomOfColumn; // if entered bottom > 1 >> take bottom as indicated by user in menu
@@ -97,10 +120,16 @@ public class FindColumnOutlines_ extends ImagePlus implements PlugIn  {
 			mFC = jIO.addCurrentFileInfo(mFC); 	//again???		
 			
 			//check if everything is in order
-			if (mFC.somethingIsWrong) {
+			if (mFC.columnHasNotBeenFound) {
 				IJ.error(mFC.eMsg);
 				return;
 			}
+			
+			//save some feedback to log
+			IJ.log("//////////////////////////////////////////////////////////////////////////////////////////////////////");
+			IJ.log("Processing " + mFC.fileName + " ...");
+			IJ.log("//////////////////////////////////////////////////////////////////////////////////////////////////////");
+			IJ.log("");
 			
 			//reslice in case that the column is looked at from the wrong angle
 			mFC.imageHasBeenLoaded = false;
@@ -136,92 +165,159 @@ public class FindColumnOutlines_ extends ImagePlus implements PlugIn  {
 		
 					//load a stack of sample images			
 					InputOutput.SampleTiffWrapper sTW = jIO.assembleRepresentativeSample(mFC);		// returns class sampleTiffWrapper (class of public ImagePlus, int[] samTiffSliceNumbers, int[] samSlices, boolean hasConverged)
-									
-					//re-determine the column outlines			
-					boolean look4PreciseCoords = true;
-					ObjectDetector.ColCoords3D prelimCC = jOD.findOrientationOfPVCOrAluColumn(sTW.samTiff, jCFS, look4PreciseCoords);  // returns ColCoords3D object
-					
-					//find some outlines seriously
-					ObjectDetector.ColCoords3D samCoords = jOD.findColumnWalls3D(sTW.samTiff, prelimCC, jCFS, sTW.samSlices);			// returns ColCoords3D object with the "definitive" ROIs
-					
-					//check if column stands straight and if it should be rotated upright into the center of the canvas
-					if (jCFS.putColumnStraight) {
 						
-						if (!mFC.imageHasBeenLoaded) {
-							mFC.nowTiff = jIO.openTiff3D(mFC.nowTiffPath);
-							mFC.imageHasBeenLoaded = true;
+					//count fingding attempts
+					int findingAttemptNumber = 0;
+					
+					//try all over again once the algorithm has hit the wall..
+					while (findingAttemptNumber < 5) {
+						
+						//try to purge unneccessary memory
+						System.gc();
+						IJ.wait(200);
+						System.gc();
+						
+						//count attempt
+						findingAttemptNumber++;
+						
+						//break loop in case the attempts did not make things better. 
+						if (findingAttemptNumber > 4) {
+							if (findingAttemptNumber < 100) {
+								IJ.log("\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+								IJ.log("Column in " + mFC.fileName + " could definitely not be found.. \nskipping this sample.. please have a closer look at this sample");
+								IJ.log("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
+								failedColumnDetection.add(mFC.fileName);
+							}
+							break;
 						}
-		
-						mFC.nowTiff = jIM.putColumnUprightInCenter(mFC.nowTiff, samCoords, jCFS);				
 						
-						//store new image Facts
-						mFC.nowWidth = mFC.nowTiff.getWidth();
-						mFC.nowHeight = mFC.nowTiff.getHeight();
-						mFC.nOfSlices = mFC.nowTiff.getNSlices();				
+						//change slices that are to be checked
+						if (findingAttemptNumber > 1) {
+							sTW = jIO.assembleRepresentativeSample(mFC);
+						    //jCFS.CVWallBrightnessThresh = virCVWallBrightnessThresh;
+						    //jCFS.fixedWallGrayValue = virFixedWallGrayValue;
+						    //jCFS.grayValueOfWallIsKnown = virGrayValueIsKnown;
+						    //jCFS.isAlreadyNormalized = virIsAlreadyNormalized;						    
+						    //jCFS.maxColGV = virMaxColGV;
+						    //jCFS.minColGV = virMinColGV;
+						    //jCFS.stdFixedWallGrayValue = stdFixedWallGrayValue;
+						}
 						
-						//find column outlines once more...	
-						sTW = jIO.assembleRepresentativeSample(mFC);				
-						prelimCC = jOD.findOrientationOfPVCOrAluColumn(sTW.samTiff, jCFS, look4PreciseCoords);
-						samCoords = jOD.findColumnWalls3D(sTW.samTiff, prelimCC, jCFS, sTW.samSlices);
-					}
-					
-					//find upper end of column				
-					ObjectDetector.ColCoords3D topCoords = null;
-					if (jCFS.try2FindColumnTopAndBottom) topCoords = jOD.findColumnsTop(mFC, samCoords, jCFS);
-					else topCoords = jOD.findClosestXYSlice2Top(mFC, samCoords, jCFS);
-					
-					//find lower end of column and create complete set of slice coordinates		
-					ObjectDetector.ColCoords3D roughCoords = null;
-					if (jCFS.try2FindColumnTopAndBottom) roughCoords = jOD.findColumnsBottom(mFC, topCoords, jCFS);
-					else roughCoords = jOD.findClosestXYSlice2Bottom(mFC, topCoords, jCFS);				
+						IJ.log("Attempt #" + findingAttemptNumber + " to find column for " + mFC.fileName + " ...");
+												
+						//re-determine the column outlines
+						boolean look4PreciseCoords = true;
+						ObjectDetector.ColCoords3D prelimCC = jOD.findOrientationOfPVCOrAluColumn(sTW.samTiff, jCFS, look4PreciseCoords);  // returns ColCoords3D object
+						
+						//find some outlines seriously
+						ObjectDetector.ColCoords3D samCoords = jOD.findColumnWalls3D(sTW.samTiff, prelimCC, jCFS, sTW.samSlices);			// returns ColCoords3D object with the "definitive" ROIs
+						mFC.columnHasNotBeenFound = false;						
+						
+						//check if column stands straight and if it should be rotated upright into the center of the canvas
+						if (jCFS.putColumnStraight) {
+							
+							if (!mFC.imageHasBeenLoaded) {
+								mFC.nowTiff = jIO.openTiff3D(mFC.nowTiffPath);
+								mFC.imageHasBeenLoaded = true;
+							}
 			
-					//find bevel (abgeschrägt)
-					ObjectDetector.ColCoords3D bevCoords = jOD.new ColCoords3D();
-					if (jCFS.hasBevel) bevCoords = jOD.findColumnsBevel(mFC, roughCoords, jCFS);
-					else bevCoords = roughCoords;
-					
-					//interpolate column outlines for non-samples slices
-					ObjectDetector.ColCoords3D colCoords = jOD.imputeMissingLayers(bevCoords, jCFS);
-					
-					//define vertical extent of column that should be saved	
-					int nowStart = colCoords.topOfColumn;
-					int nowStop = colCoords.bottomOfColumn;
-					colCoords.heightOfColumn = nowStop - nowStart;
-					/* .. choice of cutting of top and bottom of 3-D canvas.. will be implemented later maybe..
-					 * nowStart = (int)Math.round((double)nowStart - jCFS.topCutOff / 100 *
-					 * (double)colCoords.heightOfColumn); nowStop = (int)Math.round((double)nowStop
-					 * + jCFS.botCutOff / 100 * (double)colCoords.heightOfColumn);
-					 * colCoords.topCutOff = nowStart; colCoords.botCutOff = nowStop;
-					 */
-					if (nowStart < 0) nowStart = 0;
-					if (nowStop > mFC.nOfSlices) nowStop = mFC.nOfSlices;
-					int[] loadSlices = new int[nowStop - nowStart];				
-					for (int j = nowStart ; j < nowStop ; j++) loadSlices[j - nowStart] = j;
-					
-					//load image and cut out vertical ROI...
-					if (!mFC.imageHasBeenLoaded) mFC.nowTiff = jIO.openTiff3D(mFC);						
-					ImagePlus myTiff = jIM.selectSlicesFromTiff(mFC.nowTiff, loadSlices);
-					
-					//create and save Z-projections depicting the outlines of the detected wall
-					disp.displayColumnOutlinesByZ(mFC.nowTiff, colCoords, mFC, null);				
-					
-					//save inner circle file
-					String myInnerCirclePath = mFC.myInnerCircleFolder + pathSep + "Gauge" + mFC.colName + ".txt";
-					jIO.writeInnerCircleVer1(myInnerCirclePath, colCoords);	
-					
-					//apply calibration function again
-					Calibration cal = myTiff.getCalibration();
-					cal.pixelDepth = mFC.caliZ;
-					cal.pixelWidth = mFC.caliX;
-					cal.pixelHeight = mFC.caliY;
-					myTiff.setCalibration(cal);
-					
-					//and save... oufff!!
-					jIO.tiffSaver(mFC.myOutFolder, mFC.fileName, myTiff);
-					
-					//free memory
-					myTiff.flush();
-					IJ.freeMemory();IJ.freeMemory();		
+							mFC.nowTiff = jIM.putColumnUprightInCenter(mFC.nowTiff, samCoords, jCFS);				
+							
+							//store new image Facts
+							mFC.nowWidth = mFC.nowTiff.getWidth();
+							mFC.nowHeight = mFC.nowTiff.getHeight();
+							mFC.nOfSlices = mFC.nowTiff.getNSlices();				
+							
+							//find column outlines once more...	
+							sTW = jIO.assembleRepresentativeSample(mFC);				
+							prelimCC = jOD.findOrientationOfPVCOrAluColumn(sTW.samTiff, jCFS, look4PreciseCoords);
+							samCoords = jOD.findColumnWalls3D(sTW.samTiff, prelimCC, jCFS, sTW.samSlices);
+						}
+						
+						//try {
+						
+							//find upper end of column				
+							ObjectDetector.ColCoords3D topCoords = null;
+							if (jCFS.try2FindColumnTopAndBottom) {
+								topCoords = jOD.findColumnsTop(mFC, samCoords, jCFS);
+								if (topCoords == null) {
+									IJ.log("Top of " + mFC.fileName + " could not be found.. let's try all over again\n");
+									mFC.columnHasNotBeenFound = true;
+								}
+							}
+							else topCoords = jOD.findClosestXYSlice2Top(mFC, samCoords, jCFS);					
+			
+							//find lower end of column and create complete set of slice coordinates							
+							if (!mFC.columnHasNotBeenFound) {
+								ObjectDetector.ColCoords3D roughCoords = null;						
+								if (jCFS.try2FindColumnTopAndBottom) {						
+									roughCoords = jOD.findColumnsBottom(mFC, topCoords, jCFS);				
+									if (roughCoords == null) {
+										IJ.log("Bottom of " + mFC.fileName + " could not be found.. let's try all over again\n");
+										mFC.columnHasNotBeenFound = true;
+									}						
+								}
+								else roughCoords = jOD.findClosestXYSlice2Bottom(mFC, topCoords, jCFS);
+						
+								//find bevel (abgeschrägt)						
+								ObjectDetector.ColCoords3D bevCoords = jOD.new ColCoords3D();
+								if (jCFS.hasBevel && ! mFC.columnHasNotBeenFound) bevCoords = jOD.findColumnsBevel(mFC, roughCoords, jCFS);
+								else bevCoords = roughCoords;
+								
+								//if everything went well so far, flag column as found and break while loop
+								if (!mFC.columnHasNotBeenFound) {
+									IJ.log("Success!! Column has been found!!"); //add a new line in the log
+									findingAttemptNumber = 100;  // break while loop..
+																
+									//interpolate column outlines for non-samples slices
+									ObjectDetector.ColCoords3D colCoords = jOD.imputeMissingLayers(bevCoords, jCFS);
+									
+									//define vertical extent of column that should be saved	
+									int nowStart = colCoords.topOfColumn;
+									int nowStop = colCoords.bottomOfColumn;
+									colCoords.heightOfColumn = nowStop - nowStart;
+									/* .. choice of cutting of top and bottom of 3-D canvas.. will be implemented later maybe..
+									 * nowStart = (int)Math.round((double)nowStart - jCFS.topCutOff / 100 *
+									 * (double)colCoords.heightOfColumn); nowStop = (int)Math.round((double)nowStop
+									 * + jCFS.botCutOff / 100 * (double)colCoords.heightOfColumn);
+									 * colCoords.topCutOff = nowStart; colCoords.botCutOff = nowStop;
+									 */
+									if (nowStart < 0) nowStart = 0;
+									if (nowStop > mFC.nOfSlices) nowStop = mFC.nOfSlices;
+									int[] loadSlices = new int[nowStop - nowStart];				
+									for (int j = nowStart ; j < nowStop ; j++) loadSlices[j - nowStart] = j;
+									
+									//load image and cut out vertical ROI...
+									if (!mFC.imageHasBeenLoaded) mFC.nowTiff = jIO.openTiff3D(mFC);						
+									ImagePlus myTiff = jIM.selectSlicesFromTiff(mFC.nowTiff, loadSlices);
+									
+									//create and save Z-projections depicting the outlines of the detected wall
+									disp.displayColumnOutlinesByZ(mFC.nowTiff, colCoords, mFC, null);				
+									
+									//save inner circle file
+									String myInnerCirclePath = mFC.myInnerCircleFolder + pathSep + "Gauge" + mFC.colName + ".txt";
+									jIO.writeInnerCircleVer1(myInnerCirclePath, colCoords);	
+									
+									//apply calibration function again
+									Calibration cal = myTiff.getCalibration();
+									cal.pixelDepth = mFC.caliZ;
+									cal.pixelWidth = mFC.caliX;
+									cal.pixelHeight = mFC.caliY;
+									myTiff.setCalibration(cal);
+									
+									//and save... oufff!!
+									jIO.tiffSaver(mFC.myOutFolder, mFC.fileName, myTiff);
+									
+									//free memory
+									myTiff.flush();
+									IJ.freeMemory();IJ.freeMemory();
+								}
+							}
+						//}
+						//catch(Exception e) {
+						//	IJ.log("Algorithm has crashed.. trying to restart...");
+						//}
+					}
 				} // if not steel
 				
 				else {			// if it is a steel column				
@@ -245,14 +341,19 @@ public class FindColumnOutlines_ extends ImagePlus implements PlugIn  {
 					jIO.writeInnerCircleSteel(eggshapedCC, mFC);
 					
 				}
-			}
+				
+				IJ.log(""); //add a new line in the log
+				
+				//switch warning lamp off again
+				mFC.columnHasNotBeenFound = false;
+ 			}
 //			catch(Exception e) {
 //				failedColumnDetection.add(mFC.myTiffs[i]);
 //			}
 //		}
 		
 		if (failedColumnDetection.size() == 0) {
-			IJ.log("It appears that the column detection went smoothly for all samples.\n "
+			IJ.log("\nIt appears that the column detection went smoothly for all samples.\n "
 					+ "Please check the column detection performance in WallCoordinateidentified/ReviewFoundOutlines "
 					+ "if you are happy with the found column outlines.");			
 		}

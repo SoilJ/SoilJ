@@ -139,7 +139,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		public int nowHeight;
 		public int bitDepth;	
 				
-		public boolean somethingIsWrong;
+		public boolean columnHasNotBeenFound;
 		public boolean imageHasBeenLoaded;
 		public String eMsg;
 				
@@ -183,7 +183,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		String myOS = System.getProperty("os.name");
 		if (myOS.equalsIgnoreCase("Linux")) pathSep = "/";
 		
-		mFC.somethingIsWrong = false;
+		mFC.columnHasNotBeenFound = false;
 		
 		mFC.nowTiffPath = mFC.myBaseFolder + pathSep + mFC.fileName;	
 		
@@ -245,7 +245,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		String myOS = System.getProperty("os.name");
 		if (myOS.equalsIgnoreCase("Linux")) pathSep = "/";
 		
-		mFC.somethingIsWrong = false;
+		mFC.columnHasNotBeenFound = false;
 		
 		mFC.nowTiffPath = mFC.myBaseFolder + pathSep + mFC.fileName;	
 		
@@ -337,9 +337,11 @@ public class InputOutput extends ImagePlus implements PlugIn {
 	}
 	
 	public SampleTiffWrapper assembleRepresentativeSample(MyFileCollection mFC) {
-	// ******* e.g. for the column wall finder*******************
-	// ** takes subsamples (image processors) of the imagePlus (3d tiff) but first checks whether the histrogram/greyvalue distribution is more or less representative
-	// ** returns sampleTiffWrapper (class of public ImagePlus, int[] samTiffSliceNumbers, int[] samSlices, boolean hasConverged;
+	
+		// ******* e.g. for the column wall finder*******************
+		//** takes subsamples (image processors) of the imagePlus (3d tiff) but first checks whether the histrogram/greyvalue distribution is more or less representative
+		//** returns sampleTiffWrapper (class of public ImagePlus, int[] samTiffSliceNumbers, int[] samSlices, boolean hasConverged;
+		
 		MorphologyAnalyzer morpho = new MorphologyAnalyzer();
 		SampleTiffWrapper sTW = new SampleTiffWrapper();
 		RankFilters rF = new RankFilters();
@@ -353,7 +355,14 @@ public class InputOutput extends ImagePlus implements PlugIn {
 				    	    
 		//assign current TIFF
 		int[] sampleSlices = new int[numOfSampleSlices];
-		for (int j = 0 ; j < sampleSlices.length ; j++)	sampleSlices[j] = (int)Math.floor(startSlice + (double)j * increment);
+		for (int j = 0 ; j < sampleSlices.length ; j++)	{
+			int baseSliceNumber = (int)Math.floor(startSlice + (double)j * increment);
+			int randomContribution = (int)(Math.random()*0.8*increment - 0.4*increment);
+			int nowSlice = baseSliceNumber + randomContribution;
+			if (nowSlice < 1) nowSlice = 1;
+			if (nowSlice > numOfSlices - 1) nowSlice = numOfSlices - 2;
+			sampleSlices[j] = nowSlice;
+		}
 		
 		//Load sample image
 	    ImagePlus nowTiff = new ImagePlus();	    
