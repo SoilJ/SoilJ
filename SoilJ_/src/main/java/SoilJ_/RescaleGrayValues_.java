@@ -35,8 +35,8 @@ import ij.plugin.PlugIn;
  *
  */
 
-public class CalibrateGrayValuesFromList_ extends ImagePlus implements PlugIn  {
-
+public class RescaleGrayValues_ extends ImagePlus implements PlugIn  {
+			 
 	public void run(String arg) {
 		
 		String pathSep = "\\";
@@ -63,15 +63,14 @@ public class CalibrateGrayValuesFromList_ extends ImagePlus implements PlugIn  {
 		//set folder structure
 		String myOutFolder;
 		String myOutPath = null;		
-		myOutFolder = "CalibratedFromList";		
+		myOutFolder = "RescaledGrayValues";		
 		myOutFolder.replace(',', '.');
 		myOutPath = mFC.myBaseFolder + pathSep + myOutFolder;
 		new File(myOutPath).mkdir();
 		mFC.myOutFolder = myOutPath;
 		
-		//
-		String myGVs = jIO.chooseAFile("Please choose a file with your gray values");
-		InputOutput.ManuallyGaugedGrayValues myMGGV = jIO.readASCIIFile(myGVs);
+		//select new target gray values 
+		MenuWaiter.GrayValues2Rescale myGrays = menu.showGrayValueRescaleMenu();		
 		
 		//loop over 3D images
 		for (int i = 0 ; i < mFC.myTiffs.length ; i++) {  //myTiffs.length
@@ -80,20 +79,11 @@ public class CalibrateGrayValuesFromList_ extends ImagePlus implements PlugIn  {
 			mFC.fileName = mFC.myTiffs[i];
 			jIO.addCurrentFileInfo(mFC);
 						
+			//open 3-D image
 			ImagePlus nowTiff = jIO.openTiff3D(mFC.nowTiffPath);
-			int myN = 0;
 			
-			//find correct image			
-			for (int n = 0 ; n < myMGGV.sampleName.length ; n++) {
-				if (mFC.fileName.equalsIgnoreCase(myMGGV.sampleName[n] + ".tif")) {
-					myN = n;
-					break;
-				}
-			}
-			
-			double[] myGrays = myMGGV.Coordinates[myN];			
-			
-			ImagePlus outTiff = jIM.calibrateGrayValuesFromList(nowTiff, myGrays);
+			//do the rescale
+			ImagePlus outTiff = jIM.rescaleGrayValues(nowTiff, myGrays);
 		
 			jIO.tiffSaver(myOutPath, mFC.fileName, outTiff);
 	

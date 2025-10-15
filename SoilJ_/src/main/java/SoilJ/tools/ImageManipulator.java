@@ -305,17 +305,15 @@ public class ImageManipulator implements PlugIn {
 		
 	}
 	
-	public ImagePlus calibrateGrayValuesFromList(ImagePlus nowTiff, double[] grayVals) {
-		
-		HistogramStuff myHS = new HistogramStuff();
-		
+	public ImagePlus rescaleGrayValues(ImagePlus nowTiff, MenuWaiter.GrayValues2Rescale grayVals) {
+
 		ImageStack newStack = new ImageStack(nowTiff.getWidth(), nowTiff.getHeight());
 		ImagePlus outTiff = new ImagePlus();
 		
-		double lTarget = 5000;
-		double uTarget = 12000;
-		double upper = StatUtils.percentile(grayVals, 50);
-		double lower = 5000;
+		double lTarget = grayVals.newLow;
+		double uTarget = grayVals.newHigh;
+		double lower = grayVals.oldLow;
+		double upper = grayVals.oldHigh;
 		
 		for (int z = 0 ; z < nowTiff.getNSlices() ; z++) {
 			

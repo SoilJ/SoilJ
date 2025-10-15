@@ -449,6 +449,16 @@ public class MenuWaiter implements PlugIn {
 		
 	}
 	
+	public class GrayValues2Rescale {
+		
+		public int oldLow;
+		public int oldHigh;
+		
+		public int newLow;
+		public int newHigh;
+		
+	}
+	
 	public class ClosingMaskOptionMenu {
 		
 		public boolean useInnerCircleFiles;
@@ -3834,6 +3844,38 @@ public class MenuWaiter implements PlugIn {
 		
 		return mGEO;
 	}	
+	
+	public GrayValues2Rescale showGrayValueRescaleMenu() {
+		
+		GrayValues2Rescale myGrays = new GrayValues2Rescale();
+		
+		GenericDialog gd = new GenericDialog("Let me know how you want to rescale your gray values, please.");
+		
+		gd.addNumericField("Old lower reference value", 5000, 0);
+		gd.addNumericField("Old higher reference value", 20000, 0);
+		
+		gd.addMessage("");
+		gd.addMessage("These values will be scaled to ...");
+		gd.addMessage("");
+		
+		gd.addNumericField("New lower reference value", 7000, 0);
+		gd.addNumericField("New higher reference value", 20000, 0);
+		
+		//show dialog
+		gd.showDialog();
+	    if (gd.wasCanceled()) return null;
+	    else {
+	    	
+	    	myGrays.oldLow = (int)gd.getNextNumber();
+	    	myGrays.oldHigh = (int)gd.getNextNumber();
+	    	myGrays.newLow = (int)gd.getNextNumber();
+	    	myGrays.newHigh = (int)gd.getNextNumber();
+	    	
+	    }
+		
+		return myGrays;
+		
+	}
 	
 	public SelectFiles showFileSelectionMenu(File file) {
 
