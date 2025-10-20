@@ -1334,7 +1334,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
 				outStack.addSlice(nowIP);
 			}	
 			catch(Exception e){
-				IJ.error("Something was fishy when trying to open 2-D image #" + (i + 1) +" sample slices from " + mFC.colName);
+				IJ.log("Something was fishy when trying to open 2-D image #" + (i + 1) +" sample slices from " + mFC.colName);
 			}		
 			
 		}

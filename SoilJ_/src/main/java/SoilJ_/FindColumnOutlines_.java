@@ -361,7 +361,8 @@ public class FindColumnOutlines_ extends ImagePlus implements PlugIn  {
 			String eMsg = "No column could be detected for the following samples:\n\n";
 			for (int i = 0 ; i < failedColumnDetection.size() ; i++) eMsg += failedColumnDetection.get(i) + "\n";
 			eMsg += "\n Please re-run the column detection for these columns using a lower R2 value "
-					+ "or using less strict criteria for a successful column find. ";					
+					+ "or using less strict criteria for a successful column find. ";		
+			IJ.log(eMsg);
 		}
 		
 		if (errorCounts > 0) {

@@ -13,7 +13,7 @@
 
 	<groupId>net.imagej</groupId>
 	<artifactId>SoilJ_</artifactId>
-	<version>1.3.26-SNAPSHOT</version>
+	<version>1.3.27-SNAPSHOT</version>
 
 	<name>SoilJ</name>
 	<description>A Maven project implementing the SoilJ ImageJ 1.x plugin</description>
