@@ -4221,7 +4221,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		
 		//check if soil surface should be taken into account
 		int topSurface = 1;
-		int botSurface = mFC.nOfSlices;
+		int botSurface = mFC.nOfSlices + 1;
 		if (mRSO.includeSurfaceTopography) {			
 			MorphologyAnalyzer.SurfaceStatistics mST = jOD.extractSurfaceStatistics(mFC);
 			topSurface = mST.medianElevation;
