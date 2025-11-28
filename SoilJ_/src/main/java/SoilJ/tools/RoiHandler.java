@@ -560,7 +560,7 @@ public class RoiHandler implements PlugIn {
 					avgRadius[radiusFinder] = (jCO.innerMajorRadius[radiusFinder] + jCO.innerMinorRadius[radiusFinder]) / 2; // avg of major and minor inner radius
 				}
 				
-				double myOldRadius = StatUtils.mean(avgRadius) - cutAwayFromXY;				// mean of the slice-averages
+				double myOldRadius = StatUtils.mean(avgRadius);				// mean of the slice-averages
 				double myRadius = myOldRadius;
 				if (cutAwayFromXY > 0) myRadius = myOldRadius - cutAwayFromXY;	
 				if (keepRadiusAroundCentralAxis > 0) myRadius = keepRadiusAroundCentralAxis;				
@@ -734,7 +734,7 @@ public class RoiHandler implements PlugIn {
 				outTiffs[1] = null;
 				
 				//also cut ROI
-				for (int i = mFC.startSlice ; i < mFC.stopSlice - mFC.startSlice ; i++) {
+				for (int i = mFC.startSlice ; i < mFC.stopSlice - mFC.startSlice - 1; i++) {
 					colRoi.pRoi[i - mFC.startSlice] = colRoi.pRoi[i];
 					if (colRoi.iRoi != null) colRoi.iRoi[i - mFC.startSlice] = colRoi.iRoi[i];
 				}

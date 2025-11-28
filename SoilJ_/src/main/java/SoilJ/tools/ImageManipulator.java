@@ -70,10 +70,9 @@ import inra.ijpb.label.select.LabelSizeFiltering;
 import inra.ijpb.label.select.RelationalOperator;
 import inra.ijpb.measure.region3d.EquivalentEllipsoid;
 import inra.ijpb.measure.region3d.InertiaEllipsoid;
+import inra.ijpb.morphology.Reconstruction3D;
 import inra.ijpb.watershed.ExtendedMinimaWatershed;
-import mcib3d.image3d.ImageByte;
 import mcib3d.image3d.ImageHandler;
-import mcib3d.image3d.processing.FillHoles3D;
 import mcib3d.image3d.segment.HysteresisSegment;
 import process3d.Dilate_;
 import process3d.Erode_;
@@ -537,12 +536,12 @@ public class ImageManipulator implements PlugIn {
 	}
 	
 	public ImagePlus removeHoles(ImagePlus nowTiff) {
-				
-		ImageByte imgByte = new ImageByte(nowTiff);
-		FillHoles3D.process(imgByte, 255, Runtime.getRuntime().availableProcessors(), false);
-		nowTiff.updateImage();	
+			
+		ImageStack stack = nowTiff.getStack();
+		ImageStack result = Reconstruction3D.fillHoles(stack);
+		ImagePlus outTiff = new ImagePlus("filledHoles", result);
 		
-		return nowTiff;
+		return outTiff;
 		
 	}
 	

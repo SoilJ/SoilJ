@@ -120,9 +120,9 @@
 			<artifactId>MorphoLibJ_</artifactId>
 		</dependency>	
 		<dependency>
-    		<groupId>org.framagit.mcib3d</groupId>
-    		<artifactId>mcib3d-plugins</artifactId>
-    		<version>4.0.63</version>
+			<groupId>org.framagit.mcib3d</groupId>
+			<artifactId>mcib3d-core</artifactId>
+			<version>4.1.7</version>		
 		</dependency>
 		<dependency>
 			<groupId>org.apache.commons</groupId>
