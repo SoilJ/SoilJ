@@ -760,7 +760,10 @@ public class MenuWaiter implements PlugIn {
 		String[] typeOfColumn = new String[2];
 		typeOfColumn[0] = "steel";
 		typeOfColumn[1] = "aluminium or PVC";
-		preg.addRadioButtonGroup("Please choose a column material!", typeOfColumn, 1, 2, "steel");
+		preg.addRadioButtonGroup("Please choose a column material!", typeOfColumn, 1, 2, "aluminium or PVC");
+		
+		preg.addNumericField("Enter the quantile for the lower reference value ", 0.6, 2, 5, "");
+		preg.addNumericField("Enter the quantile for the upper reference value ", 0.8, 2, 5, "");
 		
 		preg.addMessage("Please remember that this routine requires InnerCircle files!!");
 
@@ -776,7 +779,12 @@ public class MenuWaiter implements PlugIn {
 	    	}
 	    	
 	    	if (myChoiceIndex == 0) mBDH.isSteelColumn = true;
-	    	else mBDH.isSteelColumn = false;
+	    	else mBDH.isSteelColumn = false;	    	
+	    	
+	    	mBDH.lowerQ = preg.getNextNumber();
+	    	
+	    	mBDH.upperQ = preg.getNextNumber();
+
 		}
 			
 		return mBDH;

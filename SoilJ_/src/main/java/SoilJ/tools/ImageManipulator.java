@@ -993,7 +993,7 @@ public class ImageManipulator implements PlugIn {
 			standardRadius = (int)Math.round(radialMappingFactor * (StatUtils.percentile(jCO.innerRadius, 50)));
 			
 			boolean isSteel = true;
-			correctionMaps = getBeamHardeningCorrectionMaps(jCO.heightOfColumn, jCO.anglesChecked, standardRadius, radialGrayValues, isSteel);
+			correctionMaps = getBeamHardeningCorrectionMaps(jCO.heightOfColumn, jCO.anglesChecked, standardRadius, radialGrayValues, isSteel, mBDH.upperQ, mBDH.lowerQ);
 						
 			jEC = jOD.extractColCoordsEssentials3D(jCO);
 			
@@ -1007,7 +1007,7 @@ public class ImageManipulator implements PlugIn {
 			standardRadius = (int)Math.round(radialMappingFactor * (StatUtils.percentile(jCO.innerMinorRadius, 50)));
 				
 			boolean isSteel = false;
-			correctionMaps = getBeamHardeningCorrectionMaps(jCO.heightOfColumn, jCO.anglesChecked, standardRadius, radialGrayValues,isSteel);
+			correctionMaps = getBeamHardeningCorrectionMaps(jCO.heightOfColumn, jCO.anglesChecked, standardRadius, radialGrayValues, isSteel, mBDH.upperQ, mBDH.lowerQ);
 			
 			jEC = jOD.extractColCoordsEssentials3D(jCO);
 						
@@ -1019,14 +1019,14 @@ public class ImageManipulator implements PlugIn {
 		
 	}
 	
-	public ImagePlus getBeamHardeningCorrectionMaps(int heightOfColumn, int anglesChecked, int standardRadius, double[][][] radialGrayValues, boolean isSteel) {
+	public ImagePlus getBeamHardeningCorrectionMaps(int heightOfColumn, int anglesChecked, int standardRadius, double[][][] radialGrayValues, boolean isSteel, double lowerQ, double upperQ) {
 
 		ObjectDetector jOD = new ObjectDetector();
 		FitStuff jFS = new FitStuff();
 		
 		//get two different percentile radial illumination profiles..
-		double lowerPerc = 60;
-		double upperPerc = 80;
+		double lowerPerc = lowerQ * 100;
+		double upperPerc = upperQ * 100;
 		ObjectDetector.RadialFacts lowerRF = jOD.getRadialFacts(heightOfColumn, anglesChecked, standardRadius, radialGrayValues, lowerPerc);			
 		ObjectDetector.RadialFacts upperRF = jOD.getRadialFacts(heightOfColumn, anglesChecked, standardRadius, radialGrayValues, upperPerc);				
 		

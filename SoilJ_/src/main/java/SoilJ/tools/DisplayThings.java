@@ -1231,7 +1231,7 @@ public class DisplayThings implements PlugIn {
 		
 	}
 	
-	public boolean plotXYXY(double[] x, double[] y, double[] x2, double[] y2,String title, String xLabel, String yLabel) {
+	public boolean plotXYXY(double[] x, double[] y, double[] x2, double[] y2, String title, String xLabel, String yLabel) {
 		
 		RollerCaster rC = new RollerCaster();	
 		
@@ -1245,20 +1245,20 @@ public class DisplayThings implements PlugIn {
 		rmo.setLimits(StatUtils.min(x), StatUtils.max(x), 0.99 * StatUtils.min(mini), 1.01 * StatUtils.max(maxi));
 		if (StatUtils.min(mini) < 0) rmo.setLimits(StatUtils.min(x), StatUtils.max(x), 1.01 * StatUtils.min(mini), 1.01 * StatUtils.max(maxi));
 		if (StatUtils.min(maxi) < 0) rmo.setLimits(StatUtils.min(x), StatUtils.max(x), 1.01 * StatUtils.min(mini), 0.99 * StatUtils.max(maxi));
-		//rmo.setLimits(0, 400, 7000, 17000);
+		rmo.setLimits(0, 500, 0.6, 1.4);
 		rmo.setColor(Color.BLUE);
 		rmo.addPoints(rC.castDouble2Float(x), rC.castDouble2Float(y), Plot.LINE);
 		rmo.setColor(Color.RED);
 		rmo.addPoints(rC.castDouble2Float(x2), rC.castDouble2Float(y2), Plot.LINE);
-		rmo.draw();
+		//rmo.draw();
 		PlotWindow pW = rmo.show();		
 
 		
-//		GenericDialog gd = new GenericDialog("");
-//		gd.showDialog();
-//	    if (gd.wasCanceled()) return false;
-//	    else new WaitForUserDialog("press any key");
-//	    gd.removeAll();
+		GenericDialog gd = new GenericDialog("");
+		gd.showDialog();
+	    if (gd.wasCanceled()) return false;
+	    else new WaitForUserDialog("press any key");
+	    gd.removeAll();
 	    
 		IJ.wait(500);
 		

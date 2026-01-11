@@ -165,9 +165,13 @@ public class FitStuff implements PlugIn {
 		double[] smoothy = new double[rF.standardRadius];
 		double[] zwischi = new double[rF.standardRadius];
 		
-		double[] early = new double[(int)(r.length/2)];
-		double[] rearly = new double[early.length];
-		double[] smearly = new double[early.length];
+		double[] early = new double[(int)(r.length/3)];
+		double[] midly = new double[(int)(r.length/3)];   
+		double[] lately = new double[(int)(r.length/3 - 20)];
+		double[] rearly = new double[(int)(r.length/3)];
+		double[] rmidly = new double[(int)(r.length/3)];
+		double[] rlately = new double[(int)(r.length/3 - 20)];
+
 		
 		int keeps = Math.floorDiv(r.length,20);
 		double[] fiveQuant = new double[keeps];
@@ -185,10 +189,20 @@ public class FitStuff implements PlugIn {
 					early[x] = rF.radialProfile[z][x];
 					rearly[x] = x;
 				}
+				if (x >= midly.length & x < 2 * midly.length) {
+					midly[x - midly.length] = rF.radialProfile[z][x];
+					rmidly[x - midly.length] = x - midly.length;
+				}				
+				if (x >= 2 * midly.length & x < rF.standardRadius - 21) {
+					lately[x - 2 * midly.length] = rF.radialProfile[z][x];
+					rlately[x - 2 * midly.length] = x - 2 * midly.length;
+				}
 			}
 			
 			//calculate plateau
-			double mearly = StatUtils.percentile(early,50);			
+			double mearly = StatUtils.percentile(early,50);	
+			double mmidly = StatUtils.percentile(midly,50);	
+			double mlately = StatUtils.percentile(lately,50);	
 			
 			int set2one = r.length / 8;
 			if (!isSteel) set2one = r.length / 3;
@@ -196,8 +210,10 @@ public class FitStuff implements PlugIn {
 			for (int x = 0 ; x < rF.standardRadius ; x++) {				
 				r[x] = x;
 				if (x < set2one) raw[x] = 1;	//fortify against macropores in the horizontal center
-				else raw[x] = rF.radialProfile[z][x] / mearly;
+				else raw[x] = rF.radialProfile[z][x] / mmidly;
 			}
+			
+			//check median-filtered gray values next to plateau to refine fortification
 			
 			if (isSteel) {
 				
@@ -287,12 +303,17 @@ public class FitStuff implements PlugIn {
 				
 				for (int i = 0 ; i < r.length ; i++) {
 					smoothy[i] = pe[0]*Math.exp(-pe[1]*i)+pe[2];
-				}
-				
-				//disp.plotXYXY(ruse, rawuse, r, zwischi, null, null, null);
+				}				
 				
 				//assign smoothy to output array and reconvert to original values..
-				for (int i = 0 ; i < rF.standardRadius ; i++) smooth[z][i] = smoothy[i] * mearly;
+				for (int i = 0 ; i < rF.standardRadius ; i++) {
+					if (mlately < mmidly) smooth[z][i] = 1;
+					else smooth[z][i] = smoothy[i] * mmidly;
+				}
+
+				//if (z > 70) {
+				//	disp.plotXYXY(ruse, rawuse, r, smoothy, "layer" + (z + 1), null, null);
+				//}
 				
 			}
 			
