@@ -301,13 +301,16 @@ public class FitStuff implements PlugIn {
 				mCF.doFit(CurveFitter.EXP_WITH_OFFSET);			
 				double[] pe = mCF.getParams();
 				
+				//catch downward slopes and set them to no correction function applied
+				if (pe[0] < 0) pe[0] = 0;
+				
 				for (int i = 0 ; i < r.length ; i++) {
 					smoothy[i] = pe[0]*Math.exp(-pe[1]*i)+pe[2];
 				}				
 				
 				//assign smoothy to output array and reconvert to original values..
 				for (int i = 0 ; i < rF.standardRadius ; i++) {
-					if (mlately < mmidly) smooth[z][i] = 1;
+					if (mlately < mmidly) smooth[z][i] = mmidly;
 					else smooth[z][i] = smoothy[i] * mmidly;
 				}
 

@@ -1007,7 +1007,7 @@ public class ImageManipulator implements PlugIn {
 			standardRadius = (int)Math.round(radialMappingFactor * (StatUtils.percentile(jCO.innerMinorRadius, 50)));
 				
 			boolean isSteel = false;
-			correctionMaps = getBeamHardeningCorrectionMaps(jCO.heightOfColumn, jCO.anglesChecked, standardRadius, radialGrayValues, isSteel, mBDH.upperQ, mBDH.lowerQ);
+			correctionMaps = getBeamHardeningCorrectionMaps(jCO.heightOfColumn, jCO.anglesChecked, standardRadius, radialGrayValues, isSteel, mBDH.lowerQ, mBDH.upperQ);
 			
 			jEC = jOD.extractColCoordsEssentials3D(jCO);
 						
@@ -2763,6 +2763,8 @@ public class ImageManipulator implements PlugIn {
 		ImageProcessor lCM = correctionMaps.getProcessor();
 		correctionMaps.setSlice(2);
 		ImageProcessor uCM = correctionMaps.getProcessor();		
+		
+		correctionMaps.updateAndDraw();correctionMaps.show();
 		
 		//calculate number of angles needed to paint the whole canvas..
 		double spacing = 2 * Math.PI / jCO.anglesChecked;		

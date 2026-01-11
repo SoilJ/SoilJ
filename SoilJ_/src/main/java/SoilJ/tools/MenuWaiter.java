@@ -781,8 +781,7 @@ public class MenuWaiter implements PlugIn {
 	    	if (myChoiceIndex == 0) mBDH.isSteelColumn = true;
 	    	else mBDH.isSteelColumn = false;	    	
 	    	
-	    	mBDH.lowerQ = preg.getNextNumber();
-	    	
+	    	mBDH.lowerQ = preg.getNextNumber();	    	
 	    	mBDH.upperQ = preg.getNextNumber();
 
 		}
