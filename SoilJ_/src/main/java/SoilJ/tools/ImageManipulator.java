@@ -1036,8 +1036,8 @@ public class ImageManipulator implements PlugIn {
 		upperRF = jFS.fitRadialProfile(upperRF, isSteel);
 		
 		//create correction maps
-		ImageProcessor lowerCorrectionMap = createBeamHardeningCorrectionMap4Steel(lowerRF);
-		ImageProcessor upperCorrectionMap = createBeamHardeningCorrectionMap4Steel(upperRF);
+		ImageProcessor lowerCorrectionMap = createBeamHardeningCorrectionMap(lowerRF);
+		ImageProcessor upperCorrectionMap = createBeamHardeningCorrectionMap(upperRF);
 				
 		ImageStack outStack = new ImageStack(upperCorrectionMap.getWidth(), upperCorrectionMap.getHeight());
 		outStack.addSlice(lowerCorrectionMap);
@@ -2764,7 +2764,8 @@ public class ImageManipulator implements PlugIn {
 		correctionMaps.setSlice(2);
 		ImageProcessor uCM = correctionMaps.getProcessor();		
 		
-		correctionMaps.updateAndDraw();correctionMaps.show();
+		//check how correction maps look like
+		//correctionMaps.updateAndDraw();correctionMaps.show();
 		
 		//calculate number of angles needed to paint the whole canvas..
 		double spacing = 2 * Math.PI / jCO.anglesChecked;		
@@ -5742,7 +5743,7 @@ public class ImageManipulator implements PlugIn {
 	}
 
 	//create correction maps
-	public ImageProcessor createBeamHardeningCorrectionMap4Steel(ObjectDetector.RadialFacts rF) {
+	public ImageProcessor createBeamHardeningCorrectionMap(ObjectDetector.RadialFacts rF) {
 		
 		TailoredMaths math = new TailoredMaths();
 		

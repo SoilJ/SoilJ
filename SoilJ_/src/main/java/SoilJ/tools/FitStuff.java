@@ -193,7 +193,7 @@ public class FitStuff implements PlugIn {
 					midly[x - midly.length] = rF.radialProfile[z][x];
 					rmidly[x - midly.length] = x - midly.length;
 				}				
-				if (x >= 2 * midly.length & x < rF.standardRadius - 21) {
+				if (x >= 2 * midly.length & x < early.length + midly.length + lately.length) {
 					lately[x - 2 * midly.length] = rF.radialProfile[z][x];
 					rlately[x - 2 * midly.length] = x - 2 * midly.length;
 				}
