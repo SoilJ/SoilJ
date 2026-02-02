@@ -4095,18 +4095,18 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		String myOutFolder = "";	
 		if (mRSO.choiceOfRoi.equals("RealSample")) {			
 			
-			if (mRSO.heightOfRoi > 0) myOutFolder = "Top" + mRSO.cutAwayFromTop + "Height" + mRSO.heightOfRoi + wallOrRadius + cutOrKeep;
+			if (mRSO.heightOfRoi > 0) myOutFolder = "Top" + mRSO.cutAwayOrAdd2RefLayer + "Height" + mRSO.heightOfRoi + wallOrRadius + cutOrKeep;
 			boolean isCut = false;
-			if (mRSO.cutAwayFromBottom > 0 | mRSO.cutAwayFromTop > 0 | cutOrKeep > 0 | mRSO.cutAwayFromCenter > 0) isCut = true; 
-			if (isCut & mRSO.heightOfRoi > 0) myOutFolder = "Tv" + mRSO.cutAwayFromTop + "Height" + mRSO.heightOfRoi + wallOrRadius + cutOrKeep;
+			if (mRSO.cutAwayFromBottom > 0 | mRSO.cutAwayOrAdd2RefLayer > 0 | cutOrKeep > 0 | mRSO.cutAwayFromCenter > 0) isCut = true; 
+			if (isCut & mRSO.heightOfRoi > 0) myOutFolder = "Tv" + mRSO.cutAwayOrAdd2RefLayer + "Height" + mRSO.heightOfRoi + wallOrRadius + cutOrKeep;
 			if (isCut & mRSO.cutZPercent & mRSO.cutXYPercent & mRSO.heightOfRoi == 0) myOutFolder = 
-					"Tp" + mRSO.cutAwayFromTop + "Bp" + mRSO.cutAwayFromBottom +	"Wp" + cutOrKeep + "Cp" + mRSO.cutAwayFromCenter;
+					"Tp" + mRSO.cutAwayOrAdd2RefLayer + "Bp" + mRSO.cutAwayFromBottom +	"Wp" + cutOrKeep + "Cp" + mRSO.cutAwayFromCenter;
 			if (isCut & !mRSO.cutZPercent & mRSO.cutXYPercent & mRSO.heightOfRoi == 0) myOutFolder = 
-					"Tv" + mRSO.cutAwayFromTop + "Bv" + mRSO.cutAwayFromBottom +	"Wp" + cutOrKeep + "Cp" + mRSO.cutAwayFromCenter;
+					"Tv" + mRSO.cutAwayOrAdd2RefLayer + "Bv" + mRSO.cutAwayFromBottom +	"Wp" + cutOrKeep + "Cp" + mRSO.cutAwayFromCenter;
 			if (isCut & mRSO.cutZPercent & !mRSO.cutXYPercent & mRSO.heightOfRoi == 0) myOutFolder = 
-					"Tp" + mRSO.cutAwayFromTop + "Bp" + mRSO.cutAwayFromBottom +	"Wv" + cutOrKeep + "Cv" + mRSO.cutAwayFromCenter;
+					"Tp" + mRSO.cutAwayOrAdd2RefLayer + "Bp" + mRSO.cutAwayFromBottom +	"Wv" + cutOrKeep + "Cv" + mRSO.cutAwayFromCenter;
 			if (isCut & !mRSO.cutZPercent & !mRSO.cutXYPercent & mRSO.heightOfRoi == 0) myOutFolder = 
-					"Tv" + mRSO.cutAwayFromTop + "Bv" + mRSO.cutAwayFromBottom +	"Wv" + cutOrKeep + "Cv" + mRSO.cutAwayFromCenter;
+					"Tv" + mRSO.cutAwayOrAdd2RefLayer + "Bv" + mRSO.cutAwayFromBottom +	"Wv" + cutOrKeep + "Cv" + mRSO.cutAwayFromCenter;
 			if (!isCut) myOutFolder = "InnerCircleColumn";	
 
 			if (mRSO.includeSurfaceTopography) myOutFolder = "S_"+ myOutFolder;
@@ -4161,18 +4161,18 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		String myPreOutFolder = "";		
 		if (mPSA.mRSO.choiceOfRoi.equals("RealSample")) {			
 			
-			if (mPSA.mRSO.heightOfRoi > 0) myPreOutFolder = "Top" + mPSA.mRSO.cutAwayFromTop + "Height" + mPSA.mRSO.heightOfRoi + wallOrRadius + cutOrKeep;
+			if (mPSA.mRSO.heightOfRoi > 0) myPreOutFolder = "Top" + mPSA.mRSO.cutAwayOrAdd2RefLayer + "Height" + mPSA.mRSO.heightOfRoi + wallOrRadius + cutOrKeep;
 			boolean isCut = false;
-			if (mPSA.mRSO.cutAwayFromBottom > 0 | mPSA.mRSO.cutAwayFromTop > 0 | cutOrKeep > 0 | mPSA.mRSO.cutAwayFromCenter > 0) isCut = true; 
-			if (isCut & mPSA.mRSO.heightOfRoi > 0) myPreOutFolder = "Tv" + mPSA.mRSO.cutAwayFromTop + "Height" + mPSA.mRSO.heightOfRoi + wallOrRadius + cutOrKeep;
+			if (mPSA.mRSO.cutAwayFromBottom > 0 | mPSA.mRSO.cutAwayOrAdd2RefLayer > 0 | cutOrKeep > 0 | mPSA.mRSO.cutAwayFromCenter > 0) isCut = true; 
+			if (isCut & mPSA.mRSO.heightOfRoi > 0) myPreOutFolder = "Tv" + mPSA.mRSO.cutAwayOrAdd2RefLayer + "Height" + mPSA.mRSO.heightOfRoi + wallOrRadius + cutOrKeep;
 			if (isCut & mPSA.mRSO.cutZPercent & mPSA.mRSO.cutXYPercent & mPSA.mRSO.heightOfRoi == 0) myPreOutFolder = 
-					"Tp" + mPSA.mRSO.cutAwayFromTop + "Bp" + mPSA.mRSO.cutAwayFromBottom +	"Wp" + cutOrKeep + "Cp" + mPSA.mRSO.cutAwayFromCenter;
+					"Tp" + mPSA.mRSO.cutAwayOrAdd2RefLayer + "Bp" + mPSA.mRSO.cutAwayFromBottom +	"Wp" + cutOrKeep + "Cp" + mPSA.mRSO.cutAwayFromCenter;
 			if (isCut & !mPSA.mRSO.cutZPercent & mPSA.mRSO.cutXYPercent & mPSA.mRSO.heightOfRoi == 0) myPreOutFolder = 
-					"Tv" + mPSA.mRSO.cutAwayFromTop + "Bv" + mPSA.mRSO.cutAwayFromBottom +	"Wp" + cutOrKeep + "Cp" + mPSA.mRSO.cutAwayFromCenter;
+					"Tv" + mPSA.mRSO.cutAwayOrAdd2RefLayer + "Bv" + mPSA.mRSO.cutAwayFromBottom +	"Wp" + cutOrKeep + "Cp" + mPSA.mRSO.cutAwayFromCenter;
 			if (isCut & mPSA.mRSO.cutZPercent & !mPSA.mRSO.cutXYPercent & mPSA.mRSO.heightOfRoi == 0) myPreOutFolder = 
-					"Tp" + mPSA.mRSO.cutAwayFromTop + "Bp" + mPSA.mRSO.cutAwayFromBottom +	"Wv" + cutOrKeep + "Cv" + mPSA.mRSO.cutAwayFromCenter;
+					"Tp" + mPSA.mRSO.cutAwayOrAdd2RefLayer + "Bp" + mPSA.mRSO.cutAwayFromBottom +	"Wv" + cutOrKeep + "Cv" + mPSA.mRSO.cutAwayFromCenter;
 			if (isCut & !mPSA.mRSO.cutZPercent & !mPSA.mRSO.cutXYPercent & mPSA.mRSO.heightOfRoi == 0) myPreOutFolder = 
-					"Tv" + mPSA.mRSO.cutAwayFromTop + "Bv" + mPSA.mRSO.cutAwayFromBottom +	"Wv" + cutOrKeep + "Cv" + mPSA.mRSO.cutAwayFromCenter;
+					"Tv" + mPSA.mRSO.cutAwayOrAdd2RefLayer + "Bv" + mPSA.mRSO.cutAwayFromBottom +	"Wv" + cutOrKeep + "Cv" + mPSA.mRSO.cutAwayFromCenter;
 			if (!isCut) myPreOutFolder = "InnerCircleColumn";	
 						
 			if (mPSA.mRSO.includeSurfaceTopography) myPreOutFolder = "S_"+ myPreOutFolder;
@@ -4212,8 +4212,7 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		
 		return mFC;
 		
-	}
-	
+	}	
 	
 	public int[] findStartAndStopSlices(MyFileCollection mFC, MenuWaiter.ROISelectionOptions mRSO) {
 		
@@ -4228,31 +4227,49 @@ public class InputOutput extends ImagePlus implements PlugIn {
 			botSurface = mST.medianIntrusion;
 		}
 		
+		//init start and stopslice
+		int startSlice = 0;
+		int stopSlice = 0;
+		
 		//define start and stop
-		int startSlice = topSurface + mRSO.cutAwayFromTop;
-		int stopSlice = botSurface - mRSO.cutAwayFromBottom;
+		if (mRSO.referenceLayer.equalsIgnoreCase("none")) {
+			startSlice = topSurface + mRSO.cutAwayOrAdd2RefLayer;
+			stopSlice = botSurface - mRSO.cutAwayFromBottom;
+		}
+		if (mRSO.referenceLayer.equalsIgnoreCase("Topmost layer of image")) {
+			startSlice = topSurface + mRSO.cutAwayOrAdd2RefLayer;
+			stopSlice = botSurface + mRSO.cutAwayOrAdd2RefLayer + mRSO.heightOfRoi;
+		}
+		if (mRSO.referenceLayer.equalsIgnoreCase("Bottommost layer of image")) {
+			startSlice = botSurface - mRSO.heightOfRoi - mRSO.cutAwayOrAdd2RefLayer;;
+			stopSlice = botSurface - mRSO.cutAwayOrAdd2RefLayer;;
+		}
+		if (mRSO.referenceLayer.equalsIgnoreCase("Vertical center of image")) {
+			startSlice = mFC.nOfSlices / 2 - mRSO.heightOfRoi / 2;
+			stopSlice = mFC.nOfSlices / 2 + mRSO.heightOfRoi / 2;
+		}
 		
 		//check if there is something to cut away
-		if (mRSO.choiceOfRoi.equalsIgnoreCase("Cuboid")) mRSO.cutAwayFromTop = mRSO.cubeZ1 - 1; 
+		if (mRSO.choiceOfRoi.equalsIgnoreCase("Cuboid")) mRSO.cutAwayOrAdd2RefLayer = mRSO.cubeZ1 - 1; 
 		
 		if (mRSO.choiceOfRoi.equalsIgnoreCase("Cylinder")) {			
-			mRSO.cutAwayFromTop = mRSO.cylZ1; 
+			mRSO.cutAwayOrAdd2RefLayer = mRSO.cylZ1; 
 			startSlice = mRSO.cylZ1;
 			stopSlice = mRSO.cylZ2;			
 			if (stopSlice == 0 & mRSO.cutAwayFromBottom > 0) stopSlice = mFC.nOfSlices - mRSO.cutAwayFromBottom;
 			else if (stopSlice == 0) stopSlice = mFC.nOfSlices;
 			
 		}
-		if (mRSO.cutAwayFromTop < 0) mRSO.cutAwayFromTop = 0;
+		if (mRSO.cutAwayOrAdd2RefLayer < 0) mRSO.cutAwayOrAdd2RefLayer = 0;
 		if (startSlice == 0) startSlice = 0; 			
 		
 		if (mRSO.cutZPercent) {
-			startSlice = (int)Math.round((float)mRSO.cutAwayFromTop / 100f * (float)mFC.nOfSlices);
+			startSlice = (int)Math.round((float)mRSO.cutAwayOrAdd2RefLayer / 100f * (float)mFC.nOfSlices);
 			if (startSlice == 0) startSlice = 0; 
 			if (mRSO.cutAwayFromBottom == 0) stopSlice = mFC.nOfSlices;
 			else stopSlice = mFC.nOfSlices - (int)Math.round((float)mRSO.cutAwayFromBottom / 100f * (float)mFC.nOfSlices);
 		}
-		if (mRSO.heightOfRoi > 0) stopSlice = startSlice + mRSO.heightOfRoi;
+		//if (mRSO.heightOfRoi > 0) stopSlice = startSlice + mRSO.heightOfRoi;
 				
 		int[] startStop = {startSlice, stopSlice};
 		
@@ -4634,19 +4651,19 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		}
 		
 		//check if height used for cylinder is the same as the total number of slices
-		if (mRSO.cylZ1 > 0) mRSO.cutAwayFromTop = mRSO.cylZ1;
+		if (mRSO.cylZ1 > 0) mRSO.cutAwayOrAdd2RefLayer = mRSO.cylZ1;
 		if (mRSO.cylZ2 > 0) mRSO.cutAwayFromBottom = mFC.nOfSlices - mRSO.cylZ2;
 		
 		//check if height used for cubic ROI is the same as the total number of slices
-		if (mRSO.cubeZ1 > 0) mRSO.cutAwayFromTop = mRSO.cubeZ1;
+		if (mRSO.cubeZ1 > 0) mRSO.cutAwayOrAdd2RefLayer = mRSO.cubeZ1;
 		if (mRSO.cubeZ2 > 0) mRSO.cutAwayFromBottom = mFC.nOfSlices - mRSO.cubeZ2;
 		
 		//check if there is something to cut away
-		int startSlice = topSurface + mRSO.cutAwayFromTop;
+		int startSlice = topSurface + mRSO.cutAwayOrAdd2RefLayer;
 		mFC.startSlice = startSlice;
 		int stopSlice = botSurface - mRSO.cutAwayFromBottom;
 		if (mRSO.cutZPercent) {
-			startSlice = (int)Math.round((float)mRSO.cutAwayFromTop / 100f * (float)mFC.nOfSlices);
+			startSlice = (int)Math.round((float)mRSO.cutAwayOrAdd2RefLayer / 100f * (float)mFC.nOfSlices);
 			stopSlice = mFC.nOfSlices - (int)Math.round((float)mRSO.cutAwayFromBottom / 100f * (float)mFC.nOfSlices);
 		}
 		if (mRSO.heightOfRoi > 0) stopSlice = startSlice + mRSO.heightOfRoi;

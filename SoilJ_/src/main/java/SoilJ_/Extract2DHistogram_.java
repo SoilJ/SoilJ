@@ -109,18 +109,18 @@ public class Extract2DHistogram_ extends ImagePlus implements PlugIn  {
 	    //create output paths
   		String myPreOutFolder = "";  		
   		if (mRSO.choiceOfRoi.equals("RealSample")) {	
-  			if (mRSO.heightOfRoi > 0) myPreOutFolder = "Top" + mRSO.cutAwayFromTop + "Height" + mRSO.heightOfRoi + "Wall" + mRSO.cutAwayFromWall;
+  			if (mRSO.heightOfRoi > 0) myPreOutFolder = "Top" + mRSO.cutAwayOrAdd2RefLayer + "Height" + mRSO.heightOfRoi + "Wall" + mRSO.cutAwayFromWall;
 	  			boolean isCut = false;
-	  			if (mRSO.cutAwayFromBottom > 0 | mRSO.cutAwayFromTop > 0 | mRSO.cutAwayFromWall > 0 | mRSO.cutAwayFromCenter > 0) isCut = true; 
-	  			if (isCut & mRSO.heightOfRoi > 0) myPreOutFolder = "Tv" + mRSO.cutAwayFromTop + "Height" + mRSO.heightOfRoi + "Wall" + mRSO.cutAwayFromWall;
+	  			if (mRSO.cutAwayFromBottom > 0 | mRSO.cutAwayOrAdd2RefLayer > 0 | mRSO.cutAwayFromWall > 0 | mRSO.cutAwayFromCenter > 0) isCut = true; 
+	  			if (isCut & mRSO.heightOfRoi > 0) myPreOutFolder = "Tv" + mRSO.cutAwayOrAdd2RefLayer + "Height" + mRSO.heightOfRoi + "Wall" + mRSO.cutAwayFromWall;
 	  			if (isCut & mRSO.cutZPercent & mRSO.cutXYPercent & mRSO.heightOfRoi == 0) myPreOutFolder = 
-	  					"Tp" + mRSO.cutAwayFromTop + "Bp" + mRSO.cutAwayFromBottom +	"Wp" + mRSO.cutAwayFromWall + "Cp" + mRSO.cutAwayFromCenter;
+	  					"Tp" + mRSO.cutAwayOrAdd2RefLayer + "Bp" + mRSO.cutAwayFromBottom +	"Wp" + mRSO.cutAwayFromWall + "Cp" + mRSO.cutAwayFromCenter;
 	  			if (isCut & !mRSO.cutZPercent & mRSO.cutXYPercent & mRSO.heightOfRoi == 0) myPreOutFolder = 
-	  					"Tv" + mRSO.cutAwayFromTop + "Bv" + mRSO.cutAwayFromBottom +	"Wp" + mRSO.cutAwayFromWall + "Cp" + mRSO.cutAwayFromCenter;
+	  					"Tv" + mRSO.cutAwayOrAdd2RefLayer + "Bv" + mRSO.cutAwayFromBottom +	"Wp" + mRSO.cutAwayFromWall + "Cp" + mRSO.cutAwayFromCenter;
 	  			if (isCut & mRSO.cutZPercent & !mRSO.cutXYPercent & mRSO.heightOfRoi == 0) myPreOutFolder = 
-	  					"Tp" + mRSO.cutAwayFromTop + "Bp" + mRSO.cutAwayFromBottom +	"Wv" + mRSO.cutAwayFromWall + "Cv" + mRSO.cutAwayFromCenter;
+	  					"Tp" + mRSO.cutAwayOrAdd2RefLayer + "Bp" + mRSO.cutAwayFromBottom +	"Wv" + mRSO.cutAwayFromWall + "Cv" + mRSO.cutAwayFromCenter;
 	  			if (isCut & !mRSO.cutZPercent & !mRSO.cutXYPercent & mRSO.heightOfRoi == 0) myPreOutFolder = 
-	  					"Tv" + mRSO.cutAwayFromTop + "Bv" + mRSO.cutAwayFromBottom +	"Wv" + mRSO.cutAwayFromWall + "Cv" + mRSO.cutAwayFromCenter;
+	  					"Tv" + mRSO.cutAwayOrAdd2RefLayer + "Bv" + mRSO.cutAwayFromBottom +	"Wv" + mRSO.cutAwayFromWall + "Cv" + mRSO.cutAwayFromCenter;
 	  			if (!isCut) myPreOutFolder = "InnerCircleColumn";	
 	  			  			
 	  			if (mRSO.includeSurfaceTopography) myPreOutFolder = "S_"+ myPreOutFolder;

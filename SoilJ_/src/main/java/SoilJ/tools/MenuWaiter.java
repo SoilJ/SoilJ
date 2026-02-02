@@ -229,8 +229,9 @@ public class MenuWaiter implements PlugIn {
 		public boolean cutZPercent; 
 		public boolean cutXYPercent;		
 		
+		public String referenceLayer;
 		public int heightOfRoi;
-		public int cutAwayFromTop;
+		public int cutAwayOrAdd2RefLayer;
 		public int cutAwayFromBottom;
 		
 		public int cutAwayFromWall;
@@ -1491,7 +1492,7 @@ public class MenuWaiter implements PlugIn {
 		    if (gd.wasCanceled()) return null;
 		    else {
 		    	//domain definitions		    	
-		    	mRSO.cutAwayFromTop = (int)Math.round(gd.getNextNumber());
+		    	mRSO.cutAwayOrAdd2RefLayer = (int)Math.round(gd.getNextNumber());
 		    	mRSO.cutAwayFromBottom = (int)Math.round(gd.getNextNumber());
 		    }
 	    }
@@ -1504,7 +1505,7 @@ public class MenuWaiter implements PlugIn {
 			
 			String[] choiceOfSubRoi = new String[5];
 			choiceOfSubRoi[0] = "The entire soil column";
-			choiceOfSubRoi[1] = "The central part of the soil column (define depth under soil surface and column height in voxel)";
+			choiceOfSubRoi[1] = "The central part of the soil column (define reference layer and column height in voxel)";
 			choiceOfSubRoi[2] = "The central part of the soil column (define number of voxels to be cut away from top and/or bottom)";
 			choiceOfSubRoi[3] = "The central part of the soil column (define percentage to be cut away from top and/or bottom)";
 			choiceOfSubRoi[4] = "The top or bottom half of the soil column";
@@ -1539,7 +1540,7 @@ public class MenuWaiter implements PlugIn {
     			mRSO.cutXYPercent = false;
     			
     			mRSO.cutAwayFromBottom = 0;
-    			mRSO.cutAwayFromTop = 0;
+    			mRSO.cutAwayOrAdd2RefLayer = 0;
     			mRSO.cutAwayFromCenter = 0;
     			mRSO.cutAwayFromWall = 0;
     			mRSO.heightOfRoi = 0;
@@ -1554,20 +1555,30 @@ public class MenuWaiter implements PlugIn {
 		    
 		    	switch (myChoiceIndex) {
 		    		case 0: {
-		    			mRSO.choiceOfZRoi = "everything";		    			
+		    			mRSO.choiceOfZRoi = "everything";	
+		    			mRSO.referenceLayer = "none";
 		    			break;
 		    		}
 		    		case 1: {
 		    			
 		    			mRSO.choiceOfZRoi = "fixedHeight";		    			
+		    			
 		    			GenericDialog gd3 = new GenericDialog("Please tell me more!");
-		    			gd3.addNumericField("Cut away from top", 0, 0, 5, "voxel");
-		    			gd3.addNumericField("Column height", 0, 0, 5, "voxel");
+		    			
+		    			String[] referenceLayer = new String[3];
+		    			referenceLayer[0] = "Topmost layer of image";
+		    			referenceLayer[1] = "Bottommost layer of image";
+		    			referenceLayer[2] = "Vertical center of image";	    			
+		    			gd3.addRadioButtonGroup("Please choose a reference reference layer for your ROI", referenceLayer, 3, 1, referenceLayer[0]);
+		    					    			
+		    			gd3.addNumericField("Cut away from or add to reference layer", 0, 0, 5, "voxel");
+		    			gd3.addNumericField("ROI height", 0, 0, 5, "voxel");
 		    			
 		    			gd3.showDialog();
 		    		    if (gd3.wasCanceled()) return null;
 		    		    else {
-		    		    	mRSO.cutAwayFromTop = (int) Math.round(gd3.getNextNumber());
+		    		    	mRSO.referenceLayer = gd3.getNextRadioButton();
+		    		    	mRSO.cutAwayOrAdd2RefLayer = (int) Math.round(gd3.getNextNumber());
 		    		    	mRSO.heightOfRoi = (int) Math.round(gd3.getNextNumber());
 		    		    }
 		    		
@@ -1585,9 +1596,10 @@ public class MenuWaiter implements PlugIn {
 		    			gd3.showDialog();
 		    		    if (gd3.wasCanceled()) return null;
 		    		    else {
-		    		    	mRSO.cutAwayFromTop = (int) Math.round(gd3.getNextNumber());
+		    		    	mRSO.cutAwayOrAdd2RefLayer = (int) Math.round(gd3.getNextNumber());
 		    		    	mRSO.cutAwayFromBottom = (int) Math.round(gd3.getNextNumber());
 		    		    	mRSO.heightOfRoi = 0;
+		    		    	mRSO.referenceLayer = "none";
 		    		    }	    		    
 		    			
 		    			break;
@@ -1603,9 +1615,10 @@ public class MenuWaiter implements PlugIn {
 		    		    if (gd3.wasCanceled()) return null;
 		    		    else {
 		    		    	mRSO.cutZPercent = true;
-		    		    	mRSO.cutAwayFromTop = (int) Math.round(gd3.getNextNumber());
+		    		    	mRSO.cutAwayOrAdd2RefLayer = (int) Math.round(gd3.getNextNumber());
 		    		    	mRSO.cutAwayFromBottom = (int) Math.round(gd3.getNextNumber());
 		    		    	mRSO.heightOfRoi = 0;
+		    		    	mRSO.referenceLayer = "none";
 		    		    }
 		    			break;
 		    		}
@@ -1632,16 +1645,18 @@ public class MenuWaiter implements PlugIn {
 		    		    	switch (myChoiceIndex) {
 		    		    		case 0: {
 		    		    			mRSO.cutZPercent = true;
-				    		    	mRSO.cutAwayFromTop = 0;
+				    		    	mRSO.cutAwayOrAdd2RefLayer = 0;
 				    		    	mRSO.cutAwayFromBottom = 50;		
 				    		    	mRSO.heightOfRoi = 0;
+				    		    	mRSO.referenceLayer = "none";
 		    		    			break;
 		    		    		}
 		    		    		case 1: {
 		    		    			mRSO.cutZPercent = true;
-				    		    	mRSO.cutAwayFromTop = 50;
+				    		    	mRSO.cutAwayOrAdd2RefLayer = 50;
 				    		    	mRSO.cutAwayFromBottom = 0;	
 				    		    	mRSO.heightOfRoi = 0;
+				    		    	mRSO.referenceLayer = "none";
 		    		    			break;
 		    		    		}
 		    		    	}

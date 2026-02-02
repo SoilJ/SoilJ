@@ -68,23 +68,23 @@ public class RoiHandler implements PlugIn {
 		ObjectDetector jOD = new ObjectDetector();
 		ObjectDetector.ColCoords3D outCo = jOD.new ColCoords3D();
 		
-		int cFT = mRSO.cutAwayFromTop;
+		int cFT = mRSO.cutAwayOrAdd2RefLayer;
 		int iHeight = mRSO.heightOfRoi;
 		
 		//check if height of ROI is definedin percent of original height
 		if (iHeight == 0) {
 			if (mRSO.cutZPercent == true) {
-				if ((mRSO.cutAwayFromTop == 50 & mRSO.cutAwayFromBottom == 0) | (mRSO.cutAwayFromTop == 0 & mRSO.cutAwayFromBottom == 50)) {							
+				if ((mRSO.cutAwayOrAdd2RefLayer == 50 & mRSO.cutAwayFromBottom == 0) | (mRSO.cutAwayOrAdd2RefLayer == 0 & mRSO.cutAwayFromBottom == 50)) {							
 					iHeight = inCo.xmid.length / 2;
-					if (mRSO.cutAwayFromTop == 50) cFT = inCo.xmid.length / 2 - 1; 
+					if (mRSO.cutAwayOrAdd2RefLayer == 50) cFT = inCo.xmid.length / 2 - 1; 
 				}			
 				else {
-					iHeight = inCo.xmid.length - (mRSO.cutAwayFromTop + mRSO.cutAwayFromBottom) * inCo.xmid.length / 100;
-					cFT = inCo.xmid.length - mRSO.cutAwayFromTop * inCo.xmid.length / 100;
+					iHeight = inCo.xmid.length - (mRSO.cutAwayOrAdd2RefLayer + mRSO.cutAwayFromBottom) * inCo.xmid.length / 100;
+					cFT = inCo.xmid.length - mRSO.cutAwayOrAdd2RefLayer * inCo.xmid.length / 100;
 				}
 			}
 			else {
-				iHeight = inCo.xmid.length - mRSO.cutAwayFromTop - mRSO.cutAwayFromBottom;
+				iHeight = inCo.xmid.length - mRSO.cutAwayOrAdd2RefLayer - mRSO.cutAwayFromBottom;
 			}
 		}
 		
@@ -520,8 +520,8 @@ public class RoiHandler implements PlugIn {
 		boolean hasSurface = mRSO.includeSurfaceTopography;
 				
 		//check if mFC and mRSO values match
-		if (mRSO.cutAwayFromTop != mFC.startSlice) mFC.startSlice = mRSO.cutAwayFromTop;
-		if (mRSO.cutAwayFromBottom > 0 & mRSO.cutAwayFromBottom != nowTiff.getNSlices() - mFC.stopSlice) mFC.stopSlice = nowTiff.getNSlices() - mRSO.cutAwayFromBottom;
+		//if (mRSO.cutAwayOrAdd2RefLayer != mFC.startSlice) mFC.startSlice = mRSO.cutAwayOrAdd2RefLayer;
+		//if (mRSO.cutAwayFromBottom > 0 & mRSO.cutAwayFromBottom != nowTiff.getNSlices() - mFC.stopSlice) mFC.stopSlice = nowTiff.getNSlices() - mRSO.cutAwayFromBottom;
 		
 		//binarize4 if necessary
 		nowTiff = jIM.extractPhaseOfInterest(nowTiff, imagePhase2BeAnalyzed, nameOfAnalyzedPhase);	
@@ -618,7 +618,7 @@ public class RoiHandler implements PlugIn {
 	// + + + + + + + + + + if the ROI is defined by the choice of layer below the surface
 	// + + + + + + + + + + and the height of the ROI
 			
-			if ((mRSO.cutAwayFromTop > 0 & mRSO.cutAwayFromBottom == 0 ) & 
+			if ((mRSO.cutAwayOrAdd2RefLayer > 0 & mRSO.cutAwayFromBottom == 0 ) & 
 					mRSO.includeSurfaceTopography & mRSO.heightOfRoi > 0 & mRSO.heightOfRoi < 4000) {  // ROI below top and height of column
 				
 				//assign soil top and bottom surfaces		
@@ -649,7 +649,7 @@ public class RoiHandler implements PlugIn {
 			} // if ROI below top and height of column
 			
 			//if only bottom voxels need to be removed below surface
-			if ((mRSO.cutAwayFromTop > 0 & mRSO.cutAwayFromBottom == 0 ) & mRSO.includeSurfaceTopography & (mRSO.heightOfRoi == 0 | mRSO.heightOfRoi > 4000)) {
+			if ((mRSO.cutAwayOrAdd2RefLayer > 0 & mRSO.cutAwayFromBottom == 0 ) & mRSO.includeSurfaceTopography & (mRSO.heightOfRoi == 0 | mRSO.heightOfRoi > 4000)) {
 				
 				//assign soil top and bottom surfaces		
 				ImageStack surStack = soilSurface.getStack();						
@@ -676,7 +676,7 @@ public class RoiHandler implements PlugIn {
 			}
 			
 			//if only top voxels need to be removed below surface
-			if ((mRSO.cutAwayFromTop == 0 & mRSO.cutAwayFromBottom > 0 ) & mRSO.includeSurfaceTopography & (mRSO.heightOfRoi == 0 | mRSO.heightOfRoi > 4000)) {
+			if ((mRSO.cutAwayOrAdd2RefLayer == 0 & mRSO.cutAwayFromBottom > 0 ) & mRSO.includeSurfaceTopography & (mRSO.heightOfRoi == 0 | mRSO.heightOfRoi > 4000)) {
 				
 				//assign soil top and bottom surfaces		
 				ImageStack surStack = soilSurface.getStack();
@@ -704,7 +704,7 @@ public class RoiHandler implements PlugIn {
 			}
 			
 			//if both soil surfaces should be included
-			if (mRSO.cutAwayFromTop == 0 & mRSO.includeSurfaceTopography & mRSO.cutAwayFromBottom == 0 & (mRSO.heightOfRoi == 0 | mRSO.heightOfRoi > 4000)) {
+			if (mRSO.cutAwayOrAdd2RefLayer == 0 & mRSO.includeSurfaceTopography & mRSO.cutAwayFromBottom == 0 & (mRSO.heightOfRoi == 0 | mRSO.heightOfRoi > 4000)) {
 				
 				//assign soil top and bottom surfaces		
 				ImageStack surStack = soilSurface.getStack();
@@ -888,7 +888,7 @@ public class RoiHandler implements PlugIn {
 			mRSO.choiceOfRoi = "RealSample";
 			
 			//if there is a surface File, also cut this one..
-			if (mRSO.includeSurfaceTopography & (mRSO.cutAwayFromTop > 0 | mRSO.cutAwayFromBottom > 0)) {
+			if (mRSO.includeSurfaceTopography & (mRSO.cutAwayOrAdd2RefLayer > 0 | mRSO.cutAwayFromBottom > 0)) {
 				
 				ImageStack cutStackS = new ImageStack(maxX-minX, maxY-minY);
 					
@@ -900,7 +900,7 @@ public class RoiHandler implements PlugIn {
 					
 					int[] myHist = nowIP.getHistogram();					
 					int surfMedian = hist.findMedianFromHistogram(myHist);									
-					int roiStartsAt = surfMedian + mRSO.cutAwayFromTop;		
+					int roiStartsAt = surfMedian + mRSO.cutAwayOrAdd2RefLayer;		
 					
 					if (i == 0)	roiEnds = roiStartsAt + mRSO.heightOfRoi;
 					
@@ -1026,13 +1026,13 @@ public class RoiHandler implements PlugIn {
 
 		//save the cut-out samples		
 		if (mRSO.saveROI) {
-			if (mRSO.cutAwayFromTop > 0 | mRSO.cutAwayFromWall > 0 | mRSO.choiceOfRoi.equals("RealSample")) {			
+			if (mRSO.cutAwayOrAdd2RefLayer > 0 | mRSO.cutAwayFromWall > 0 | mRSO.choiceOfRoi.equals("RealSample")) {			
 				jIO.tiffSaver(mFC.myPreOutFolder, imgName + ".tif", outTiffs[0]);						
 			}
-			if (mRSO.cutAwayFromTop == 0 & mRSO.choiceOfRoi.equals("RealSample") & !mRSO.includeSurfaceTopography) {
+			if (mRSO.cutAwayOrAdd2RefLayer == 0 & mRSO.choiceOfRoi.equals("RealSample") & !mRSO.includeSurfaceTopography) {
 				jIO.tiffSaver(mFC.myPreOutFolder, imgName + ".tif", outTiffs[0]);						
 			}
-			if (mRSO.cutAwayFromTop == 0 & mRSO.choiceOfRoi.equals("RealSample") & mRSO.includeSurfaceTopography) {
+			if (mRSO.cutAwayOrAdd2RefLayer == 0 & mRSO.choiceOfRoi.equals("RealSample") & mRSO.includeSurfaceTopography) {
 				String thicknessTiffLocation = mFC.myPreOutFolder + pathSep + "Tiff4ThicknessAnalyses";
 				new File(thicknessTiffLocation).mkdir();
 				jIO.tiffSaver(thicknessTiffLocation, imgName + ".tif", outTiffs[1]);
