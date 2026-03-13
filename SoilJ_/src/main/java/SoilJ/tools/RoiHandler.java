@@ -727,7 +727,7 @@ public class RoiHandler implements PlugIn {
 			
 			}		
 			
-			//if no surface topographie should be included
+			//if no surface topography should be included
 			if (!mRSO.includeSurfaceTopography) { 
 					
 				outTiffs[0] = nowTiff;			
@@ -798,6 +798,8 @@ public class RoiHandler implements PlugIn {
 		
 			for (int i = 0 ; i < outTiffs[0].getNSlices() ; i++) {
 				
+				int test = outTiffs[0].getNSlices();
+				
 				outTiffs[0].setPosition(i+1);
 				ImageProcessor nowIP = outTiffs[0].getProcessor().duplicate();
 				
@@ -822,8 +824,8 @@ public class RoiHandler implements PlugIn {
 
 				//cut away from wall or cut out column with defined radius				
 				if (GandS[0].contains("Gauge")) {					
-					ixmid[i] = colRoi.jCO.xmid[i + mFC.startSlice] - cutRoi.getXBase();						
-					iymid[i] = colRoi.jCO.ymid[i + mFC.startSlice] - cutRoi.getYBase();
+					ixmid[i] = colRoi.jCO.xmid[i + mFC.startSlice - 1] - cutRoi.getXBase();						
+					iymid[i] = colRoi.jCO.ymid[i + mFC.startSlice - 1] - cutRoi.getYBase();
 					if (mRSO.keepRadiusFromCenter > 0) {
 						innerMajorRadius[i] = mRSO.keepRadiusFromCenter;
 						innerMinorRadius[i] = mRSO.keepRadiusFromCenter;
@@ -831,14 +833,14 @@ public class RoiHandler implements PlugIn {
 						outerMinorRadius[i] = mRSO.keepRadiusFromCenter + 1;						
 					}
 					else {
-						innerMajorRadius[i] = colRoi.jCO.innerMajorRadius[i + mFC.startSlice] - mRSO.cutAwayFromWall;
-						innerMinorRadius[i] = colRoi.jCO.innerMinorRadius[i + mFC.startSlice] - mRSO.cutAwayFromWall;
-						outerMajorRadius[i] = colRoi.jCO.outerMajorRadius[i + mFC.startSlice] - mRSO.cutAwayFromWall;
-						outerMinorRadius[i] = colRoi.jCO.outerMinorRadius[i + mFC.startSlice] - mRSO.cutAwayFromWall;
+						innerMajorRadius[i] = colRoi.jCO.innerMajorRadius[i + mFC.startSlice - 1] - mRSO.cutAwayFromWall;
+						innerMinorRadius[i] = colRoi.jCO.innerMinorRadius[i + mFC.startSlice - 1] - mRSO.cutAwayFromWall;
+						outerMajorRadius[i] = colRoi.jCO.outerMajorRadius[i + mFC.startSlice - 1] - mRSO.cutAwayFromWall;
+						outerMinorRadius[i] = colRoi.jCO.outerMinorRadius[i + mFC.startSlice - 1] - mRSO.cutAwayFromWall;
 					}
 					
-					theta[i] = colRoi.jCO.theta[i + mFC.startSlice];
-					wallThickness[i] = colRoi.jCO.wallThickness[i + mFC.startSlice];
+					theta[i] = colRoi.jCO.theta[i + mFC.startSlice - 1];
+					wallThickness[i] = colRoi.jCO.wallThickness[i + mFC.startSlice - 1];
 					nowZ[i] = i + 1;
 					dummy[i] = 0;
 				}

@@ -1287,7 +1287,7 @@ public class ImageManipulator implements PlugIn {
   public ImagePlus extractBioPoresfromBinaryImage(InputOutput.MyFileCollection mFC, ImagePlus nowTiff, MenuWaiter.BioPoreExtractionOptions mBEO) {
 		
 		ImageCalculator iC = new ImageCalculator();
-		Dilate_ dil = new Dilate_();
+		Dilate_ dil = new Dilate_();		
 		
 		int dyn = 2;
 		double thresholdVesselness = mBEO.thresholdVesselness; 
