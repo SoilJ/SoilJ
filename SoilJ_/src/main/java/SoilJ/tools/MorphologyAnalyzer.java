@@ -760,6 +760,9 @@ public class MorphologyAnalyzer implements PlugIn {
 		//create a distance map
 		IJ.showStatus("Performing Euklidean distance transform ...");
 		
+		//colRoi.nowTiff.updateAndDraw();
+		//colRoi.nowTiff.show();
+		
 		float[] floatWeights = ChamferWeights3D.BORGEFORS.getFloatWeights();
 		boolean normalize = true;
 		DistanceTransform3D dt = new DistanceTransform3DFloat(floatWeights, normalize);
@@ -775,21 +778,7 @@ public class MorphologyAnalyzer implements PlugIn {
 			for (int i = 0 ; i < distTiff.getNSlices() ; i++) {
 				
 				distTiff.setPosition(i+1);
-				ImageProcessor nowIP = distTiff.getProcessor();		
-				
-				//select ROI.. cut ROI is not yet implemented to be updated for PoreSpaceAnalyzer
-				/*
-				 * if (mPSA.mRSO.choiceOfRoi.equals("RealSample")) {
-				 * 
-				 * //remove voxels outside ROI nowIP.setRoi(colRoi.pRoi[i]); nowIP.setColor(0);
-				 * nowIP.fillOutside(colRoi.pRoi[i]);
-				 * 
-				 * ImagePlus dodo = new ImagePlus("", nowIP); dodo.updateAndDraw();dodo.show();
-				 * 
-				 * //also remove voxels inside inner Roi, is selected if
-				 * (mPSA.mRSO.cutAwayFromCenter > 0) { nowIP.setRoi(colRoi.iRoi[i]);
-				 * nowIP.setColor(0); nowIP.fill(colRoi.iRoi[i]); } } else {
-				 */
+				ImageProcessor nowIP = distTiff.getProcessor();
 					
 				OvalRoi cutRoi = new OvalRoi(0,0, distTiff.getWidth(), distTiff.getHeight());
 				
