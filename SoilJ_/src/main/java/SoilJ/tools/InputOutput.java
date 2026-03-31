@@ -4253,21 +4253,16 @@ public class InputOutput extends ImagePlus implements PlugIn {
 		if (mRSO.choiceOfRoi.equalsIgnoreCase("Cuboid")) mRSO.cutAwayOrAdd2RefLayer = mRSO.cubeZ1 - 1; 
 		
 		if (mRSO.choiceOfRoi.equalsIgnoreCase("Cylinder")) {			
-			mRSO.cutAwayOrAdd2RefLayer = mRSO.cylZ1; 
-			startSlice = mRSO.cylZ1;
-			stopSlice = mRSO.cylZ2;			
-			if (stopSlice == 0 & mRSO.cutAwayFromBottom > 0) stopSlice = mFC.nOfSlices - mRSO.cutAwayFromBottom;
-			else if (stopSlice == 0) stopSlice = mFC.nOfSlices;
-			
+			if (mRSO.cylZ1 > 0) startSlice = startSlice + mRSO.cylZ1;
+			if (mRSO.cylZ2 > 0) stopSlice = stopSlice - mRSO.cylZ1;			
 		}
 		if (mRSO.cutAwayOrAdd2RefLayer < 0) mRSO.cutAwayOrAdd2RefLayer = 0;
 		if (startSlice == 0) startSlice = 0; 			
 		
 		if (mRSO.cutZPercent) {
-			startSlice = (int)Math.round((float)mRSO.cutAwayOrAdd2RefLayer / 100f * (float)mFC.nOfSlices);
-			if (startSlice == 0) startSlice = 0; 
-			if (mRSO.cutAwayFromBottom == 0) stopSlice = mFC.nOfSlices;
-			else stopSlice = mFC.nOfSlices - (int)Math.round((float)mRSO.cutAwayFromBottom / 100f * (float)mFC.nOfSlices);
+			int topCut = (int)Math.round((float)mRSO.cutAwayOrAdd2RefLayer / 100f * (float)mFC.nOfSlices);
+			if (topCut > 0) startSlice = startSlice + topCut;
+			if (mRSO.cutAwayFromBottom > 0) stopSlice = stopSlice - (int)Math.round((float)mRSO.cutAwayFromBottom / 100f * (float)mFC.nOfSlices);			
 		}
 		//if (mRSO.heightOfRoi > 0) stopSlice = startSlice + mRSO.heightOfRoi;
 				
@@ -4344,19 +4339,18 @@ public class InputOutput extends ImagePlus implements PlugIn {
             //open file
 			BufferedWriter w = null;			
 			w = new BufferedWriter(new FileWriter(savePath,false));
-				
-			String colName = mFC.colName;
-			String nowLine = colName + "\t";
+						
+			String nowLine = "voxel_value" + "\t";
+			nowLine += "frequency" + "\n";
 			
-			IJ.showStatus("Saving histogram of file " + colName + " into histogram folder..");
+			IJ.showStatus("Saving histogram of file " + mFC.colName+ " into histogram folder..");
 			
-			for (int column = 0 ; column < (int)Math.round(Math.pow(2, mFC.bitDepth)) - 1 ; column++) {
+			for (int column = 0 ; column < (int)Math.round(Math.pow(2, 16)) - 1 ; column++) {
 				
-				nowLine += Integer.toString(myHist[column]) + "\t";
+				nowLine += Integer.toString(column) + "\t";
+				nowLine += Integer.toString(myHist[column]) + "\n";
 				
 			}
-			
-			nowLine += Integer.toString(myHist[(int)Math.round(Math.pow(2, mFC.bitDepth)) - 1 ]) + "\n";
 			
 			w.write(nowLine);
 			w.flush();
@@ -4534,16 +4528,17 @@ public class InputOutput extends ImagePlus implements PlugIn {
 			BufferedWriter w = null;			
 			w = new BufferedWriter(new FileWriter(savePath,false));
 		
-			String colName = "JointHistogram";
-			String nowLine = colName + "\t";
+			String nowLine = "voxel_value" + "\t";
+			nowLine += "frequency" + "\n";
 			
-			for (int i = 0 ; i < myHist.length - 1 ; i++) {
-								
-				nowLine += Integer.toString(myHist[i]) + "\t";
-					
-			}
+			IJ.showStatus("Saving histogram of file " + mFC.colName+ " into histogram folder..");
+			
+			for (int column = 0 ; column < (int)Math.round(Math.pow(2, 16)) - 1 ; column++) {
 				
-			nowLine += Integer.toString(myHist[myHist.length - 1]) + "\n";
+				nowLine += Integer.toString(column) + "\t";
+				nowLine += Integer.toString(myHist[column]) + "\n";
+				
+			}
 				
 			w.write(nowLine);
 			w.close();

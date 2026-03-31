@@ -1775,8 +1775,8 @@ public class MenuWaiter implements PlugIn {
 
 	    if (mRSO.choiceOfRoi.equalsIgnoreCase("Cylinder")) {
 				    	
-			gd.addNumericField("Z-coordinate of cylinder top ", 0, 0, 6, "");
-			gd.addNumericField("Z-coordinate of cylinder bottom ", 0, 0, 6, "(leave 0 if you want to analyze all slices or if you want to cut away slices from the bottom)");
+			gd.addNumericField("number of slices you want to cut away from top ", 0, 0, 6, "");
+			gd.addNumericField("number of slices you want to cut away from bottom ", 0, 0, 6, "");
 			gd.addMessage(" ");
 			gd.addNumericField("Alternatively, specify how many slices you want to cut away from the bottom ", 0, 0, 6, "(leave 0 if you want to analyze all slices or specify a Z-coordinate)");
 	    	
@@ -1804,6 +1804,9 @@ public class MenuWaiter implements PlugIn {
 		    if (gd.wasCanceled()) return null;
 		    else {
 
+		    	//add standard reference layer
+		    	mRSO.referenceLayer = "Topmost layer of image";
+		    	
 		    	//domain definitions
 		    	mRSO.cylZ1 = (int)Math.round(gd.getNextNumber());
 		    	mRSO.cylZ2 = (int)Math.round(gd.getNextNumber());
@@ -1831,7 +1834,10 @@ public class MenuWaiter implements PlugIn {
 		    if (gd.wasCanceled()) return null;
 		    else {
 	
-		    	//domain definitions
+		    	//add standard reference layer
+		    	mRSO.referenceLayer = "Topmost layer of image";
+		    	
+		    	//domain definitions		    	
 		    	mRSO.cubeX1 = (int)Math.round(gd.getNextNumber());
 		    	mRSO.cubeX2 = (int)Math.round(gd.getNextNumber());
 		    	mRSO.cubeY1 = (int)Math.round(gd.getNextNumber());

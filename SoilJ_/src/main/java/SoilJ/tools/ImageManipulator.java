@@ -4026,6 +4026,10 @@ public class ImageManipulator implements PlugIn {
 			ImageProcessor gradIP = gradTiff.getProcessor();
 			ImageProcessor purgedIP = new ByteProcessor(nowTiff.getWidth(), nowTiff.getHeight());
 			
+			//nowTiff.updateAndDraw();nowTiff.show();
+			//gradTiff.updateAndDraw();gradTiff.show();
+			//closedTiff.updateAndDraw();closedTiff.show();
+			
 			for (int x = 0 ; x < nowTiff.getWidth() ; x++) {		
 				for (int y = 0 ; y < nowTiff.getHeight() ; y++) {					
 					int nowgray = (int)nowIP.getPixelValue(x, y);

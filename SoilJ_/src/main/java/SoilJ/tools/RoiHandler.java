@@ -511,9 +511,7 @@ public class RoiHandler implements PlugIn {
 		RollerCaster rC = new RollerCaster();
 		ColumnRoi colRoi = new ColumnRoi();				// contains ColCoords3D, PolygonRoi pRoi & iRoi, nowTiff, surfaceNotCut (ImagePlus)
 		
-		//init some important variables
-		int startSlice = 0;
-		int stopSlice = nowTiff.getNSlices();		
+		//init some important variables	
 		ImagePlus[] outTiffs = new ImagePlus[2];		
 		String imgName = mFC.colName;
 		double area = 0;
@@ -933,9 +931,7 @@ public class RoiHandler implements PlugIn {
 		}
 		
 		if (!mRSO.choiceOfRoi.equals("RealSample")) {
-			
-			startSlice = 0;
-			stopSlice = nowTiff.getNSlices();
+	
 			
 			ImagePlus outTiff = new ImagePlus();
 			
@@ -962,11 +958,8 @@ public class RoiHandler implements PlugIn {
 				if (mRSO.areaOfInterest == 0) area = nowTiff.getWidth() * nowTiff.getHeight();
 				else area = mRSO.areaOfInterest;
 				
-				startSlice = 0;
-				stopSlice = nowTiff.getNSlices();
-				
-				if (mRSO.choiceOfRoi.equals("TopOfEveryThing")) stopSlice = (int)Math.round(stopSlice / 2);
-				if (mRSO.choiceOfRoi.equals("BottomOfEveryThing")) startSlice = (int)Math.round(stopSlice / 2);
+				if (mRSO.choiceOfRoi.equals("TopOfEveryThing")) mFC.stopSlice = (int)Math.round(mFC.stopSlice / 2);
+				if (mRSO.choiceOfRoi.equals("BottomOfEveryThing")) mFC.startSlice = (int)Math.round(mFC.stopSlice / 2);
 				
 			}
 			
@@ -982,7 +975,7 @@ public class RoiHandler implements PlugIn {
 			int[] imageDimensions = {nowTiff.getWidth(), nowTiff.getHeight()};
 			
 			PolygonRoi pRoi = makeMeAnIndependentRoi(imageDimensions, mRSO);
-			PolygonRoi[] pRoiOut = new PolygonRoi[stopSlice - startSlice];
+			PolygonRoi[] pRoiOut = new PolygonRoi[mFC.stopSlice - mFC.startSlice];
 			
 			ImageStack roiStack = new ImageStack(imageDimensions[0], imageDimensions[1]);
 			if (mRSO.cutCanvas) roiStack = new ImageStack(pRoi.getBounds().width, pRoi.getBounds().height);
@@ -991,10 +984,10 @@ public class RoiHandler implements PlugIn {
 			//IJ.showMessage(mPSA.cubeX1 + " --- " + mPSA.cubeX2);
 			//IJ.showMessage(mPSA.cubeY1 + " --- " + mPSA.cubeY2);
 			
-			for (int i = startSlice ; i < stopSlice ; i++) {
+			for (int i = mFC.startSlice ; i < mFC.stopSlice ; i++) {
 				
-				nowTiff.setPosition(i + 1);
-				IJ.showStatus("Compiling cut-out slice #" + (i + 1 - startSlice));
+				nowTiff.setPosition(i);
+				IJ.showStatus("Compiling cut-out slice #" + (i + 1 - mFC.startSlice));
 				
 				ImageProcessor modIP = nowTiff.getProcessor().duplicate();
 				modIP.setRoi(pRoi);
@@ -1010,7 +1003,7 @@ public class RoiHandler implements PlugIn {
 				}
 				else roiStack.addSlice(modIP);
 				
-				pRoiOut[i] = pRoi;
+				pRoiOut[i-1] = pRoi;
 			}
 			
 			if (!mRSO.choiceOfRoi.equals("Everything!")) {

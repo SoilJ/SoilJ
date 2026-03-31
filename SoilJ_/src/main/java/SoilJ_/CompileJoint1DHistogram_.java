@@ -91,7 +91,10 @@ public class CompileJoint1DHistogram_ extends ImagePlus implements PlugIn  {
 		mFC = jIO.addCurrentFileInfo(mFC);
 		mFC.myHistogramFolder = mFC.myOutFolder;
 		
-		float[][] allHists = new float[mFC.myTiffs.length][(int)Math.round(Math.pow(2, mFC.bitDepth))];
+		//init variables
+		int appliedBitDepth = mFC.bitDepth;
+		if (appliedBitDepth > 16) appliedBitDepth = 16;
+		float[][] allHists = new float[mFC.myTiffs.length][(int)Math.round(Math.pow(2, appliedBitDepth))];
 		
 		//loop over 3D images
 		for (i = 0 ; i < mFC.myTiffs.length ; i++) {  //myTiffs.length
@@ -102,7 +105,11 @@ public class CompileJoint1DHistogram_ extends ImagePlus implements PlugIn  {
 			//write imageProperties in folder collection
 			mFC.fileName = mFC.myTiffs[i];
 			if (mFC.bitDepth == 16) mFC = jIO.addCurrentFileInfo(mFC);
-			else mFC = jIO.addCurrentFileInfo8Bit(mFC);
+			else {
+				if (mFC.bitDepth == 32) mFC = jIO.addCurrentFileInfo(mFC);
+				else mFC = jIO.addCurrentFileInfo8Bit(mFC);
+			}
+			
 			
 			//load file                                                                                                               
 			int[] startStopSlices = jIO.findStartAndStopSlices(mFC, mRSO);			
@@ -123,15 +130,13 @@ public class CompileJoint1DHistogram_ extends ImagePlus implements PlugIn  {
 			//try to free up some memory			
 			IJ.freeMemory();IJ.freeMemory();		
 			
-			//apply segmentation	
-			int[] histo = new int[(int)Math.pow(2, mFC.bitDepth)];
+			//apply segmentation
+			int[] histo = new int[(int)Math.pow(2, appliedBitDepth)];
+			if (mFC.bitDepth == 8) histo = hist.extractHistograms8(colRoi.nowTiff);
 			if (mFC.bitDepth == 16) histo = hist.extractHistograms16(colRoi.nowTiff);
-			else {
-				if (mFC.bitDepth == 32) histo = hist.extract32BitHisto(colRoi.nowTiff);			
-				else histo = hist.extractHistograms8(mFC, colRoi.nowTiff);
-			}
-			
-			for (int j = 0 ; j < (int)Math.round(Math.pow(2, mFC.bitDepth)) - 1 ; j++) {
+			if (mFC.bitDepth == 32) histo = hist.extractHistograms32(colRoi.nowTiff);			
+
+			for (int j = 0 ; j < (int)Math.round(Math.pow(2, appliedBitDepth)) - 1 ; j++) {
 				allHists[i][j] = (float)histo[j];
 			}
 
@@ -144,8 +149,8 @@ public class CompileJoint1DHistogram_ extends ImagePlus implements PlugIn  {
 		
 		//smnooth histogram
 		double[] jh = rC.castFloat2Double(jHisto.jHisto);		
-		double[] sh = math.linearLOESSFilter(jh, mFC.bitDepth);
-		sh = math.linearLOESSFilter(sh, mFC.bitDepth);
+		double[] sh = math.linearLOESSFilter(jh, appliedBitDepth);
+		sh = math.linearLOESSFilter(sh, appliedBitDepth);
 		float[] sJHisto = rC.castDouble2Float(sh); 
 		
 		//calculate thresholds
@@ -156,8 +161,8 @@ public class CompileJoint1DHistogram_ extends ImagePlus implements PlugIn  {
 		
 		//save histogram
 		if (mFC.bitDepth == 8) jIO.writeJointHistogram8(mFC, rC.castFloat2Int(sJHisto));
-		if (mFC.bitDepth == 16) jIO.writeJointHistogram(mFC, rC.castFloat2Int(sJHisto));
-		
+		if (mFC.bitDepth >= 16) jIO.writeJointHistogram(mFC, rC.castFloat2Int(sJHisto));
+				
 		//plot table with thresholds
 		ResultsTable tab = new ResultsTable();
 		
