@@ -1476,6 +1476,11 @@ public class MenuWaiter implements PlugIn {
 
 	    gd.removeAll();	 
 	    
+	    if (mRSO.choiceOfRoi.equalsIgnoreCase("Everything!")) {
+	    	//add standard reference layer
+	    	mRSO.referenceLayer = "Topmost layer of image";	    	
+	    }
+	    
 	    if (mRSO.choiceOfRoi.equalsIgnoreCase("EverythingInXY")) {
 	    	
 	    	gd.addNumericField("How many slices do you want to cut away from the top? ", 0, 0, 6, "");
@@ -1491,6 +1496,9 @@ public class MenuWaiter implements PlugIn {
 			gd.showDialog();
 		    if (gd.wasCanceled()) return null;
 		    else {
+		    	//add standard reference layer
+		    	mRSO.referenceLayer = "Topmost layer of image";
+		    	
 		    	//domain definitions		    	
 		    	mRSO.cutAwayOrAdd2RefLayer = (int)Math.round(gd.getNextNumber());
 		    	mRSO.cutAwayFromBottom = (int)Math.round(gd.getNextNumber());
