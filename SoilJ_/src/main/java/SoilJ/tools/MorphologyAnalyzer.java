@@ -804,7 +804,9 @@ public class MorphologyAnalyzer implements PlugIn {
 		double maxDistance = Math.sqrt(height * height + diagonal * diagonal);
 		double[] classBounds = new double[(int)Math.round(maxDistance)];
 		for (int i = 0 ; i < classBounds.length ; i++) classBounds[i] = i;
-		extractDistanceDistro(outDistPath, distTiff, classBounds);
+		
+		//only save if it was selected in options
+		if (mPSA.calcDistance) extractDistanceDistro(outDistPath, distTiff, classBounds);
 		
 		//save average distance
 		myP.averageDistance2PhaseBoundary = calculateAverageValue(distTiff);
